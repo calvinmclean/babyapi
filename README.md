@@ -63,12 +63,58 @@ Implement custom request/response handling by implemented `Renderer` and `Binder
     curl localhost:8080/todos
     ```
 
-// TODO: Add GIFs?
+
+## Client
+
+In addition to providing the HTTP API backend, `babyapi` is also able to create a client that provides access to the base endpoints:
+
+```go
+// Create a client from an existing API struct (mostly useful for unit testing):
+client := api.Client(serverURL)
+
+// Create a client from the Resource type:
+client := babyapi.NewClient[*TODO](addr, "/todos")
+```
+
+```go
+// Create a new TODO item
+todo, err := client.Post(context.Background(), &TODO{Title: "use babyapi!"})
+
+// Get an existing TODO item by ID
+todo, err := client.Get(context.Background(), todo.GetID())
+
+// Get all incomplete TODO items
+incompleteTODOs, err := client.GetAll(context.Background(), url.Values{
+    "completed": []string{"false"},
+})
+
+// Delete a TODO item
+err := client.Delete(context.Background(), todo.GetID())
+```
+ 
+The client provides methods for interacting with the base API and `MakeRequest` and `MakeRequestWithResponse` to interact with custom routes. You can replace the underlying `http.Client` and set a request editor function that can be used to set authorization headers for a client.
+
+
+## Testing
+
+`babyapi` also makes it easy to unit test your APIs with functions that start an HTTP server with routes, execute the provided request, and return the `httptest.ResponseRecorder`.
 
 
 ## Examples
-// TODO: make markdown table describing each example
-// TODO: link to garden-app
+|                                        | Description                                                                                                                                                               | Features                                                                                                                                                                              |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Simple example](./examples/simple/)   | This is the simplest possible example of using `babyapi`. It is the same as the example in this `README`                                                                  |                                                                                                                                                                                       |
+| [TODO list](./examples/todo/)          | This example expands upon the base example to create a realistic TODO list application                                                                                    | <ul><li>Custom `PATCH` logic</li><li>Additional request validation</li><li>Automatically set `CreatedAt` field</li><li>Query parameter parsing to only show completed items</li></ul> |
+| [Nested resources](./examples/nested/) | Demonstrates how to build APIs with nested/related resources. The root resource is an `Artist` which can have `Albums` and `MusicVideos`. Then, `Albums` can have `Songs` | <ul><li>Nested API resources</li><li>Custom `ResponseWrapper` to add fields from related resources</li></ul>                                                                          |
+
+Also see a full example of an application implementing a REST API using `babyapi` in my [`automated-garden` project](https://github.com/calvinmclean/automated-garden/tree/main/garden-app).
+
+
+## Storage
+
+Currently `babyapi` only provides a map-based in-memory storage implementation, but SQL or KVS storage backends can easily be integrated by implementing the `Storage` interface.
+
+I have an example of a generic implementation using Redis for storage in my [`automated-garden` project](https://github.com/calvinmclean/automated-garden/tree/main/garden-app). It uses [`madflojo/hord`](https://github.com/madflojo/hord) to easily support different DB backends.
 
 
 ## Contributing

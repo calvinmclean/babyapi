@@ -56,8 +56,17 @@ func main() {
 	api := babyapi.NewAPI[*TODO]("TODOs", "/todos", func() *TODO { return &TODO{} })
 	api.SetGetAllFilter(func(r *http.Request) babyapi.FilterFunc[*TODO] {
 		return func(t *TODO) bool {
-			getCompleted := r.URL.Query().Get("completed") == "true"
-			return !getCompleted || (t.Completed != nil && *t.Completed)
+			getCompletedParam := r.URL.Query().Get("completed")
+			// No filtering if param is not provided
+			if getCompletedParam == "" {
+				return true
+			}
+
+			if getCompletedParam == "true" {
+				return t.Completed != nil && *t.Completed
+			}
+
+			return t.Completed == nil || !*t.Completed
 		}
 	})
 
