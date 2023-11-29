@@ -52,7 +52,7 @@ func TestBabyAPI(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			api := babyapi.NewAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} })
 			api.AddCustomRoute(chi.Route{
-				Pattern: "/action",
+				Pattern: "/teapot",
 				Handlers: map[string]http.Handler{
 					http.MethodGet: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 						w.WriteHeader(http.StatusTeapot)
@@ -61,10 +61,11 @@ func TestBabyAPI(t *testing.T) {
 			})
 
 			api.AddCustomIDRoute(chi.Route{
-				Pattern: "/action",
+				Pattern: "/teapot",
 				Handlers: map[string]http.Handler{
-					http.MethodGet: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-						w.WriteHeader(http.StatusTeapot)
+					http.MethodGet: api.GetRequestedResourceAndDo(func(r *http.Request, album *Album) (render.Renderer, *babyapi.ErrResponse) {
+						render.Status(r, http.StatusTeapot)
+						return album, nil
 					}),
 				},
 			})
@@ -93,7 +94,7 @@ func TestBabyAPI(t *testing.T) {
 			})
 
 			t.Run("ActionRoute", func(t *testing.T) {
-				req, err := http.NewRequest(http.MethodGet, client.URL("")+"/action", http.NoBody)
+				req, err := http.NewRequest(http.MethodGet, client.URL("")+"/teapot", http.NoBody)
 				require.NoError(t, err)
 				_, err = client.MakeRequest(req, http.StatusTeapot)
 				require.NoError(t, err)
@@ -101,7 +102,7 @@ func TestBabyAPI(t *testing.T) {
 
 			t.Run("ActionIDRoute", func(t *testing.T) {
 				t.Run("Successful", func(t *testing.T) {
-					req, err := http.NewRequest(http.MethodGet, client.URL(album1.GetID())+"/action", http.NoBody)
+					req, err := http.NewRequest(http.MethodGet, client.URL(album1.GetID())+"/teapot", http.NoBody)
 					require.NoError(t, err)
 					_, err = client.MakeRequest(req, http.StatusTeapot)
 					require.NoError(t, err)
