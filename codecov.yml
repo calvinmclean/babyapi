@@ -1,0 +1,8 @@
+comment:
+  layout: "header, diff, flags, components"
+
+coverage:
+  status:
+    project:
+      default:
+        threshold: 1%
