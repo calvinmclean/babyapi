@@ -51,7 +51,7 @@ func (a *API[T]) requestBodyMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, httpErr := a.GetFromRequest(r)
 		if httpErr != nil {
-			render.Render(w, r, httpErr)
+			_ = render.Render(w, r, httpErr)
 			return
 		}
 
@@ -72,7 +72,7 @@ func (a *API[T]) resourceExistsMiddleware(next http.Handler) http.Handler {
 
 		resource, httpErr := a.GetRequestedResource(r)
 		if httpErr != nil {
-			render.Render(w, r, httpErr)
+			_ = render.Render(w, r, httpErr)
 			return
 		}
 

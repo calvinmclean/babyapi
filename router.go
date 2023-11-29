@@ -60,14 +60,14 @@ func (a *API[T]) Get(w http.ResponseWriter, r *http.Request) {
 	resource, httpErr := a.GetRequestedResource(r)
 	if httpErr != nil {
 		logger.Error("error getting requested resource", "error", httpErr.Error())
-		render.Render(w, r, httpErr)
+		_ = render.Render(w, r, httpErr)
 		return
 	}
 
 	err := render.Render(w, r, a.responseWrapper(resource))
 	if err != nil {
 		logger.Error("unable to render response", "error", err)
-		render.Render(w, r, ErrRender(err))
+		_ = render.Render(w, r, ErrRender(err))
 	}
 }
 
@@ -78,7 +78,7 @@ func (a *API[T]) GetAll(w http.ResponseWriter, r *http.Request) {
 	resources, err := a.storage.GetAll(a.getAllFilter(r))
 	if err != nil {
 		logger.Error("error getting resources", "error", err)
-		render.Render(w, r, InternalServerError(err))
+		_ = render.Render(w, r, InternalServerError(err))
 		return
 	}
 	logger.Debug("responding with resources", "count", len(resources))
@@ -91,7 +91,7 @@ func (a *API[T]) GetAll(w http.ResponseWriter, r *http.Request) {
 	err = render.Render(w, r, &ResourceList[render.Renderer]{Items: items})
 	if err != nil {
 		logger.Error("unable to render response", "error", err)
-		render.Render(w, r, ErrRender(err))
+		_ = render.Render(w, r, ErrRender(err))
 	}
 }
 
@@ -188,7 +188,7 @@ func (a *API[T]) Delete(w http.ResponseWriter, r *http.Request) {
 	httpErr := a.beforeDelete(r)
 	if httpErr != nil {
 		logger.Error("error executing before func", "error", httpErr)
-		render.Render(w, r, httpErr)
+		_ = render.Render(w, r, httpErr)
 		return
 	}
 
@@ -201,18 +201,18 @@ func (a *API[T]) Delete(w http.ResponseWriter, r *http.Request) {
 		logger.Error("error deleting resource", "error", err)
 
 		if errors.Is(err, ErrNotFound) {
-			render.Render(w, r, ErrNotFoundResponse)
+			_ = render.Render(w, r, ErrNotFoundResponse)
 			return
 		}
 
-		render.Render(w, r, InternalServerError(err))
+		_ = render.Render(w, r, InternalServerError(err))
 		return
 	}
 
 	httpErr = a.afterDelete(r)
 	if httpErr != nil {
 		logger.Error("error executing after func", "error", httpErr)
-		render.Render(w, r, httpErr)
+		_ = render.Render(w, r, httpErr)
 		return
 	}
 
