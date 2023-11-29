@@ -40,12 +40,10 @@ func (t *TODO) Bind(r *http.Request) error {
 	switch r.Method {
 	case http.MethodPost:
 		t.CreatedAt = time.Now()
+		fallthrough
 	case http.MethodPut:
 		if t.Title == "" {
 			return errors.New("missing required title field")
-		}
-		if t.Description == "" {
-			return errors.New("missing required description field")
 		}
 	}
 

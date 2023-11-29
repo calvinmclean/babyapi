@@ -100,22 +100,35 @@ The client provides methods for interacting with the base API and `MakeRequest` 
 `babyapi` also makes it easy to unit test your APIs with functions that start an HTTP server with routes, execute the provided request, and return the `httptest.ResponseRecorder`.
 
 
+## Storage
+
+You can bring any storage backend to `babyapi` by implementing the `Storage` interface. By default, the API will use the built-in `MapStorage` which just uses an in-memory map.
+
+The `babyapi/storage` package provides another generic `Storage` implementation using [`madflojo/hord`](https://github.com/madflojo/hord) to support a variety of key-value store backends. `babyapi/storage` provides helper functions for initializing the `hord` client for Redis or file-based storage.
+
+```go
+db, err := storage.NewFileDB(hashmap.Config{
+    Filename: "storage.json",
+})
+db, err := storage.NewRedisDB(redis.Config{
+    Server: "localhost:6379",
+})
+
+api.SetStorage(storage.NewClient[*TODO](db, "TODO"))
+```
+
+
 ## Examples
+
 |                                        | Description                                                                                                                                                               | Features                                                                                                                                                                              |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Simple example](./examples/simple/)   | This is the simplest possible example of using `babyapi`. It is the same as the example in this `README`                                                                  |                                                                                                                                                                                       |
 | [TODO list](./examples/todo/)          | This example expands upon the base example to create a realistic TODO list application                                                                                    | <ul><li>Custom `PATCH` logic</li><li>Additional request validation</li><li>Automatically set `CreatedAt` field</li><li>Query parameter parsing to only show completed items</li></ul> |
 | [Nested resources](./examples/nested/) | Demonstrates how to build APIs with nested/related resources. The root resource is an `Artist` which can have `Albums` and `MusicVideos`. Then, `Albums` can have `Songs` | <ul><li>Nested API resources</li><li>Custom `ResponseWrapper` to add fields from related resources</li></ul>                                                                          |
+| [Storage](./examples/storage/)         | The example shows how to use the `babyapi/storage` package to implement persistent storage                                                                                | <ul><li>Use `SetStorage` to use a custom storage implementation</li><li>Create a `hord` storage client using `babyapi/storage`</li></ul>                                              |
 
 Also see a full example of an application implementing a REST API using `babyapi` in my [`automated-garden` project](https://github.com/calvinmclean/automated-garden/tree/main/garden-app).
 
 
-## Storage
-
-Currently `babyapi` only provides a map-based in-memory storage implementation, but SQL or KVS storage backends can easily be integrated by implementing the `Storage` interface.
-
-I have an example of a generic implementation using Redis for storage in my [`automated-garden` project](https://github.com/calvinmclean/automated-garden/tree/main/garden-app). It uses [`madflojo/hord`](https://github.com/madflojo/hord) to easily support different DB backends.
-
-
 ## Contributing
+
 Please open issues for bugs or feature requests and feel free to create a PR.
