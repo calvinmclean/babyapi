@@ -38,13 +38,13 @@ func (a *API[T]) GetRequestedResourceAndDo(do func(*http.Request, T) (render.Ren
 		resource, httpErr := a.GetRequestedResource(r)
 		if httpErr != nil {
 			logger.Error("error getting requested resource", "error", httpErr.Error())
-			render.Render(w, r, httpErr)
+			_ = render.Render(w, r, httpErr)
 			return
 		}
 
 		resp, httpErr := do(r, resource)
 		if httpErr != nil {
-			render.Render(w, r, httpErr)
+			_ = render.Render(w, r, httpErr)
 			return
 		}
 
@@ -56,7 +56,7 @@ func (a *API[T]) GetRequestedResourceAndDo(do func(*http.Request, T) (render.Ren
 		err := render.Render(w, r, resp)
 		if err != nil {
 			logger.Error("unable to render response", "error", err)
-			render.Render(w, r, ErrRender(err))
+			_ = render.Render(w, r, ErrRender(err))
 		}
 	}
 }
@@ -69,13 +69,13 @@ func (a *API[T]) ReadRequestBodyAndDo(do func(*http.Request, T) (T, *ErrResponse
 		resource, httpErr := a.GetFromRequest(r)
 		if httpErr != nil {
 			logger.Error("invalid request to create resource", "error", httpErr.Error())
-			render.Render(w, r, httpErr)
+			_ = render.Render(w, r, httpErr)
 			return
 		}
 
 		resp, httpErr := do(r, resource)
 		if httpErr != nil {
-			render.Render(w, r, httpErr)
+			_ = render.Render(w, r, httpErr)
 			return
 		}
 
@@ -87,7 +87,7 @@ func (a *API[T]) ReadRequestBodyAndDo(do func(*http.Request, T) (T, *ErrResponse
 		err := render.Render(w, r, a.responseWrapper(resp))
 		if err != nil {
 			logger.Error("unable to render response", "error", err)
-			render.Render(w, r, ErrRender(err))
+			_ = render.Render(w, r, ErrRender(err))
 		}
 	}
 }

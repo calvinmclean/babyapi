@@ -3,7 +3,7 @@
 ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/calvinmclean/babyapi/main.yml?branch=main)
 [![License](https://img.shields.io/github/license/calvinmclean/babyapi)](https://github.com/calvinmclean/babyapi/blob/main/LICENSE)
 [![Go Reference](https://pkg.go.dev/badge/github.com/calvinmclean/babyapi.svg)](https://pkg.go.dev/github.com/calvinmclean/babyapi)
-[![codecov](https://codecov.io/gh/calvinmclean/babyapi/branch/main/graph/badge.svg?token=20LWQYHKE8)](https://codecov.io/gh/calvinmclean/babyapi)
+[![codecov](https://codecov.io/gh/calvinmclean/babyapi/graph/badge.svg?token=BCVPF745D8)](https://codecov.io/gh/calvinmclean/babyapi)
 
 A Go CRUD API framework so simple a baby could use it.
 
