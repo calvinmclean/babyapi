@@ -74,5 +74,5 @@ func main() {
 	artistAPI.AddNestedAPI(musicVideoAPI)
 	albumAPI.AddNestedAPI(songAPI)
 
-	artistAPI.Start(":8080")
+	artistAPI.Serve(":8080")
 }

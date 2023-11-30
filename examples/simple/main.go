@@ -17,5 +17,5 @@ func main() {
 		"TODOs", "/todos",
 		func() *TODO { return &TODO{} },
 	)
-	api.Start(":8080")
+	api.RunCLI()
 }

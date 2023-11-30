@@ -46,7 +46,7 @@ Implement custom request/response handling by implemented `Renderer` and `Binder
             "TODOs", "/todos",
             func() *TODO { return &TODO{} },
         )
-        api.Start(":8080")
+        api.RunCLI()
     }
     ```
 3. Run!
@@ -54,15 +54,19 @@ Implement custom request/response handling by implemented `Renderer` and `Binder
     go mod tidy
     go run main.go
     ```
-4. Use curl to explore the API (automatic CLI coming soon!)
+4. Use the built-in CLI to interact with the API:
     ```shell
     # Create a new TODO
-    curl localhost:8080/todos -d '{"title": "Use babyapi for everything!"}'
+    go run main.go post '{"title": "use babyapi!"}'
 
     # Get all TODOs
-    curl localhost:8080/todos
+    go run main.go list
+
+    # Get TODO by ID (use ID from previous responses)
+    go run main.go get cljvfslo4020kglbctog
     ```
 
+![Simple Example](examples/simple/simple.gif)
 
 ## Client
 

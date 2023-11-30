@@ -1,11 +1,14 @@
 package babyapi_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/calvinmclean/babyapi"
@@ -42,7 +45,7 @@ func TestBabyAPI(t *testing.T) {
 		{
 			"UseAPIStart",
 			func(api *babyapi.API[*Album]) (string, func()) {
-				go api.Start(":8080")
+				go api.Serve(":8080")
 				return "http://localhost:8080", api.Stop
 			},
 		},
@@ -363,10 +366,152 @@ func TestNestedAPI(t *testing.T) {
 	})
 
 	t.Run("PatchSong", func(t *testing.T) {
-		t.Run("NotFound", func(t *testing.T) {
+		t.Run("MethodNotAllowed", func(t *testing.T) {
 			_, err := songClient.Patch(context.Background(), song1Response.GetID(), &SongResponse{Song: &Song{Title: "NewTitle"}}, artist1.GetID(), album1.GetID())
 			require.Error(t, err)
-			require.Equal(t, "error patching resource: unexpected response with text: Resource not found.", err.Error())
+			require.Equal(t, "error patching resource: unexpected response with text: Method not allowed.", err.Error())
 		})
 	})
+}
+
+func TestCLI(t *testing.T) {
+	tests := []struct {
+		name           string
+		args           []string
+		expectedRegexp string
+		expectedErr    string
+	}{
+		{
+			"MissingArgs",
+			[]string{},
+			``,
+			"at least one argument required",
+		},
+		{
+			"GetAll",
+			[]string{"list"},
+			`\[\{"id":"cljcqg5o402e9s28rbp0","title":"NewAlbum"\}\]`,
+			"",
+		},
+		{
+			"Post",
+			[]string{"post", `{"title": "OtherNewAlbum"}`},
+			`\{"id":"[0-9a-v]{20}","title":"OtherNewAlbum"\}`,
+			"",
+		},
+		{
+			"PostMissingArgs",
+			[]string{"post"},
+			``,
+			"error running client from CLI: at least one argument required",
+		},
+		{
+			"PostError",
+			[]string{"post", `bad request`},
+			``,
+			"error running client from CLI: error running Post: error posting resource: unexpected response with text: Invalid request.",
+		},
+		{
+			"Patch",
+			[]string{"patch", "cljcqg5o402e9s28rbp0", `{"title":"NewTitle"}`},
+			`\{"id":"cljcqg5o402e9s28rbp0","title":"NewTitle"\}`,
+			"",
+		},
+		{
+			"Put",
+			[]string{"put", "cljcqg5o402e9s28rbp0", `{"id":"cljcqg5o402e9s28rbp0","title":"NewAlbum"}`},
+			``,
+			"",
+		},
+		{
+			"PutError",
+			[]string{"put", "cljcqg5o402e9s28rbp0", `{"title":"NewAlbum"}`},
+			``,
+			"error running client from CLI: error running Put: error putting resource: unexpected response with text: Invalid request.",
+		},
+		{
+			"GetByID",
+			[]string{"get", "cljcqg5o402e9s28rbp0"},
+			`\{"id":"cljcqg5o402e9s28rbp0","title":"NewAlbum"\}`,
+			"",
+		},
+		{
+			"GetByIDMissingArgs",
+			[]string{"get"},
+			``,
+			"error running client from CLI: at least one argument required",
+		},
+		{
+			"Delete",
+			[]string{"delete", "cljcqg5o402e9s28rbp0"},
+			`null`,
+			"",
+		},
+		{
+			"DeleteMissingArgs",
+			[]string{"delete"},
+			``,
+			"error running client from CLI: at least one argument required",
+		},
+		{
+			"GetByIDNotFound",
+			[]string{"get", "cljcqg5o402e9s28rbp0"},
+			``,
+			"error running client from CLI: error running Get: error getting resource: unexpected response with text: Resource not found.",
+		},
+		{
+			"DeleteNotFound",
+			[]string{"delete", "cljcqg5o402e9s28rbp0"},
+			``,
+			"error running client from CLI: error running Delete: error deleting resource: unexpected response with text: Resource not found.",
+		},
+		{
+			"PatchNotFound",
+			[]string{"patch", "cljcqg5o402e9s28rbp0", ""},
+			``,
+			"error running client from CLI: error running Patch: error patching resource: unexpected response with text: Resource not found.",
+		},
+		{
+			"PatchMissingArgs",
+			[]string{"patch"},
+			``,
+			"error running client from CLI: at least two arguments required",
+		},
+		{
+			"PutMissingArgs",
+			[]string{"put"},
+			``,
+			"error running client from CLI: at least two arguments required",
+		},
+	}
+
+	api := babyapi.NewAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} })
+	go func() {
+		err := api.RunWithArgs(os.Stdout, []string{"serve"}, 8080, "", false)
+		require.NoError(t, err)
+	}()
+	defer api.Stop()
+
+	album := &Album{DefaultResource: babyapi.NewDefaultResource(), Title: "NewAlbum"}
+	album.DefaultResource.ID.ID, _ = xid.FromString("cljcqg5o402e9s28rbp0")
+	err := api.Client("http://localhost:8080").Put(context.Background(), album)
+	require.NoError(t, err)
+
+	t.Run("RunCLI", func(t *testing.T) {
+		api.RunCLI()
+	})
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var out bytes.Buffer
+			err := api.RunWithArgs(&out, tt.args, 0, "http://localhost:8080", false)
+			if tt.expectedErr == "" {
+				require.NoError(t, err)
+				require.Regexp(t, tt.expectedRegexp, strings.TrimSpace(out.String()))
+			} else {
+				require.Error(t, err)
+				require.Equal(t, tt.expectedErr, err.Error())
+			}
+		})
+	}
 }

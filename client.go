@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -95,7 +96,16 @@ func (c *Client[T]) Put(ctx context.Context, resource T, parentIDs ...string) er
 		return fmt.Errorf("error encoding request body: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.URL(resource.GetID(), parentIDs...), &body)
+	return c.put(ctx, resource.GetID(), &body, parentIDs...)
+}
+
+// PutRaw makes a PUT request to create/modify a resource by ID. It uses the provided string as the request body
+func (c *Client[T]) PutRaw(ctx context.Context, id, body string, parentIDs ...string) error {
+	return c.put(ctx, id, bytes.NewBufferString(body), parentIDs...)
+}
+
+func (c *Client[T]) put(ctx context.Context, id string, body io.Reader, parentIDs ...string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.URL(id, parentIDs...), body)
 	if err != nil {
 		return fmt.Errorf("error creating request: %w", err)
 	}
@@ -116,7 +126,16 @@ func (c *Client[T]) Post(ctx context.Context, resource T, parentIDs ...string) (
 		return *new(T), fmt.Errorf("error encoding request body: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.URL("", parentIDs...), &body)
+	return c.post(ctx, &body, parentIDs...)
+}
+
+// PostRaw makes a POST request using the provided string as the body
+func (c *Client[T]) PostRaw(ctx context.Context, body string, parentIDs ...string) (T, error) {
+	return c.post(ctx, bytes.NewBufferString(body), parentIDs...)
+}
+
+func (c *Client[T]) post(ctx context.Context, body io.Reader, parentIDs ...string) (T, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.URL("", parentIDs...), body)
 	if err != nil {
 		return *new(T), fmt.Errorf("error creating request: %w", err)
 	}
@@ -137,7 +156,16 @@ func (c *Client[T]) Patch(ctx context.Context, id string, resource T, parentIDs 
 		return *new(T), fmt.Errorf("error encoding request body: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, c.URL(id, parentIDs...), &body)
+	return c.patch(ctx, id, &body, parentIDs...)
+}
+
+// PatchRaw makes a PATCH request to modify a resource by ID. It uses the provided string as the request body
+func (c *Client[T]) PatchRaw(ctx context.Context, id, body string, parentIDs ...string) (T, error) {
+	return c.patch(ctx, id, bytes.NewBufferString(body), parentIDs...)
+}
+
+func (c *Client[T]) patch(ctx context.Context, id string, body io.Reader, parentIDs ...string) (T, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, c.URL(id, parentIDs...), body)
 	if err != nil {
 		return *new(T), fmt.Errorf("error creating request: %w", err)
 	}
@@ -210,10 +238,15 @@ func (c *Client[T]) MakeRequest(req *http.Request, expectedStatusCode int) (*htt
 			return nil, fmt.Errorf("unexpected status and no body: %d", resp.StatusCode)
 		}
 
-		var httpErr *ErrResponse
-		err = json.NewDecoder(resp.Body).Decode(&httpErr)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("error decoding error response: %w", err)
+		}
+
+		var httpErr *ErrResponse
+		err = json.Unmarshal(body, &httpErr)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding error response %q: %w", string(body), err)
 		}
 		return nil, httpErr
 	}

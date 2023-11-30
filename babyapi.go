@@ -137,8 +137,8 @@ func (a *API[T]) AddMiddlewares(m chi.Middlewares) {
 	a.middlewares = append(a.middlewares, m...)
 }
 
-// Start will serve the API on the given port
-func (a *API[T]) Start(port string) {
+// Serve will serve the API on the given port
+func (a *API[T]) Serve(port string) {
 	a.server = &http.Server{Addr: port, Handler: a.Router()}
 	serverCtx, serverStopCtx := context.WithCancel(context.Background())
 
@@ -164,6 +164,7 @@ func (a *API[T]) Start(port string) {
 		serverStopCtx()
 	}()
 
+	slog.Info("starting server", "port", port, "api", a.name)
 	err := a.server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
 		slog.Error("server shutdown error", "error", err)

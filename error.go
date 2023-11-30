@@ -7,7 +7,8 @@ import (
 	"github.com/go-chi/render"
 )
 
-var ErrNotFoundResponse = &ErrResponse{HTTPStatusCode: 404, StatusText: "Resource not found."}
+var ErrNotFoundResponse = &ErrResponse{HTTPStatusCode: http.StatusNotFound, StatusText: "Resource not found."}
+var ErrMethodNotAllowedResponse = &ErrResponse{HTTPStatusCode: http.StatusMethodNotAllowed, StatusText: "Method not allowed."}
 
 // ErrResponse is an error that implements Renderer to be used in HTTP response
 type ErrResponse struct {

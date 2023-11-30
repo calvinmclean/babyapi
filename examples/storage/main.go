@@ -27,5 +27,5 @@ func main() {
 
 	api.SetStorage(storage.NewClient[*User](db, "User"))
 
-	api.Start(":8080")
+	api.RunCLI()
 }
