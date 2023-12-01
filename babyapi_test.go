@@ -382,119 +382,161 @@ func TestCLI(t *testing.T) {
 		expectedErr    string
 	}{
 		{
-			"MissingArgs",
+			"MissingTargetAPIArg",
 			[]string{},
 			``,
 			"at least one argument required",
 		},
 		{
+			"InvalidTargetAPIArg",
+			[]string{"bad", "bad"},
+			``,
+			"invalid API \"bad\". valid options are: [Albums Songs]",
+		},
+		{
+			"MissingArgs",
+			[]string{"Albums"},
+			``,
+			"at least two arguments required",
+		},
+		{
 			"GetAll",
-			[]string{"list"},
+			[]string{"list", "Albums"},
 			`\[\{"id":"cljcqg5o402e9s28rbp0","title":"NewAlbum"\}\]`,
 			"",
 		},
 		{
 			"Post",
-			[]string{"post", `{"title": "OtherNewAlbum"}`},
+			[]string{"post", "Albums", `{"title": "OtherNewAlbum"}`},
 			`\{"id":"[0-9a-v]{20}","title":"OtherNewAlbum"\}`,
 			"",
 		},
 		{
 			"PostMissingArgs",
-			[]string{"post"},
+			[]string{"post", "Albums"},
 			``,
 			"error running client from CLI: at least one argument required",
 		},
 		{
 			"PostError",
-			[]string{"post", `bad request`},
+			[]string{"post", "Albums", `bad request`},
 			``,
 			"error running client from CLI: error running Post: error posting resource: unexpected response with text: Invalid request.",
 		},
 		{
 			"Patch",
-			[]string{"patch", "cljcqg5o402e9s28rbp0", `{"title":"NewTitle"}`},
+			[]string{"patch", "Albums", "cljcqg5o402e9s28rbp0", `{"title":"NewTitle"}`},
 			`\{"id":"cljcqg5o402e9s28rbp0","title":"NewTitle"\}`,
 			"",
 		},
 		{
 			"Put",
-			[]string{"put", "cljcqg5o402e9s28rbp0", `{"id":"cljcqg5o402e9s28rbp0","title":"NewAlbum"}`},
+			[]string{"put", "Albums", "cljcqg5o402e9s28rbp0", `{"id":"cljcqg5o402e9s28rbp0","title":"NewAlbum"}`},
 			``,
 			"",
 		},
 		{
 			"PutError",
-			[]string{"put", "cljcqg5o402e9s28rbp0", `{"title":"NewAlbum"}`},
+			[]string{"put", "Albums", "cljcqg5o402e9s28rbp0", `{"title":"NewAlbum"}`},
 			``,
 			"error running client from CLI: error running Put: error putting resource: unexpected response with text: Invalid request.",
 		},
 		{
 			"GetByID",
-			[]string{"get", "cljcqg5o402e9s28rbp0"},
+			[]string{"get", "Albums", "cljcqg5o402e9s28rbp0"},
 			`\{"id":"cljcqg5o402e9s28rbp0","title":"NewAlbum"\}`,
 			"",
 		},
 		{
 			"GetByIDMissingArgs",
-			[]string{"get"},
+			[]string{"get", "Albums"},
 			``,
 			"error running client from CLI: at least one argument required",
 		},
 		{
+			"GetAllSongs",
+			[]string{"list", "Songs", "cljcqg5o402e9s28rbp0"},
+			``,
+			"",
+		},
+		{
+			"GetSongByID",
+			[]string{"get", "Songs", "clknc0do4023onrn3bqg", "cljcqg5o402e9s28rbp0"},
+			``,
+			"",
+		},
+		{
+			"PostSong",
+			[]string{"post", "Songs", `{"title": "new song"}`, "cljcqg5o402e9s28rbp0"},
+			`\{"id":"[0-9a-v]{20}","title":"new song"\}`,
+			"",
+		},
+		{
 			"Delete",
-			[]string{"delete", "cljcqg5o402e9s28rbp0"},
+			[]string{"delete", "Albums", "cljcqg5o402e9s28rbp0"},
 			`null`,
 			"",
 		},
 		{
 			"DeleteMissingArgs",
-			[]string{"delete"},
+			[]string{"delete", "Albums"},
 			``,
 			"error running client from CLI: at least one argument required",
 		},
 		{
 			"GetByIDNotFound",
-			[]string{"get", "cljcqg5o402e9s28rbp0"},
+			[]string{"get", "Albums", "cljcqg5o402e9s28rbp0"},
 			``,
 			"error running client from CLI: error running Get: error getting resource: unexpected response with text: Resource not found.",
 		},
 		{
 			"DeleteNotFound",
-			[]string{"delete", "cljcqg5o402e9s28rbp0"},
+			[]string{"delete", "Albums", "cljcqg5o402e9s28rbp0"},
 			``,
 			"error running client from CLI: error running Delete: error deleting resource: unexpected response with text: Resource not found.",
 		},
 		{
 			"PatchNotFound",
-			[]string{"patch", "cljcqg5o402e9s28rbp0", ""},
+			[]string{"patch", "Albums", "cljcqg5o402e9s28rbp0", ""},
 			``,
 			"error running client from CLI: error running Patch: error patching resource: unexpected response with text: Resource not found.",
 		},
 		{
 			"PatchMissingArgs",
-			[]string{"patch"},
+			[]string{"patch", "Albums"},
 			``,
 			"error running client from CLI: at least two arguments required",
 		},
 		{
 			"PutMissingArgs",
-			[]string{"put"},
+			[]string{"put", "Albums"},
 			``,
 			"error running client from CLI: at least two arguments required",
 		},
 	}
 
 	api := babyapi.NewAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} })
+	songAPI := babyapi.NewAPI[*Song]("Songs", "/songs", func() *Song { return &Song{} })
+	api.AddNestedAPI(songAPI)
 	go func() {
 		err := api.RunWithArgs(os.Stdout, []string{"serve"}, 8080, "", false)
 		require.NoError(t, err)
 	}()
 	defer api.Stop()
 
+	address := "http://localhost:8080"
+
+	// Create hard-coded album so we can use the ID
 	album := &Album{DefaultResource: babyapi.NewDefaultResource(), Title: "NewAlbum"}
 	album.DefaultResource.ID.ID, _ = xid.FromString("cljcqg5o402e9s28rbp0")
-	err := api.Client("http://localhost:8080").Put(context.Background(), album)
+	err := api.Client(address).Put(context.Background(), album)
+	require.NoError(t, err)
+
+	// Create hard-coded song so we can use the ID
+	song := &Song{DefaultResource: babyapi.NewDefaultResource(), Title: "NewSong"}
+	song.DefaultResource.ID.ID, _ = xid.FromString("clknc0do4023onrn3bqg")
+	songClient := babyapi.NewSubClient[*Album, *Song](api.Client(address), "/songs")
+	err = songClient.Put(context.Background(), song, album.GetID())
 	require.NoError(t, err)
 
 	t.Run("RunCLI", func(t *testing.T) {
@@ -504,7 +546,7 @@ func TestCLI(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var out bytes.Buffer
-			err := api.RunWithArgs(&out, tt.args, 0, "http://localhost:8080", false)
+			err := api.RunWithArgs(&out, tt.args, 0, address, false)
 			if tt.expectedErr == "" {
 				require.NoError(t, err)
 				require.Regexp(t, tt.expectedRegexp, strings.TrimSpace(out.String()))

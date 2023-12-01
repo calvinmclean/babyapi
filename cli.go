@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"golang.org/x/exp/maps"
 )
 
 func (a *API[T]) RunCLI() {
@@ -40,12 +42,33 @@ func (a *API[T]) RunWithArgs(out io.Writer, args []string, port int, address str
 	return a.runClientCLI(out, args, address, pretty)
 }
 
+func (a *API[T]) buildClientMap(selfClient *Client[*AnyResource], clientMap map[string]*Client[*AnyResource]) {
+	for name, child := range a.subAPIs {
+		childClient := NewSubClient[*AnyResource, *AnyResource](selfClient, child.Base())
+		clientMap[name] = childClient
+
+		child.buildClientMap(childClient, clientMap)
+	}
+}
+
 func (a *API[T]) runClientCLI(out io.Writer, args []string, address string, pretty bool) error {
-	if len(args) < 1 {
-		return fmt.Errorf("at least one argument required")
+	if len(args) < 2 {
+		return fmt.Errorf("at least two arguments required")
 	}
 
-	var cmd func([]string, string) (any, error)
+	selfClient := a.AnyClient(address)
+	clientMap := map[string]*Client[*AnyResource]{
+		a.name: selfClient,
+	}
+	a.buildClientMap(selfClient, clientMap)
+
+	targetAPI := args[1]
+	client, ok := clientMap[targetAPI]
+	if !ok {
+		return fmt.Errorf("invalid API %q. valid options are: %v", targetAPI, maps.Keys[map[string]*Client[*AnyResource]](clientMap))
+	}
+
+	var cmd func([]string, *Client[*AnyResource]) (any, error)
 	switch args[0] {
 	case "get":
 		cmd = a.runGetCommand
@@ -64,7 +87,7 @@ func (a *API[T]) runClientCLI(out io.Writer, args []string, address string, pret
 		return nil
 	}
 
-	result, err := cmd(args[1:], address)
+	result, err := cmd(args[2:], client)
 	if err != nil {
 		return fmt.Errorf("error running client from CLI: %w", err)
 	}
@@ -76,11 +99,11 @@ func (a *API[T]) runClientCLI(out io.Writer, args []string, address string, pret
 	return encoder.Encode(result)
 }
 
-func (a *API[T]) runGetCommand(args []string, address string) (any, error) {
+func (a *API[T]) runGetCommand(args []string, client *Client[*AnyResource]) (any, error) {
 	if len(args) < 1 {
 		return *new(T), fmt.Errorf("at least one argument required")
 	}
-	result, err := a.Client(address).Get(context.Background(), args[0], args[1:]...)
+	result, err := client.Get(context.Background(), args[0], args[1:]...)
 	if err != nil {
 		return *new(T), fmt.Errorf("error running Get: %w", err)
 	}
@@ -88,11 +111,11 @@ func (a *API[T]) runGetCommand(args []string, address string) (any, error) {
 	return result, nil
 }
 
-func (a *API[T]) runDeleteCommand(args []string, address string) (any, error) {
+func (a *API[T]) runDeleteCommand(args []string, client *Client[*AnyResource]) (any, error) {
 	if len(args) < 1 {
 		return *new(T), fmt.Errorf("at least one argument required")
 	}
-	err := a.Client(address).Delete(context.Background(), args[0], args[1:]...)
+	err := client.Delete(context.Background(), args[0], args[1:]...)
 	if err != nil {
 		return *new(T), fmt.Errorf("error running Delete: %w", err)
 	}
@@ -100,8 +123,8 @@ func (a *API[T]) runDeleteCommand(args []string, address string) (any, error) {
 	return nil, nil
 }
 
-func (a *API[T]) runListCommand(args []string, address string) (any, error) {
-	items, err := a.Client(address).GetAll(context.Background(), nil, args...)
+func (a *API[T]) runListCommand(args []string, client *Client[*AnyResource]) (any, error) {
+	items, err := client.GetAll(context.Background(), nil, args[0:]...)
 	if err != nil {
 		return nil, fmt.Errorf("error running GetAll: %w", err)
 	}
@@ -109,11 +132,11 @@ func (a *API[T]) runListCommand(args []string, address string) (any, error) {
 	return items.Items, nil
 }
 
-func (a *API[T]) runPostCommand(args []string, address string) (any, error) {
+func (a *API[T]) runPostCommand(args []string, client *Client[*AnyResource]) (any, error) {
 	if len(args) < 1 {
 		return *new(T), fmt.Errorf("at least one argument required")
 	}
-	result, err := a.Client(address).PostRaw(context.Background(), args[0], args[1:]...)
+	result, err := client.PostRaw(context.Background(), args[0], args[1:]...)
 	if err != nil {
 		return *new(T), fmt.Errorf("error running Post: %w", err)
 	}
@@ -121,11 +144,11 @@ func (a *API[T]) runPostCommand(args []string, address string) (any, error) {
 	return result, nil
 }
 
-func (a *API[T]) runPutCommand(args []string, address string) (any, error) {
+func (a *API[T]) runPutCommand(args []string, client *Client[*AnyResource]) (any, error) {
 	if len(args) < 2 {
 		return *new(T), fmt.Errorf("at least two arguments required")
 	}
-	err := a.Client(address).PutRaw(context.Background(), args[0], args[1], args[2:]...)
+	err := client.PutRaw(context.Background(), args[0], args[1], args[2:]...)
 	if err != nil {
 		return *new(T), fmt.Errorf("error running Put: %w", err)
 	}
@@ -133,11 +156,11 @@ func (a *API[T]) runPutCommand(args []string, address string) (any, error) {
 	return nil, nil
 }
 
-func (a *API[T]) runPatchCommand(args []string, address string) (any, error) {
+func (a *API[T]) runPatchCommand(args []string, client *Client[*AnyResource]) (any, error) {
 	if len(args) < 2 {
 		return *new(T), fmt.Errorf("at least two arguments required")
 	}
-	result, err := a.Client(address).PatchRaw(context.Background(), args[0], args[1], args[2:]...)
+	result, err := client.PatchRaw(context.Background(), args[0], args[1], args[2:]...)
 	if err != nil {
 		return *new(T), fmt.Errorf("error running Patch: %w", err)
 	}

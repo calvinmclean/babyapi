@@ -110,3 +110,19 @@ func (rl *ResourceList[T]) Render(w http.ResponseWriter, r *http.Request) error 
 	}
 	return nil
 }
+
+// AnyResource is intended to create a "generic" Client
+type AnyResource map[string]any
+
+func (ar AnyResource) GetID() string {
+	id, _ := ar["id"].(string)
+	return id
+}
+
+func (*AnyResource) Render(w http.ResponseWriter, r *http.Request) error {
+	return nil
+}
+
+func (dr *AnyResource) Bind(r *http.Request) error {
+	return nil
+}

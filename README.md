@@ -57,13 +57,13 @@ Implement custom request/response handling by implemented `Renderer` and `Binder
 4. Use the built-in CLI to interact with the API:
     ```shell
     # Create a new TODO
-    go run main.go post '{"title": "use babyapi!"}'
+    go run main.go post TODOs '{"title": "use babyapi!"}'
 
     # Get all TODOs
-    go run main.go list
+    go run main.go list TODOs
 
     # Get TODO by ID (use ID from previous responses)
-    go run main.go get cljvfslo4020kglbctog
+    go run main.go get TODOs cljvfslo4020kglbctog
     ```
 
 ![Simple Example](examples/simple/simple.gif)
