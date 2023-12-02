@@ -52,7 +52,7 @@ Implement custom request/response handling by implemented `Renderer` and `Binder
 3. Run!
     ```shell
     go mod tidy
-    go run main.go
+    go run main.go serve
     ```
 4. Use the built-in CLI to interact with the API:
     ```shell
