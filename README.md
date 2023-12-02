@@ -66,7 +66,8 @@ Implement custom request/response handling by implemented `Renderer` and `Binder
     go run main.go get TODOs cljvfslo4020kglbctog
     ```
 
-![Simple Example](examples/simple/simple.gif)
+<img alt="Simple Example" src="examples/simple/simple.gif" width="600" />
+
 
 ## Client
 
