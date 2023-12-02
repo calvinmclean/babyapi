@@ -156,7 +156,7 @@ func (a *API[T]) Patch(w http.ResponseWriter, r *http.Request) {
 
 		patcher, ok := any(resource).(Patcher[T])
 		if !ok {
-			return *new(T), ErrNotFoundResponse
+			return *new(T), ErrMethodNotAllowedResponse
 		}
 
 		httpErr = patcher.Patch(patchRequest)

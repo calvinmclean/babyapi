@@ -69,6 +69,11 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 	}
 }
 
+// Base returns the API's base path
+func (a *API[T]) Base() string {
+	return a.base
+}
+
 // Name returns the name of the API
 func (a *API[T]) Name() string {
 	return a.name
@@ -116,6 +121,11 @@ func (a *API[T]) Client(addr string) *Client[T] {
 	return NewClient[T](addr, a.base)
 }
 
+// AnyClient returns a new Client based on the API's configuration. It is a shortcut for NewClient
+func (a *API[T]) AnyClient(addr string) *Client[*AnyResource] {
+	return NewClient[*AnyResource](addr, a.base)
+}
+
 // AddCustomRoute appends a custom API route to the base path: /base/custom-route
 func (a *API[T]) AddCustomRoute(route chi.Route) {
 	a.customRoutes = append(a.customRoutes, route)
@@ -137,8 +147,8 @@ func (a *API[T]) AddMiddlewares(m chi.Middlewares) {
 	a.middlewares = append(a.middlewares, m...)
 }
 
-// Start will serve the API on the given port
-func (a *API[T]) Start(port string) {
+// Serve will serve the API on the given port
+func (a *API[T]) Serve(port string) {
 	a.server = &http.Server{Addr: port, Handler: a.Router()}
 	serverCtx, serverStopCtx := context.WithCancel(context.Background())
 
@@ -164,6 +174,7 @@ func (a *API[T]) Start(port string) {
 		serverStopCtx()
 	}()
 
+	slog.Info("starting server", "port", port, "api", a.name)
 	err := a.server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
 		slog.Error("server shutdown error", "error", err)

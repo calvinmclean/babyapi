@@ -11,11 +11,13 @@ import (
 type relatedAPI interface {
 	Router() chi.Router
 	Route(chi.Router)
+	Base() string
 	Name() string
 	GetIDParam(*http.Request) string
 	Parent() relatedAPI
 
 	setParent(relatedAPI)
+	buildClientMap(selfClient *Client[*AnyResource], clientMap map[string]*Client[*AnyResource])
 }
 
 // Parent returns the API's parent API

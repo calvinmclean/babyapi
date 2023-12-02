@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -51,7 +52,7 @@ func (c *Client[T]) SetRequestEditor(requestEditor RequestEditor) {
 
 // Get will get a resource by ID
 func (c *Client[T]) Get(ctx context.Context, id string, parentIDs ...string) (T, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.URL(id, parentIDs...), http.NoBody)
+	req, err := c.NewRequestWithParentIDs(ctx, http.MethodGet, http.NoBody, id, parentIDs...)
 	if err != nil {
 		return *new(T), fmt.Errorf("error creating request: %w", err)
 	}
@@ -66,7 +67,7 @@ func (c *Client[T]) Get(ctx context.Context, id string, parentIDs ...string) (T,
 
 // GetAll gets all resources from the API
 func (c *Client[T]) GetAll(ctx context.Context, query url.Values, parentIDs ...string) (*ResourceList[T], error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.URL("", parentIDs...), http.NoBody)
+	req, err := c.NewRequestWithParentIDs(ctx, http.MethodGet, http.NoBody, "", parentIDs...)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
@@ -95,7 +96,16 @@ func (c *Client[T]) Put(ctx context.Context, resource T, parentIDs ...string) er
 		return fmt.Errorf("error encoding request body: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.URL(resource.GetID(), parentIDs...), &body)
+	return c.put(ctx, resource.GetID(), &body, parentIDs...)
+}
+
+// PutRaw makes a PUT request to create/modify a resource by ID. It uses the provided string as the request body
+func (c *Client[T]) PutRaw(ctx context.Context, id, body string, parentIDs ...string) error {
+	return c.put(ctx, id, bytes.NewBufferString(body), parentIDs...)
+}
+
+func (c *Client[T]) put(ctx context.Context, id string, body io.Reader, parentIDs ...string) error {
+	req, err := c.NewRequestWithParentIDs(ctx, http.MethodPut, body, id, parentIDs...)
 	if err != nil {
 		return fmt.Errorf("error creating request: %w", err)
 	}
@@ -116,7 +126,16 @@ func (c *Client[T]) Post(ctx context.Context, resource T, parentIDs ...string) (
 		return *new(T), fmt.Errorf("error encoding request body: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.URL("", parentIDs...), &body)
+	return c.post(ctx, &body, parentIDs...)
+}
+
+// PostRaw makes a POST request using the provided string as the body
+func (c *Client[T]) PostRaw(ctx context.Context, body string, parentIDs ...string) (T, error) {
+	return c.post(ctx, bytes.NewBufferString(body), parentIDs...)
+}
+
+func (c *Client[T]) post(ctx context.Context, body io.Reader, parentIDs ...string) (T, error) {
+	req, err := c.NewRequestWithParentIDs(ctx, http.MethodPost, body, "", parentIDs...)
 	if err != nil {
 		return *new(T), fmt.Errorf("error creating request: %w", err)
 	}
@@ -137,7 +156,16 @@ func (c *Client[T]) Patch(ctx context.Context, id string, resource T, parentIDs 
 		return *new(T), fmt.Errorf("error encoding request body: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, c.URL(id, parentIDs...), &body)
+	return c.patch(ctx, id, &body, parentIDs...)
+}
+
+// PatchRaw makes a PATCH request to modify a resource by ID. It uses the provided string as the request body
+func (c *Client[T]) PatchRaw(ctx context.Context, id, body string, parentIDs ...string) (T, error) {
+	return c.patch(ctx, id, bytes.NewBufferString(body), parentIDs...)
+}
+
+func (c *Client[T]) patch(ctx context.Context, id string, body io.Reader, parentIDs ...string) (T, error) {
+	req, err := c.NewRequestWithParentIDs(ctx, http.MethodPatch, body, id, parentIDs...)
 	if err != nil {
 		return *new(T), fmt.Errorf("error creating request: %w", err)
 	}
@@ -158,7 +186,7 @@ func (c *Client[T]) Patch(ctx context.Context, id string, resource T, parentIDs 
 
 // Delete makes a DELETE request to delete a resource by ID
 func (c *Client[T]) Delete(ctx context.Context, id string, parentIDs ...string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.URL(id, parentIDs...), http.NoBody)
+	req, err := c.NewRequestWithParentIDs(ctx, http.MethodDelete, http.NoBody, id, parentIDs...)
 	if err != nil {
 		return fmt.Errorf("error creating request: %w", err)
 	}
@@ -171,10 +199,20 @@ func (c *Client[T]) Delete(ctx context.Context, id string, parentIDs ...string) 
 	return nil
 }
 
+// NewRequestWithParentIDs uses http.NewRequestWithContext to create a new request using the URL created from the provided ID and parent IDs
+func (c *Client[T]) NewRequestWithParentIDs(ctx context.Context, method string, body io.Reader, id string, parentIDs ...string) (*http.Request, error) {
+	address, err := c.URL(id, parentIDs...)
+	if err != nil {
+		return nil, fmt.Errorf("error creating target URL: %w", err)
+	}
+
+	return http.NewRequestWithContext(ctx, method, address, body)
+}
+
 // URL gets the URL based on provided ID and optional parent IDs
-func (c *Client[T]) URL(id string, parentIDs ...string) string {
+func (c *Client[T]) URL(id string, parentIDs ...string) (string, error) {
 	if len(parentIDs) != len(c.parentPaths) {
-		panic("incorrect number of parent IDs provided")
+		return "", fmt.Errorf("expected %d parentIDs", len(c.parentPaths))
 	}
 
 	path := c.addr
@@ -188,7 +226,7 @@ func (c *Client[T]) URL(id string, parentIDs ...string) string {
 		path += fmt.Sprintf("/%s", id)
 	}
 
-	return path
+	return path, nil
 }
 
 // MakeRequest generically sends an HTTP request after calling the request editor and checks the response code
@@ -210,10 +248,15 @@ func (c *Client[T]) MakeRequest(req *http.Request, expectedStatusCode int) (*htt
 			return nil, fmt.Errorf("unexpected status and no body: %d", resp.StatusCode)
 		}
 
-		var httpErr *ErrResponse
-		err = json.NewDecoder(resp.Body).Decode(&httpErr)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("error decoding error response: %w", err)
+		}
+
+		var httpErr *ErrResponse
+		err = json.Unmarshal(body, &httpErr)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding error response %q: %w", string(body), err)
 		}
 		return nil, httpErr
 	}

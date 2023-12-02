@@ -1,11 +1,14 @@
 package babyapi_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/calvinmclean/babyapi"
@@ -42,7 +45,7 @@ func TestBabyAPI(t *testing.T) {
 		{
 			"UseAPIStart",
 			func(api *babyapi.API[*Album]) (string, func()) {
-				go api.Start(":8080")
+				go api.Serve(":8080")
 				return "http://localhost:8080", api.Stop
 			},
 		},
@@ -94,7 +97,9 @@ func TestBabyAPI(t *testing.T) {
 			})
 
 			t.Run("ActionRoute", func(t *testing.T) {
-				req, err := http.NewRequest(http.MethodGet, client.URL("")+"/teapot", http.NoBody)
+				address, err := client.URL("")
+				require.NoError(t, err)
+				req, err := http.NewRequest(http.MethodGet, address+"/teapot", http.NoBody)
 				require.NoError(t, err)
 				_, err = client.MakeRequest(req, http.StatusTeapot)
 				require.NoError(t, err)
@@ -102,7 +107,9 @@ func TestBabyAPI(t *testing.T) {
 
 			t.Run("ActionIDRoute", func(t *testing.T) {
 				t.Run("Successful", func(t *testing.T) {
-					req, err := http.NewRequest(http.MethodGet, client.URL(album1.GetID())+"/teapot", http.NoBody)
+					address, err := client.URL(album1.GetID())
+					require.NoError(t, err)
+					req, err := http.NewRequest(http.MethodGet, address+"/teapot", http.NoBody)
 					require.NoError(t, err)
 					_, err = client.MakeRequest(req, http.StatusTeapot)
 					require.NoError(t, err)
@@ -319,7 +326,7 @@ func TestNestedAPI(t *testing.T) {
 		})
 
 		t.Run("SuccessfulParsedAsSongResponse", func(t *testing.T) {
-			req, err := http.NewRequest(http.MethodGet, songClient.URL(song1Response.GetID(), artist1.GetID(), album1.GetID()), http.NoBody)
+			req, err := songClient.NewRequestWithParentIDs(context.Background(), http.MethodGet, http.NoBody, song1Response.GetID(), artist1.GetID(), album1.GetID())
 			require.NoError(t, err)
 
 			resp, err := songClient.MakeRequest(req, http.StatusOK)
@@ -363,10 +370,209 @@ func TestNestedAPI(t *testing.T) {
 	})
 
 	t.Run("PatchSong", func(t *testing.T) {
-		t.Run("NotFound", func(t *testing.T) {
+		t.Run("MethodNotAllowed", func(t *testing.T) {
 			_, err := songClient.Patch(context.Background(), song1Response.GetID(), &SongResponse{Song: &Song{Title: "NewTitle"}}, artist1.GetID(), album1.GetID())
 			require.Error(t, err)
-			require.Equal(t, "error patching resource: unexpected response with text: Resource not found.", err.Error())
+			require.Equal(t, "error patching resource: unexpected response with text: Method not allowed.", err.Error())
 		})
 	})
+}
+
+func TestCLI(t *testing.T) {
+	tests := []struct {
+		name           string
+		args           []string
+		expectedRegexp string
+		expectedErr    bool
+	}{
+		{
+			"MissingTargetAPIArg",
+			[]string{},
+			"at least one argument required",
+			true,
+		},
+		{
+			"InvalidTargetAPIArg",
+			[]string{"bad", "bad"},
+			`invalid API \"bad\". valid options are: (\[Albums Songs\]|\[Songs Albums\])`,
+			true,
+		},
+		{
+			"MissingArgs",
+			[]string{"Albums"},
+			"at least two arguments required",
+			true,
+		},
+		{
+			"GetAll",
+			[]string{"list", "Albums"},
+			`\[\{"id":"cljcqg5o402e9s28rbp0","title":"NewAlbum"\}\]`,
+			false,
+		},
+		{
+			"Post",
+			[]string{"post", "Albums", `{"title": "OtherNewAlbum"}`},
+			`\{"id":"[0-9a-v]{20}","title":"OtherNewAlbum"\}`,
+			false,
+		},
+		{
+			"PostIncorrectParentArgs",
+			[]string{"post", "Albums", `{"title": "OtherNewAlbum"}`, "ExtraID"},
+			"error running client from CLI: error running Post: error creating request: error creating target URL: expected 0 parentIDs",
+			true,
+		},
+		{
+			"PostMissingArgs",
+			[]string{"post", "Albums"},
+			"error running client from CLI: at least one argument required",
+			true,
+		},
+		{
+			"PostError",
+			[]string{"post", "Albums", `bad request`},
+			"error running client from CLI: error running Post: error posting resource: unexpected response with text: Invalid request.",
+			true,
+		},
+		{
+			"Patch",
+			[]string{"patch", "Albums", "cljcqg5o402e9s28rbp0", `{"title":"NewTitle"}`},
+			`\{"id":"cljcqg5o402e9s28rbp0","title":"NewTitle"\}`,
+			false,
+		},
+		{
+			"Put",
+			[]string{"put", "Albums", "cljcqg5o402e9s28rbp0", `{"id":"cljcqg5o402e9s28rbp0","title":"NewAlbum"}`},
+			`null`,
+			false,
+		},
+		{
+			"PutError",
+			[]string{"put", "Albums", "cljcqg5o402e9s28rbp0", `{"title":"NewAlbum"}`},
+			"error running client from CLI: error running Put: error putting resource: unexpected response with text: Invalid request.",
+			true,
+		},
+		{
+			"GetByID",
+			[]string{"get", "Albums", "cljcqg5o402e9s28rbp0"},
+			`\{"id":"cljcqg5o402e9s28rbp0","title":"NewAlbum"\}`,
+			false,
+		},
+		{
+			"GetByIDMissingArgs",
+			[]string{"get", "Albums"},
+			"error running client from CLI: at least one argument required",
+			true,
+		},
+		{
+			"GetAllSongs",
+			[]string{"list", "Songs", "cljcqg5o402e9s28rbp0"},
+			`\[{"id":"clknc0do4023onrn3bqg","title":"NewSong"}\]`,
+			false,
+		},
+		{
+			"GetSongByID",
+			[]string{"get", "Songs", "clknc0do4023onrn3bqg", "cljcqg5o402e9s28rbp0"},
+			`{"id":"clknc0do4023onrn3bqg","title":"NewSong"}`,
+			false,
+		},
+		{
+			"GetSongByIDMissingParentID",
+			[]string{"get", "Songs", "clknc0do4023onrn3bqg"},
+			"error running client from CLI: error running Get: error creating request: error creating target URL: expected 1 parentIDs",
+			true,
+		},
+		{
+			"PostSong",
+			[]string{"post", "Songs", `{"title": "new song"}`, "cljcqg5o402e9s28rbp0"},
+			`\{"id":"[0-9a-v]{20}","title":"new song"\}`,
+			false,
+		},
+		{
+			"Delete",
+			[]string{"delete", "Albums", "cljcqg5o402e9s28rbp0"},
+			`null`,
+			false,
+		},
+		{
+			"DeleteMissingArgs",
+			[]string{"delete", "Albums"},
+			"error running client from CLI: at least one argument required",
+			true,
+		},
+		{
+			"GetByIDNotFound",
+			[]string{"get", "Albums", "cljcqg5o402e9s28rbp0"},
+			"error running client from CLI: error running Get: error getting resource: unexpected response with text: Resource not found.",
+			true,
+		},
+		{
+			"DeleteNotFound",
+			[]string{"delete", "Albums", "cljcqg5o402e9s28rbp0"},
+			"error running client from CLI: error running Delete: error deleting resource: unexpected response with text: Resource not found.",
+			true,
+		},
+		{
+			"PatchNotFound",
+			[]string{"patch", "Albums", "cljcqg5o402e9s28rbp0", ""},
+			"error running client from CLI: error running Patch: error patching resource: unexpected response with text: Resource not found.",
+			true,
+		},
+		{
+			"PatchMissingArgs",
+			[]string{"patch", "Albums"},
+			"error running client from CLI: at least two arguments required",
+			true,
+		},
+		{
+			"PutMissingArgs",
+			[]string{"put", "Albums"},
+			"error running client from CLI: at least two arguments required",
+			true,
+		},
+	}
+
+	api := babyapi.NewAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} })
+	songAPI := babyapi.NewAPI[*Song]("Songs", "/songs", func() *Song { return &Song{} })
+	api.AddNestedAPI(songAPI)
+	go func() {
+		err := api.RunWithArgs(os.Stdout, []string{"serve"}, 8080, "", false)
+		require.NoError(t, err)
+	}()
+	defer api.Stop()
+
+	address := "http://localhost:8080"
+
+	// Create hard-coded album so we can use the ID
+	album := &Album{DefaultResource: babyapi.NewDefaultResource(), Title: "NewAlbum"}
+	album.DefaultResource.ID.ID, _ = xid.FromString("cljcqg5o402e9s28rbp0")
+	err := api.Client(address).Put(context.Background(), album)
+	require.NoError(t, err)
+
+	// Create hard-coded song so we can use the ID
+	song := &Song{DefaultResource: babyapi.NewDefaultResource(), Title: "NewSong"}
+	song.DefaultResource.ID.ID, _ = xid.FromString("clknc0do4023onrn3bqg")
+	songClient := babyapi.NewSubClient[*Album, *Song](api.Client(address), "/songs")
+	err = songClient.Put(context.Background(), song, album.GetID())
+	require.NoError(t, err)
+
+	t.Run("RunCLI", func(t *testing.T) {
+		api.RunCLI()
+	})
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var out bytes.Buffer
+			err := api.RunWithArgs(&out, tt.args, 0, address, false)
+			if !tt.expectedErr {
+				require.NoError(t, err)
+				require.Regexp(t, tt.expectedRegexp, strings.TrimSpace(out.String()))
+				if tt.expectedRegexp == "" {
+					require.Equal(t, tt.expectedRegexp, strings.TrimSpace(out.String()))
+				}
+			} else {
+				require.Error(t, err)
+				require.Regexp(t, tt.expectedRegexp, err.Error())
+			}
+		})
+	}
 }

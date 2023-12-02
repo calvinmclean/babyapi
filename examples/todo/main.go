@@ -68,5 +68,5 @@ func main() {
 		}
 	})
 
-	api.Start(":8080")
+	api.RunCLI()
 }
