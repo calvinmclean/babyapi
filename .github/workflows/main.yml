@@ -8,10 +8,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+
       - uses: actions/setup-go@v4
         with:
           go-version: "1.21"
           cache: false
+
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
@@ -34,3 +36,20 @@ jobs:
         uses: codecov/codecov-action@v3
         with:
           functionalities: "fixes"
+
+  build_examples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.21"
+
+      - name: Build examples
+        run: |
+          for dir in examples/*/; do
+            echo "Building $dir"
+            go build $dir/*.go
+          done
