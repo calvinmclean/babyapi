@@ -1,8 +1,6 @@
 package main
 
-import (
-	"github.com/calvinmclean/babyapi"
-)
+import "github.com/calvinmclean/babyapi"
 
 type TODO struct {
 	babyapi.DefaultResource

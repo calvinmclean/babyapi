@@ -29,9 +29,7 @@ Implement custom request/response handling by implemented `Renderer` and `Binder
     ```go
     package main
 
-    import (
-        "github.com/calvinmclean/babyapi"
-    )
+    import "github.com/calvinmclean/babyapi"
 
     type TODO struct {
         babyapi.DefaultResource
