@@ -15,7 +15,6 @@ func (a *API[T]) defaultMiddleware(r chi.Router) {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
 	r.Use(a.logMiddleware)
-	r.Use(render.SetContentType(render.ContentTypeJSON))
 }
 
 func (a *API[T]) logMiddleware(next http.Handler) http.Handler {

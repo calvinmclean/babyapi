@@ -34,7 +34,8 @@ type API[T Resource] struct {
 	customRoutes   []chi.Route
 	customIDRoutes []chi.Route
 
-	responseWrapper func(T) render.Renderer
+	responseWrapper       func(T) render.Renderer
+	getAllResponseWrapper func([]T) render.Renderer
 
 	getAllFilter func(*http.Request) FilterFunc[T]
 
@@ -44,6 +45,8 @@ type API[T Resource] struct {
 	onCreateOrUpdate func(*http.Request, T) *ErrResponse
 
 	parent relatedAPI
+
+	customResponseCodes map[string]int
 }
 
 // NewAPI initializes an API using the provided name, base URL path, and function to create a new instance of
@@ -61,11 +64,13 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 		nil,
 		nil,
 		func(r T) render.Renderer { return r },
+		nil,
 		func(*http.Request) FilterFunc[T] { return func(T) bool { return true } },
 		defaultBeforeAfter,
 		defaultBeforeAfter,
 		func(*http.Request, T) *ErrResponse { return nil },
 		nil,
+		map[string]int{},
 	}
 }
 
@@ -77,6 +82,17 @@ func (a *API[T]) Base() string {
 // Name returns the name of the API
 func (a *API[T]) Name() string {
 	return a.name
+}
+
+// SetCustomResponseCode will override the default response codes for the specified HTTP verb
+func (a *API[T]) SetCustomResponseCode(verb string, code int) {
+	a.customResponseCodes[verb] = code
+}
+
+// SetGetAllResponseWrapper sets a function that can create a custom response for GetAll. This function will receive
+// a slice of Resources from storage and must return a render.Renderer
+func (a *API[T]) SetGetAllResponseWrapper(getAllResponder func([]T) render.Renderer) {
+	a.getAllResponseWrapper = getAllResponder
 }
 
 // SetOnCreateOrUpdate runs on POST, PATCH, and PUT requests before saving the created/updated resource.
@@ -142,6 +158,11 @@ func (a *API[T]) SetStorage(s Storage[T]) {
 	a.storage = s
 }
 
+// Storage returns the storage interface for the API so it can be used in custom routes or other use cases
+func (a *API[T]) Storage() Storage[T] {
+	return a.storage
+}
+
 // AddMiddlewares appends chi.Middlewares to existing middlewares
 func (a *API[T]) AddMiddlewares(m chi.Middlewares) {
 	a.middlewares = append(a.middlewares, m...)
@@ -186,6 +207,11 @@ func (a *API[T]) Serve(port string) {
 // Stop will stop the API
 func (a *API[T]) Stop() {
 	a.quit <- os.Interrupt
+}
+
+// Done returns a channel that's closed when the API stops, similar to context.Done()
+func (a *API[T]) Done() <-chan os.Signal {
+	return a.quit
 }
 
 type beforeAfterFunc func(*http.Request) *ErrResponse

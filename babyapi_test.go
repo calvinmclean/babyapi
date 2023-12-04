@@ -5,11 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/calvinmclean/babyapi"
 	"github.com/go-chi/chi/v5"
@@ -46,7 +48,19 @@ func TestBabyAPI(t *testing.T) {
 			"UseAPIStart",
 			func(api *babyapi.API[*Album]) (string, func()) {
 				go api.Serve(":8080")
-				return "http://localhost:8080", api.Stop
+				return "http://localhost:8080", func() {
+					// Test `Done()`
+					go func() {
+						timeout := time.After(2 * time.Second)
+						select {
+						case <-api.Done():
+						case <-timeout:
+							t.Error("timed out before graceful shutdown")
+						}
+					}()
+
+					api.Stop()
+				}
 			},
 		},
 	}
@@ -575,4 +589,136 @@ func TestCLI(t *testing.T) {
 			}
 		})
 	}
+}
+
+type UnorderedList struct {
+	Items []*ListItem
+}
+
+func (ul *UnorderedList) Render(w http.ResponseWriter, r *http.Request) error {
+	return nil
+}
+
+func (ul *UnorderedList) HTML() string {
+	result := "<ul>\n"
+	for _, li := range ul.Items {
+		result += li.HTML() + "\n"
+	}
+	return result + "</ul>"
+}
+
+type ListItem struct {
+	babyapi.DefaultResource
+	Content string
+}
+
+func (d *ListItem) HTML() string {
+	return "<li>" + d.Content + "</li>"
+}
+
+func TestHTML(t *testing.T) {
+	api := babyapi.NewAPI[*ListItem]("Items", "/items", func() *ListItem { return &ListItem{} })
+
+	api.SetGetAllResponseWrapper(func(d []*ListItem) render.Renderer {
+		return &UnorderedList{d}
+	})
+
+	item1 := &ListItem{
+		DefaultResource: babyapi.NewDefaultResource(),
+		Content:         "Item1",
+	}
+
+	address, closer := babyapi.TestServe[*ListItem](t, api)
+	defer closer()
+
+	client := api.Client(address)
+
+	t.Run("CreateItem", func(t *testing.T) {
+		err := api.Storage().Set(item1)
+		require.NoError(t, err)
+	})
+
+	t.Run("GetItemHTML", func(t *testing.T) {
+		t.Run("Successful", func(t *testing.T) {
+			url, err := client.URL(item1.GetID())
+			require.NoError(t, err)
+
+			req, err := http.NewRequest(http.MethodGet, url, http.NoBody)
+			require.NoError(t, err)
+			req.Header.Set("Accept", "text/html")
+
+			resp, err := client.MakeRequest(req, http.StatusOK)
+			require.NoError(t, err)
+
+			data, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+			require.Equal(t, "<li>Item1</li>", string(data))
+		})
+	})
+
+	t.Run("GetAllItemsHTML", func(t *testing.T) {
+		t.Run("Successful", func(t *testing.T) {
+			url, err := client.URL("")
+			require.NoError(t, err)
+
+			req, err := http.NewRequest(http.MethodGet, url, http.NoBody)
+			require.NoError(t, err)
+			req.Header.Set("Accept", "text/html")
+
+			resp, err := client.MakeRequest(req, http.StatusOK)
+			require.NoError(t, err)
+
+			data, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+			require.Equal(t, `<ul>
+<li>Item1</li>
+</ul>`, string(data))
+		})
+	})
+}
+
+func TestServerSentEvents(t *testing.T) {
+	api := babyapi.NewAPI[*ListItem]("Items", "/items", func() *ListItem { return &ListItem{} })
+
+	api.SetGetAllResponseWrapper(func(d []*ListItem) render.Renderer {
+		return &UnorderedList{d}
+	})
+
+	events := api.AddServerSentEventHandler("/events")
+
+	address, closer := babyapi.TestServe[*ListItem](t, api)
+	defer closer()
+
+	item1 := &ListItem{
+		DefaultResource: babyapi.NewDefaultResource(),
+		Content:         "Item1",
+	}
+	t.Run("CreateItem", func(t *testing.T) {
+		err := api.Storage().Set(item1)
+		require.NoError(t, err)
+	})
+
+	t.Run("GetServerSentEventsEndpoint", func(t *testing.T) {
+		go func() {
+			events <- &babyapi.ServerSentEvent{
+				Event: "event",
+				Data:  "hello",
+			}
+		}()
+
+		response, err := http.Get(address + "/items/events")
+		require.NoError(t, err)
+		defer response.Body.Close()
+
+		require.Equal(t, http.StatusOK, response.StatusCode)
+
+		expected := `event: event
+data: hello
+`
+		body := make([]byte, len(expected))
+		n, err := response.Body.Read(body)
+		require.NoError(t, err)
+
+		require.Equal(t, expected, string(body[:n]))
+	})
 }

@@ -9,8 +9,26 @@ import (
 	"github.com/go-chi/render"
 )
 
+// HTMLer allows for easily represending reponses as HTML strings when accepted content
+// type is text/html
+type HTMLer interface {
+	HTML() string
+}
+
 // Create API routes on the given router
 func (a *API[T]) Route(r chi.Router) {
+	render.Respond = func(w http.ResponseWriter, r *http.Request, v interface{}) {
+		if render.GetAcceptedContentType(r) == render.ContentTypeHTML {
+			htmler, ok := v.(HTMLer)
+			if ok {
+				render.HTML(w, r, htmler.HTML())
+				return
+			}
+		}
+
+		render.DefaultResponder(w, r, v)
+	}
+
 	r.Route(a.base, func(r chi.Router) {
 		// Only set these middleware for root-level API
 		if a.parent == nil {
@@ -64,6 +82,11 @@ func (a *API[T]) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	codeOverride, ok := a.customResponseCodes[http.MethodGet]
+	if ok {
+		render.Status(r, codeOverride)
+	}
+
 	err := render.Render(w, r, a.responseWrapper(resource))
 	if err != nil {
 		logger.Error("unable to render response", "error", err)
@@ -83,12 +106,23 @@ func (a *API[T]) GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 	logger.Debug("responding with resources", "count", len(resources))
 
-	items := []render.Renderer{}
-	for _, item := range resources {
-		items = append(items, a.responseWrapper(item))
+	var resp render.Renderer
+	if a.getAllResponseWrapper != nil {
+		resp = a.getAllResponseWrapper(resources)
+	} else {
+		items := []render.Renderer{}
+		for _, item := range resources {
+			items = append(items, a.responseWrapper(item))
+		}
+		resp = &ResourceList[render.Renderer]{Items: items}
 	}
 
-	err = render.Render(w, r, &ResourceList[render.Renderer]{Items: items})
+	codeOverride, ok := a.customResponseCodes[http.MethodGet]
+	if ok {
+		render.Status(r, codeOverride)
+	}
+
+	err = render.Render(w, r, resp)
 	if err != nil {
 		logger.Error("unable to render response", "error", err)
 		_ = render.Render(w, r, ErrRender(err))
@@ -112,7 +146,13 @@ func (a *API[T]) Post(w http.ResponseWriter, r *http.Request) {
 			return *new(T), InternalServerError(err)
 		}
 
-		render.Status(r, http.StatusCreated)
+		codeOverride, ok := a.customResponseCodes[http.MethodPost]
+		if ok {
+			render.Status(r, codeOverride)
+		} else {
+			render.Status(r, http.StatusCreated)
+		}
+
 		return resource, nil
 	})(w, r)
 }
@@ -136,6 +176,12 @@ func (a *API[T]) Put(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			logger.Error("error storing resource", "error", err)
 			return *new(T), InternalServerError(err)
+		}
+
+		codeOverride, ok := a.customResponseCodes[http.MethodPut]
+		if ok {
+			render.Status(r, codeOverride)
+			return *new(T), nil
 		}
 
 		render.NoContent(w, r)
@@ -178,6 +224,11 @@ func (a *API[T]) Patch(w http.ResponseWriter, r *http.Request) {
 			return *new(T), InternalServerError(err)
 		}
 
+		codeOverride, ok := a.customResponseCodes[http.MethodPatch]
+		if ok {
+			render.Status(r, codeOverride)
+		}
+
 		return resource, nil
 	})(w, r)
 }
@@ -213,6 +264,12 @@ func (a *API[T]) Delete(w http.ResponseWriter, r *http.Request) {
 	if httpErr != nil {
 		logger.Error("error executing after func", "error", httpErr)
 		_ = render.Render(w, r, httpErr)
+		return
+	}
+
+	codeOverride, ok := a.customResponseCodes[http.MethodDelete]
+	if ok {
+		render.Status(r, codeOverride)
 		return
 	}
 
