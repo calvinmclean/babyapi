@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io"
 	"net/http"
 	"net/url"
@@ -613,7 +614,8 @@ type ListItem struct {
 }
 
 func (d *ListItem) HTML() string {
-	return "<li>" + d.Content + "</li>"
+	tmpl := template.Must(template.New("li").Parse(`<li>{{ .Content }}</li>`))
+	return babyapi.MustRenderHTML(tmpl, d)
 }
 
 func TestHTML(t *testing.T) {
@@ -720,5 +722,12 @@ data: hello
 		require.NoError(t, err)
 
 		require.Equal(t, expected, string(body[:n]))
+	})
+}
+
+func TestMustRenderHTML(t *testing.T) {
+	tmpl := template.Must(template.New("test").Parse("{{ .UndefinedVariable }}"))
+	require.Panics(t, func() {
+		babyapi.MustRenderHTML(tmpl, "string is bad input")
 	})
 }

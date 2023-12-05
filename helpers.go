@@ -1,8 +1,10 @@
 package babyapi
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"html/template"
 	"net/http"
 	"strings"
 
@@ -174,4 +176,15 @@ func (a *API[T]) HandleServerSentEvents(events <-chan *ServerSentEvent) http.Han
 			}
 		}
 	}
+}
+
+// MustRenderHTML renders the provided template and data to a string. Panics if there is an error
+func MustRenderHTML(tmpl *template.Template, data any) string {
+	var renderedOutput bytes.Buffer
+	err := tmpl.Execute(&renderedOutput, data)
+	if err != nil {
+		panic(err)
+	}
+
+	return renderedOutput.String()
 }
