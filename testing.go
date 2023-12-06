@@ -56,7 +56,8 @@ func (p *mockParent) GetIDParam(r *http.Request) string {
 
 func (p *mockParent) setParent(relatedAPI) {}
 
-func (p *mockParent) buildClientMap(*Client[*AnyResource], map[string]*Client[*AnyResource]) {}
+func (p *mockParent) buildClientMap(*Client[*AnyResource], map[string]*Client[*AnyResource], func(*http.Request) error) {
+}
 
 // Test is meant to be used in external tests of nested APIs
 func TestWithParentRoute[T, P Resource](t *testing.T, api *API[T], parent P, parentName, parentBasePath string, r *http.Request) *httptest.ResponseRecorder {
