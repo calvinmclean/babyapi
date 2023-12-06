@@ -2,6 +2,7 @@ package babyapi
 
 import (
 	"flag"
+	"io"
 	"os"
 	"testing"
 
@@ -15,4 +16,7 @@ func TestStringSliceFlag(t *testing.T) {
 	flag.Parse()
 
 	require.ElementsMatch(t, headers, []string{"arg1", "arg2"})
+
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+	flag.CommandLine.SetOutput(io.Discard)
 }

@@ -47,6 +47,7 @@ type API[T Resource] struct {
 	parent relatedAPI
 
 	customResponseCodes map[string]int
+	serverCtx           context.Context
 }
 
 // NewAPI initializes an API using the provided name, base URL path, and function to create a new instance of
@@ -71,6 +72,7 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 		func(*http.Request, T) *ErrResponse { return nil },
 		nil,
 		map[string]int{},
+		nil,
 	}
 }
 
@@ -171,14 +173,16 @@ func (a *API[T]) AddMiddlewares(m chi.Middlewares) {
 // Serve will serve the API on the given port
 func (a *API[T]) Serve(port string) {
 	a.server = &http.Server{Addr: port, Handler: a.Router()}
-	serverCtx, serverStopCtx := context.WithCancel(context.Background())
+
+	var serverStopCtx context.CancelFunc
+	a.serverCtx, serverStopCtx = context.WithCancel(context.Background())
 
 	signal.Notify(a.quit, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
 		<-a.quit
 
-		shutdownCtx, cancel := context.WithTimeout(serverCtx, 30*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(a.serverCtx, 10*time.Second)
 		defer cancel()
 
 		go func() {
@@ -201,12 +205,13 @@ func (a *API[T]) Serve(port string) {
 		slog.Error("server shutdown error", "error", err)
 	}
 
-	<-serverCtx.Done()
+	<-a.serverCtx.Done()
 }
 
 // Stop will stop the API
 func (a *API[T]) Stop() {
 	a.quit <- os.Interrupt
+	<-a.serverCtx.Done()
 }
 
 // Done returns a channel that's closed when the API stops, similar to context.Done()
