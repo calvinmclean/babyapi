@@ -6,30 +6,48 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
+	"strings"
 
 	"golang.org/x/exp/maps"
 )
+
+// stringSliceFlag is a custom flag type to handle multiple occurrences of the same string flag
+type stringSliceFlag []string
+
+// String is the string representation of the flag's value
+func (ssf *stringSliceFlag) String() string {
+	return fmt.Sprintf("%v", *ssf)
+}
+
+// Set appends the value to the slice
+func (ssf *stringSliceFlag) Set(value string) error {
+	*ssf = append(*ssf, value)
+	return nil
+}
 
 func (a *API[T]) RunCLI() {
 	var port int
 	var address string
 	var pretty bool
+	var headers stringSliceFlag
 	flag.IntVar(&port, "port", 8080, "http port for server")
 	flag.StringVar(&address, "address", "http://localhost:8080", "server address for client")
 	flag.BoolVar(&pretty, "pretty", true, "pretty print JSON if enabled")
+	flag.Var(&headers, "H", "add headers to request")
 
 	flag.Parse()
 
 	args := flag.Args()
 
-	err := a.RunWithArgs(os.Stdout, args, port, address, pretty)
+	err := a.RunWithArgs(os.Stdout, args, port, address, pretty, headers)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 	}
 }
 
-func (a *API[T]) RunWithArgs(out io.Writer, args []string, port int, address string, pretty bool) error {
+func (a *API[T]) RunWithArgs(out io.Writer, args []string, port int, address string, pretty bool, headers []string) error {
 	if len(args) < 1 {
 		return fmt.Errorf("at least one argument required")
 	}
@@ -39,28 +57,42 @@ func (a *API[T]) RunWithArgs(out io.Writer, args []string, port int, address str
 		return nil
 	}
 
-	return a.runClientCLI(out, args, address, pretty)
+	return a.runClientCLI(out, args, address, pretty, headers)
 }
 
-func (a *API[T]) buildClientMap(selfClient *Client[*AnyResource], clientMap map[string]*Client[*AnyResource]) {
+func (a *API[T]) buildClientMap(selfClient *Client[*AnyResource], clientMap map[string]*Client[*AnyResource], reqEditor func(*http.Request) error) {
 	for name, child := range a.subAPIs {
 		childClient := NewSubClient[*AnyResource, *AnyResource](selfClient, child.Base())
-		clientMap[name] = childClient
+		childClient.SetRequestEditor(reqEditor)
 
-		child.buildClientMap(childClient, clientMap)
+		clientMap[name] = childClient
+		child.buildClientMap(childClient, clientMap, reqEditor)
 	}
 }
 
-func (a *API[T]) runClientCLI(out io.Writer, args []string, address string, pretty bool) error {
+func (a *API[T]) runClientCLI(out io.Writer, args []string, address string, pretty bool, headers []string) error {
 	if len(args) < 2 {
 		return fmt.Errorf("at least two arguments required")
 	}
 
+	reqEditor := func(r *http.Request) error {
+		for _, header := range headers {
+			headerSplit := strings.SplitN(header, ":", 2)
+			if len(headerSplit) != 2 {
+				return fmt.Errorf("invalid header provided: %q", header)
+			}
+			r.Header.Add(strings.TrimSpace(headerSplit[0]), strings.TrimSpace(headerSplit[1]))
+		}
+		return nil
+	}
+
 	selfClient := a.AnyClient(address)
+	selfClient.SetRequestEditor(reqEditor)
+
 	clientMap := map[string]*Client[*AnyResource]{
 		a.name: selfClient,
 	}
-	a.buildClientMap(selfClient, clientMap)
+	a.buildClientMap(selfClient, clientMap, reqEditor)
 
 	targetAPI := args[1]
 	client, ok := clientMap[targetAPI]

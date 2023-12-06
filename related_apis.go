@@ -17,7 +17,7 @@ type relatedAPI interface {
 	Parent() relatedAPI
 
 	setParent(relatedAPI)
-	buildClientMap(selfClient *Client[*AnyResource], clientMap map[string]*Client[*AnyResource])
+	buildClientMap(*Client[*AnyResource], map[string]*Client[*AnyResource], func(*http.Request) error)
 }
 
 // Parent returns the API's parent API

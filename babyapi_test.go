@@ -550,7 +550,7 @@ func TestCLI(t *testing.T) {
 	songAPI := babyapi.NewAPI[*Song]("Songs", "/songs", func() *Song { return &Song{} })
 	api.AddNestedAPI(songAPI)
 	go func() {
-		err := api.RunWithArgs(os.Stdout, []string{"serve"}, 8080, "", false)
+		err := api.RunWithArgs(os.Stdout, []string{"serve"}, 8080, "", false, nil)
 		require.NoError(t, err)
 	}()
 	defer api.Stop()
@@ -577,7 +577,7 @@ func TestCLI(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var out bytes.Buffer
-			err := api.RunWithArgs(&out, tt.args, 0, address, false)
+			err := api.RunWithArgs(&out, tt.args, 0, address, false, nil)
 			if !tt.expectedErr {
 				require.NoError(t, err)
 				require.Regexp(t, tt.expectedRegexp, strings.TrimSpace(out.String()))
