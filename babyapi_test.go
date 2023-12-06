@@ -35,194 +35,172 @@ func (a *Album) Patch(newAlbum *Album) *babyapi.ErrResponse {
 }
 
 func TestBabyAPI(t *testing.T) {
-	tests := []struct {
-		name  string
-		start func(*babyapi.API[*Album]) (string, func())
-	}{
-		{
-			"UseTestServe",
-			func(api *babyapi.API[*Album]) (string, func()) {
-				return babyapi.TestServe[*Album](t, api)
-			},
+	api := babyapi.NewAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} })
+	api.AddCustomRoute(chi.Route{
+		Pattern: "/teapot",
+		Handlers: map[string]http.Handler{
+			http.MethodGet: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusTeapot)
+			}),
 		},
-		{
-			"UseAPIStart",
-			func(api *babyapi.API[*Album]) (string, func()) {
-				go api.Serve(":8080")
-				return "http://localhost:8080", func() {
-					// Test `Done()`
-					go func() {
-						timeout := time.After(2 * time.Second)
-						select {
-						case <-api.Done():
-						case <-timeout:
-							t.Error("timed out before graceful shutdown")
-						}
-					}()
+	})
 
-					api.Stop()
-				}
-			},
+	api.AddCustomIDRoute(chi.Route{
+		Pattern: "/teapot",
+		Handlers: map[string]http.Handler{
+			http.MethodGet: api.GetRequestedResourceAndDo(func(r *http.Request, album *Album) (render.Renderer, *babyapi.ErrResponse) {
+				render.Status(r, http.StatusTeapot)
+				return album, nil
+			}),
 		},
-	}
+	})
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			api := babyapi.NewAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} })
-			api.AddCustomRoute(chi.Route{
-				Pattern: "/teapot",
-				Handlers: map[string]http.Handler{
-					http.MethodGet: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-						w.WriteHeader(http.StatusTeapot)
-					}),
-				},
-			})
+	api.SetGetAllFilter(func(r *http.Request) babyapi.FilterFunc[*Album] {
+		return func(a *Album) bool {
+			title := r.URL.Query().Get("title")
+			return title == "" || a.Title == title
+		}
+	})
 
-			api.AddCustomIDRoute(chi.Route{
-				Pattern: "/teapot",
-				Handlers: map[string]http.Handler{
-					http.MethodGet: api.GetRequestedResourceAndDo(func(r *http.Request, album *Album) (render.Renderer, *babyapi.ErrResponse) {
-						render.Status(r, http.StatusTeapot)
-						return album, nil
-					}),
-				},
-			})
+	album1 := &Album{Title: "Album1"}
 
-			api.SetGetAllFilter(func(r *http.Request) babyapi.FilterFunc[*Album] {
-				return func(a *Album) bool {
-					title := r.URL.Query().Get("title")
-					return title == "" || a.Title == title
-				}
-			})
+	serverURL, stop := babyapi.TestServe[*Album](t, api)
 
-			album1 := &Album{Title: "Album1"}
+	defer func() {
+		// Test `Done()`
+		go func() {
+			timeout := time.After(2 * time.Second)
+			select {
+			case <-api.Done():
+			case <-timeout:
+				t.Error("timed out before graceful shutdown")
+			}
+		}()
 
-			serverURL, stop := tt.start(api)
-			defer stop()
+		stop()
+	}()
 
-			client := api.Client(serverURL)
+	client := api.Client(serverURL)
 
-			t.Run("PostAlbum", func(t *testing.T) {
-				t.Run("Successful", func(t *testing.T) {
-					var err error
-					album1, err = client.Post(context.Background(), album1)
-					require.NoError(t, err)
-					require.NotEqual(t, xid.NilID(), album1.GetID())
-				})
-			})
-
-			t.Run("ActionRoute", func(t *testing.T) {
-				address, err := client.URL("")
-				require.NoError(t, err)
-				req, err := http.NewRequest(http.MethodGet, address+"/teapot", http.NoBody)
-				require.NoError(t, err)
-				_, err = client.MakeRequest(req, http.StatusTeapot)
-				require.NoError(t, err)
-			})
-
-			t.Run("ActionIDRoute", func(t *testing.T) {
-				t.Run("Successful", func(t *testing.T) {
-					address, err := client.URL(album1.GetID())
-					require.NoError(t, err)
-					req, err := http.NewRequest(http.MethodGet, address+"/teapot", http.NoBody)
-					require.NoError(t, err)
-					_, err = client.MakeRequest(req, http.StatusTeapot)
-					require.NoError(t, err)
-				})
-			})
-
-			t.Run("GetAll", func(t *testing.T) {
-				t.Run("Successful", func(t *testing.T) {
-					albums, err := client.GetAll(context.Background(), nil)
-					require.NoError(t, err)
-					require.ElementsMatch(t, []*Album{album1}, albums.Items)
-				})
-
-				t.Run("SuccessfulWithFilter", func(t *testing.T) {
-					albums, err := client.GetAll(context.Background(), url.Values{
-						"title": []string{"Album1"},
-					})
-					require.NoError(t, err)
-					require.ElementsMatch(t, []*Album{album1}, albums.Items)
-				})
-
-				t.Run("SuccessfulWithFilterShowingNoResults", func(t *testing.T) {
-					albums, err := client.GetAll(context.Background(), url.Values{
-						"title": []string{"Album2"},
-					})
-					require.NoError(t, err)
-					require.Len(t, albums.Items, 0)
-				})
-			})
-
-			t.Run("GetAlbum", func(t *testing.T) {
-				t.Run("Successful", func(t *testing.T) {
-					a, err := client.Get(context.Background(), album1.GetID())
-					require.NoError(t, err)
-					require.Equal(t, album1, a)
-				})
-
-				t.Run("NotFound", func(t *testing.T) {
-					a, err := client.Get(context.Background(), "2")
-					require.Nil(t, a)
-					require.Error(t, err)
-					require.Equal(t, "error getting resource: unexpected response with text: Resource not found.", err.Error())
-				})
-			})
-
-			t.Run("PatchAlbum", func(t *testing.T) {
-				t.Run("Successful", func(t *testing.T) {
-					a, err := client.Patch(context.Background(), album1.GetID(), &Album{Title: "New Title"})
-					require.NoError(t, err)
-					require.Equal(t, "New Title", a.Title)
-					require.Equal(t, album1.GetID(), a.GetID())
-
-					a, err = client.Get(context.Background(), album1.GetID())
-					require.NoError(t, err)
-					require.Equal(t, "New Title", a.Title)
-					require.Equal(t, album1.GetID(), a.GetID())
-				})
-
-				t.Run("NotFound", func(t *testing.T) {
-					a, err := client.Patch(context.Background(), "2", &Album{Title: "2"})
-					require.Nil(t, a)
-					require.Error(t, err)
-					require.Equal(t, "error patching resource: unexpected response with text: Resource not found.", err.Error())
-				})
-			})
-
-			t.Run("PutAlbum", func(t *testing.T) {
-				t.Run("SuccessfulUpdateExisting", func(t *testing.T) {
-					newAlbum1 := *album1
-					newAlbum1.Title = "NewAlbum1"
-					err := client.Put(context.Background(), &newAlbum1)
-					require.NoError(t, err)
-
-					a, err := client.Get(context.Background(), album1.GetID())
-					require.NoError(t, err)
-					require.Equal(t, newAlbum1, *a)
-				})
-
-				t.Run("SuccessfulCreateNewAlbum", func(t *testing.T) {
-					err := client.Put(context.Background(), &Album{DefaultResource: babyapi.NewDefaultResource()})
-					require.NoError(t, err)
-				})
-			})
-
-			t.Run("DeleteAlbum", func(t *testing.T) {
-				t.Run("Successful", func(t *testing.T) {
-					err := client.Delete(context.Background(), album1.GetID())
-					require.NoError(t, err)
-				})
-
-				t.Run("NotFound", func(t *testing.T) {
-					err := client.Delete(context.Background(), album1.GetID())
-					require.Error(t, err)
-					require.Equal(t, "error deleting resource: unexpected response with text: Resource not found.", err.Error())
-				})
-			})
+	t.Run("PostAlbum", func(t *testing.T) {
+		t.Run("Successful", func(t *testing.T) {
+			var err error
+			album1, err = client.Post(context.Background(), album1)
+			require.NoError(t, err)
+			require.NotEqual(t, xid.NilID(), album1.GetID())
 		})
-	}
+	})
+
+	t.Run("ActionRoute", func(t *testing.T) {
+		address, err := client.URL("")
+		require.NoError(t, err)
+		req, err := http.NewRequest(http.MethodGet, address+"/teapot", http.NoBody)
+		require.NoError(t, err)
+		_, err = client.MakeRequest(req, http.StatusTeapot)
+		require.NoError(t, err)
+	})
+
+	t.Run("ActionIDRoute", func(t *testing.T) {
+		t.Run("Successful", func(t *testing.T) {
+			address, err := client.URL(album1.GetID())
+			require.NoError(t, err)
+			req, err := http.NewRequest(http.MethodGet, address+"/teapot", http.NoBody)
+			require.NoError(t, err)
+			_, err = client.MakeRequest(req, http.StatusTeapot)
+			require.NoError(t, err)
+		})
+	})
+
+	t.Run("GetAll", func(t *testing.T) {
+		t.Run("Successful", func(t *testing.T) {
+			albums, err := client.GetAll(context.Background(), nil)
+			require.NoError(t, err)
+			require.ElementsMatch(t, []*Album{album1}, albums.Items)
+		})
+
+		t.Run("SuccessfulWithFilter", func(t *testing.T) {
+			albums, err := client.GetAll(context.Background(), url.Values{
+				"title": []string{"Album1"},
+			})
+			require.NoError(t, err)
+			require.ElementsMatch(t, []*Album{album1}, albums.Items)
+		})
+
+		t.Run("SuccessfulWithFilterShowingNoResults", func(t *testing.T) {
+			albums, err := client.GetAll(context.Background(), url.Values{
+				"title": []string{"Album2"},
+			})
+			require.NoError(t, err)
+			require.Len(t, albums.Items, 0)
+		})
+	})
+
+	t.Run("GetAlbum", func(t *testing.T) {
+		t.Run("Successful", func(t *testing.T) {
+			a, err := client.Get(context.Background(), album1.GetID())
+			require.NoError(t, err)
+			require.Equal(t, album1, a)
+		})
+
+		t.Run("NotFound", func(t *testing.T) {
+			a, err := client.Get(context.Background(), "2")
+			require.Nil(t, a)
+			require.Error(t, err)
+			require.Equal(t, "error getting resource: unexpected response with text: Resource not found.", err.Error())
+		})
+	})
+
+	t.Run("PatchAlbum", func(t *testing.T) {
+		t.Run("Successful", func(t *testing.T) {
+			a, err := client.Patch(context.Background(), album1.GetID(), &Album{Title: "New Title"})
+			require.NoError(t, err)
+			require.Equal(t, "New Title", a.Title)
+			require.Equal(t, album1.GetID(), a.GetID())
+
+			a, err = client.Get(context.Background(), album1.GetID())
+			require.NoError(t, err)
+			require.Equal(t, "New Title", a.Title)
+			require.Equal(t, album1.GetID(), a.GetID())
+		})
+
+		t.Run("NotFound", func(t *testing.T) {
+			a, err := client.Patch(context.Background(), "2", &Album{Title: "2"})
+			require.Nil(t, a)
+			require.Error(t, err)
+			require.Equal(t, "error patching resource: unexpected response with text: Resource not found.", err.Error())
+		})
+	})
+
+	t.Run("PutAlbum", func(t *testing.T) {
+		t.Run("SuccessfulUpdateExisting", func(t *testing.T) {
+			newAlbum1 := *album1
+			newAlbum1.Title = "NewAlbum1"
+			err := client.Put(context.Background(), &newAlbum1)
+			require.NoError(t, err)
+
+			a, err := client.Get(context.Background(), album1.GetID())
+			require.NoError(t, err)
+			require.Equal(t, newAlbum1, *a)
+		})
+
+		t.Run("SuccessfulCreateNewAlbum", func(t *testing.T) {
+			err := client.Put(context.Background(), &Album{DefaultResource: babyapi.NewDefaultResource()})
+			require.NoError(t, err)
+		})
+	})
+
+	t.Run("DeleteAlbum", func(t *testing.T) {
+		t.Run("Successful", func(t *testing.T) {
+			err := client.Delete(context.Background(), album1.GetID())
+			require.NoError(t, err)
+		})
+
+		t.Run("NotFound", func(t *testing.T) {
+			err := client.Delete(context.Background(), album1.GetID())
+			require.Error(t, err)
+			require.Equal(t, "error deleting resource: unexpected response with text: Resource not found.", err.Error())
+		})
+	})
 }
 
 type Song struct {
