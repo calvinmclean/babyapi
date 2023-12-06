@@ -3,10 +3,8 @@ package babyapi_test
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"html/template"
-	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -84,9 +82,9 @@ func TestBabyAPI(t *testing.T) {
 
 	t.Run("PostAlbum", func(t *testing.T) {
 		t.Run("Successful", func(t *testing.T) {
-			var err error
-			album1, err = client.Post(context.Background(), album1)
+			result, err := client.Post(context.Background(), album1)
 			require.NoError(t, err)
+			album1 = result.Data
 			require.NotEqual(t, xid.NilID(), album1.GetID())
 		})
 	})
@@ -115,7 +113,7 @@ func TestBabyAPI(t *testing.T) {
 		t.Run("Successful", func(t *testing.T) {
 			albums, err := client.GetAll(context.Background(), nil)
 			require.NoError(t, err)
-			require.ElementsMatch(t, []*Album{album1}, albums.Items)
+			require.ElementsMatch(t, []*Album{album1}, albums.Data.Items)
 		})
 
 		t.Run("SuccessfulWithFilter", func(t *testing.T) {
@@ -123,7 +121,7 @@ func TestBabyAPI(t *testing.T) {
 				"title": []string{"Album1"},
 			})
 			require.NoError(t, err)
-			require.ElementsMatch(t, []*Album{album1}, albums.Items)
+			require.ElementsMatch(t, []*Album{album1}, albums.Data.Items)
 		})
 
 		t.Run("SuccessfulWithFilterShowingNoResults", func(t *testing.T) {
@@ -131,7 +129,7 @@ func TestBabyAPI(t *testing.T) {
 				"title": []string{"Album2"},
 			})
 			require.NoError(t, err)
-			require.Len(t, albums.Items, 0)
+			require.Len(t, albums.Data.Items, 0)
 		})
 	})
 
@@ -139,7 +137,7 @@ func TestBabyAPI(t *testing.T) {
 		t.Run("Successful", func(t *testing.T) {
 			a, err := client.Get(context.Background(), album1.GetID())
 			require.NoError(t, err)
-			require.Equal(t, album1, a)
+			require.Equal(t, album1, a.Data)
 		})
 
 		t.Run("NotFound", func(t *testing.T) {
@@ -154,13 +152,13 @@ func TestBabyAPI(t *testing.T) {
 		t.Run("Successful", func(t *testing.T) {
 			a, err := client.Patch(context.Background(), album1.GetID(), &Album{Title: "New Title"})
 			require.NoError(t, err)
-			require.Equal(t, "New Title", a.Title)
-			require.Equal(t, album1.GetID(), a.GetID())
+			require.Equal(t, "New Title", a.Data.Title)
+			require.Equal(t, album1.GetID(), a.Data.GetID())
 
 			a, err = client.Get(context.Background(), album1.GetID())
 			require.NoError(t, err)
-			require.Equal(t, "New Title", a.Title)
-			require.Equal(t, album1.GetID(), a.GetID())
+			require.Equal(t, "New Title", a.Data.Title)
+			require.Equal(t, album1.GetID(), a.Data.GetID())
 		})
 
 		t.Run("NotFound", func(t *testing.T) {
@@ -180,7 +178,7 @@ func TestBabyAPI(t *testing.T) {
 
 			a, err := client.Get(context.Background(), album1.GetID())
 			require.NoError(t, err)
-			require.Equal(t, newAlbum1, *a)
+			require.Equal(t, newAlbum1, *a.Data)
 		})
 
 		t.Run("SuccessfulCreateNewAlbum", func(t *testing.T) {
@@ -273,33 +271,33 @@ func TestNestedAPI(t *testing.T) {
 
 	t.Run("PostArtist", func(t *testing.T) {
 		t.Run("Successful", func(t *testing.T) {
-			var err error
-			artist1, err = artistClient.Post(context.Background(), artist1)
+			result, err := artistClient.Post(context.Background(), artist1)
 			require.NoError(t, err)
+			artist1 = result.Data
 		})
 	})
 
 	t.Run("PostAlbum", func(t *testing.T) {
 		t.Run("Successful", func(t *testing.T) {
-			var err error
-			album1, err = albumClient.Post(context.Background(), album1, artist1.GetID())
+			result, err := albumClient.Post(context.Background(), album1, artist1.GetID())
 			require.NoError(t, err)
+			album1 = result.Data
 		})
 	})
 
 	t.Run("PostMusicVideo", func(t *testing.T) {
 		t.Run("Successful", func(t *testing.T) {
-			var err error
-			musicVideo1, err = musicVideoClient.Post(context.Background(), musicVideo1, artist1.GetID())
+			result, err := musicVideoClient.Post(context.Background(), musicVideo1, artist1.GetID())
 			require.NoError(t, err)
+			musicVideo1 = result.Data
 		})
 	})
 
 	t.Run("PostAlbumSong", func(t *testing.T) {
 		t.Run("Successful", func(t *testing.T) {
-			var err error
-			song1Response, err = songClient.Post(context.Background(), &SongResponse{Song: song1}, artist1.GetID(), album1.GetID())
+			result, err := songClient.Post(context.Background(), &SongResponse{Song: song1}, artist1.GetID(), album1.GetID())
 			require.NoError(t, err)
+			song1Response = result.Data
 		})
 		t.Run("ErrorParentArtistDNE", func(t *testing.T) {
 			_, err := songClient.Post(context.Background(), &SongResponse{Song: &Song{Title: "Song2"}}, "2", album1.GetID())
@@ -315,7 +313,7 @@ func TestNestedAPI(t *testing.T) {
 		t.Run("Successful", func(t *testing.T) {
 			s, err := songClient.Get(context.Background(), song1Response.GetID(), artist1.GetID(), album1.GetID())
 			require.NoError(t, err)
-			require.Equal(t, song1Response, s)
+			require.Equal(t, song1Response, s.Data)
 		})
 
 		t.Run("SuccessfulParsedAsSongResponse", func(t *testing.T) {
@@ -325,12 +323,8 @@ func TestNestedAPI(t *testing.T) {
 			resp, err := songClient.MakeRequest(req, http.StatusOK)
 			require.NoError(t, err)
 
-			var sr SongResponse
-			err = json.NewDecoder(resp.Body).Decode(&sr)
-			require.NoError(t, err)
-
-			require.Equal(t, "Album1", sr.AlbumTitle)
-			require.Equal(t, "Artist1", sr.ArtistName)
+			require.Equal(t, "Album1", resp.Data.AlbumTitle)
+			require.Equal(t, "Artist1", resp.Data.ArtistName)
 		})
 
 		t.Run("NotFound", func(t *testing.T) {
@@ -350,7 +344,7 @@ func TestNestedAPI(t *testing.T) {
 		t.Run("Successful", func(t *testing.T) {
 			albums, err := albumClient.GetAll(context.Background(), nil, artist1.GetID())
 			require.NoError(t, err)
-			require.ElementsMatch(t, []*Album{album1}, albums.Items)
+			require.ElementsMatch(t, []*Album{album1}, albums.Data.Items)
 		})
 	})
 
@@ -358,7 +352,7 @@ func TestNestedAPI(t *testing.T) {
 		t.Run("Successful", func(t *testing.T) {
 			songs, err := songClient.GetAll(context.Background(), nil, artist1.GetID(), album1.GetID())
 			require.NoError(t, err)
-			require.ElementsMatch(t, []*SongResponse{song1Response}, songs.Items)
+			require.ElementsMatch(t, []*SongResponse{song1Response}, songs.Data.Items)
 		})
 	})
 
@@ -630,9 +624,7 @@ func TestHTML(t *testing.T) {
 			resp, err := client.MakeRequest(req, http.StatusOK)
 			require.NoError(t, err)
 
-			data, err := io.ReadAll(resp.Body)
-			require.NoError(t, err)
-			require.Equal(t, "<li>Item1</li>", string(data))
+			require.Equal(t, "<li>Item1</li>", resp.Body)
 		})
 	})
 
@@ -648,11 +640,9 @@ func TestHTML(t *testing.T) {
 			resp, err := client.MakeRequest(req, http.StatusOK)
 			require.NoError(t, err)
 
-			data, err := io.ReadAll(resp.Body)
-			require.NoError(t, err)
 			require.Equal(t, `<ul>
 <li>Item1</li>
-</ul>`, string(data))
+</ul>`, resp.Body)
 		})
 	})
 }

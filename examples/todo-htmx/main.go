@@ -62,12 +62,12 @@ const (
 <td>{{ .Title }}</td>
 <td>{{ .Description }}</td>
 <td>
-	{{ $color := "primary" }}
-	{{ $disabled := "" }}
-	{{ if .Completed }}
-		{{ $color = "secondary" }}
-		{{ $disabled = "disabled" }}
-	{{ end }}
+	{{- $color := "primary" }}
+	{{- $disabled := "" }}
+	{{- if .Completed }}
+		{{- $color = "secondary" }}
+		{{- $disabled = "disabled" }}
+	{{- end -}}
 
 	<button class="btn btn-{{ $color }}"
 		hx-patch="/todos/{{ .ID }}"
