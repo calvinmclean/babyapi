@@ -184,12 +184,12 @@ func (a *API[T]) runPutCommand(args []string, client *Client[*AnyResource]) (*Re
 	if len(args) < 2 {
 		return nil, fmt.Errorf("at least two arguments required")
 	}
-	err := client.PutRaw(context.Background(), args[0], args[1], args[2:]...)
+	result, err := client.PutRaw(context.Background(), args[0], args[1], args[2:]...)
 	if err != nil {
 		return nil, fmt.Errorf("error running Put: %w", err)
 	}
 
-	return nil, nil
+	return result, nil
 }
 
 func (a *API[T]) runPatchCommand(args []string, client *Client[*AnyResource]) (*Response[*AnyResource], error) {

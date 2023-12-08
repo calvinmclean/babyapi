@@ -109,35 +109,35 @@ func (c *Client[T]) GetAll(ctx context.Context, query url.Values, parentIDs ...s
 }
 
 // Put makes a PUT request to create/modify a resource by ID
-func (c *Client[T]) Put(ctx context.Context, resource T, parentIDs ...string) error {
+func (c *Client[T]) Put(ctx context.Context, resource T, parentIDs ...string) (*Response[T], error) {
 	var body bytes.Buffer
 	err := json.NewEncoder(&body).Encode(resource)
 	if err != nil {
-		return fmt.Errorf("error encoding request body: %w", err)
+		return nil, fmt.Errorf("error encoding request body: %w", err)
 	}
 
 	return c.put(ctx, resource.GetID(), &body, parentIDs...)
 }
 
 // PutRaw makes a PUT request to create/modify a resource by ID. It uses the provided string as the request body
-func (c *Client[T]) PutRaw(ctx context.Context, id, body string, parentIDs ...string) error {
+func (c *Client[T]) PutRaw(ctx context.Context, id, body string, parentIDs ...string) (*Response[T], error) {
 	return c.put(ctx, id, bytes.NewBufferString(body), parentIDs...)
 }
 
-func (c *Client[T]) put(ctx context.Context, id string, body io.Reader, parentIDs ...string) error {
+func (c *Client[T]) put(ctx context.Context, id string, body io.Reader, parentIDs ...string) (*Response[T], error) {
 	req, err := c.NewRequestWithParentIDs(ctx, http.MethodPut, body, id, parentIDs...)
 	if err != nil {
-		return fmt.Errorf("error creating request: %w", err)
+		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
 	req.Header.Add("Content-Type", "application/json")
 
-	_, err = c.MakeRequest(req, http.StatusNoContent)
+	result, err := c.MakeRequest(req, http.StatusOK)
 	if err != nil {
-		return fmt.Errorf("error putting resource: %w", err)
+		return nil, fmt.Errorf("error putting resource: %w", err)
 	}
 
-	return nil
+	return result, nil
 }
 
 // Post makes a POST request to create a new resource

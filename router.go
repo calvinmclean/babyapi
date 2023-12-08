@@ -184,8 +184,7 @@ func (a *API[T]) Put(w http.ResponseWriter, r *http.Request) {
 			return *new(T), nil
 		}
 
-		render.NoContent(w, r)
-		return *new(T), nil
+		return resource, nil
 	})(w, r)
 }
 

@@ -76,12 +76,15 @@ const (
 		{{- end -}}
 
 		<button class="uk-button uk-button-{{ $color }}"
-			hx-patch="/todos/{{ .ID }}"
+			hx-put="/todos/{{ .ID }}"
 			hx-headers='{"Accept": "text/html"}'
 			hx-include="this"
 			{{ $disabled }}>
 
 			<input type="hidden" name="Completed" value="true">
+			<input type="hidden" name="Title" value="{{ .Title }}">
+			<input type="hidden" name="Description" value="{{ .Description }}">
+			<input type="hidden" name="ID" value="{{ .ID }}">
 			Complete
 		</button>
 
@@ -98,20 +101,6 @@ type TODO struct {
 	Title       string
 	Description string
 	Completed   *bool
-}
-
-func (t *TODO) Patch(newTODO *TODO) *babyapi.ErrResponse {
-	if newTODO.Title != "" {
-		t.Title = newTODO.Title
-	}
-	if newTODO.Description != "" {
-		t.Description = newTODO.Description
-	}
-	if newTODO.Completed != nil {
-		t.Completed = newTODO.Completed
-	}
-
-	return nil
 }
 
 func (t *TODO) HTML() string {

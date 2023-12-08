@@ -173,17 +173,20 @@ func TestBabyAPI(t *testing.T) {
 		t.Run("SuccessfulUpdateExisting", func(t *testing.T) {
 			newAlbum1 := *album1
 			newAlbum1.Title = "NewAlbum1"
-			err := client.Put(context.Background(), &newAlbum1)
+			a, err := client.Put(context.Background(), &newAlbum1)
 			require.NoError(t, err)
+			require.Equal(t, "NewAlbum1", a.Data.Title)
+			require.Equal(t, album1.GetID(), a.Data.GetID())
 
-			a, err := client.Get(context.Background(), album1.GetID())
+			a, err = client.Get(context.Background(), album1.GetID())
 			require.NoError(t, err)
 			require.Equal(t, newAlbum1, *a.Data)
 		})
 
 		t.Run("SuccessfulCreateNewAlbum", func(t *testing.T) {
-			err := client.Put(context.Background(), &Album{DefaultResource: babyapi.NewDefaultResource()})
+			a, err := client.Put(context.Background(), &Album{DefaultResource: babyapi.NewDefaultResource(), Title: "PutNew"})
 			require.NoError(t, err)
+			require.Equal(t, "PutNew", a.Data.Title)
 		})
 	})
 
@@ -429,7 +432,7 @@ func TestCLI(t *testing.T) {
 		{
 			"Put",
 			[]string{"put", "Albums", "cljcqg5o402e9s28rbp0", `{"id":"cljcqg5o402e9s28rbp0","title":"NewAlbum"}`},
-			`null`,
+			`\{"id":"cljcqg5o402e9s28rbp0","title":"NewAlbum"\}`,
 			false,
 		},
 		{
@@ -532,14 +535,14 @@ func TestCLI(t *testing.T) {
 	// Create hard-coded album so we can use the ID
 	album := &Album{DefaultResource: babyapi.NewDefaultResource(), Title: "NewAlbum"}
 	album.DefaultResource.ID.ID, _ = xid.FromString("cljcqg5o402e9s28rbp0")
-	err := api.Client(address).Put(context.Background(), album)
+	_, err := api.Client(address).Put(context.Background(), album)
 	require.NoError(t, err)
 
 	// Create hard-coded song so we can use the ID
 	song := &Song{DefaultResource: babyapi.NewDefaultResource(), Title: "NewSong"}
 	song.DefaultResource.ID.ID, _ = xid.FromString("clknc0do4023onrn3bqg")
 	songClient := babyapi.NewSubClient[*Album, *Song](api.Client(address), "/songs")
-	err = songClient.Put(context.Background(), song, album.GetID())
+	_, err = songClient.Put(context.Background(), song, album.GetID())
 	require.NoError(t, err)
 
 	t.Run("RunCLI", func(t *testing.T) {
