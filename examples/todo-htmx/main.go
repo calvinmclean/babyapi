@@ -10,12 +10,12 @@ import (
 
 const (
 	allTODOsTemplate = `<!doctype html>
-<html data-bs-theme="dark">
+<html>
 	<head>
 		<meta charset="UTF-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<title>TODOs</title>
-		<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+		<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3.17.11/dist/css/uikit.min.css" />
 		<script src="https://unpkg.com/htmx.org@1.9.8"></script>
 		<script src="https://unpkg.com/htmx.org/dist/ext/sse.js"></script>
 	</head>
@@ -28,7 +28,13 @@ const (
 	</style>
 
 	<body>
-		<table class="table">
+		<table class="uk-table uk-table-divider uk-margin-left uk-margin-right">
+			<colgroup>
+				<col>
+				<col>
+				<col style="width: 300px;">
+			</colgroup>
+
 			<thead>
 				<tr>
 					<th>Title</th>
@@ -37,16 +43,16 @@ const (
 				</tr>
 			</thead>
 
-			<tbody id="todos-table" hx-ext="sse"sse-connect="/todos/listen" sse-swap="data" hx-swap="beforeend">
-				<form hx-post="/todos" hx-swap="none">
+			<tbody hx-ext="sse" sse-connect="/todos/listen" sse-swap="data" hx-swap="beforeend">
+				<form hx-post="/todos" hx-swap="none" hx-on::after-request="this.reset()">
 					<td>
-						<input class="form-control" name="Title" type="text">
+						<input class="uk-input" name="Title" type="text">
 					</td>
 					<td>
-						<input class="form-control" name="Description" type="text">
+						<input class="uk-input" name="Description" type="text">
 					</td>
 					<td>
-						<button type="submit" class="btn btn-primary">Add TODO</button>
+						<button type="submit" class="uk-button uk-button-primary">Add TODO</button>
 					</td>
 				</form>
 
@@ -59,30 +65,30 @@ const (
 </html>`
 
 	todoRowTemplate = `<tr hx-target="this" hx-swap="outerHTML">
-<td>{{ .Title }}</td>
-<td>{{ .Description }}</td>
-<td>
-	{{- $color := "primary" }}
-	{{- $disabled := "" }}
-	{{- if .Completed }}
-		{{- $color = "secondary" }}
-		{{- $disabled = "disabled" }}
-	{{- end -}}
+	<td>{{ .Title }}</td>
+	<td>{{ .Description }}</td>
+	<td>
+		{{- $color := "primary" }}
+		{{- $disabled := "" }}
+		{{- if .Completed }}
+			{{- $color = "secondary" }}
+			{{- $disabled = "disabled" }}
+		{{- end -}}
 
-	<button class="btn btn-{{ $color }}"
-		hx-patch="/todos/{{ .ID }}"
-		hx-headers='{"Accept": "text/html"}'
-		hx-include="this"
-		{{ $disabled }}>
+		<button class="uk-button uk-button-{{ $color }}"
+			hx-patch="/todos/{{ .ID }}"
+			hx-headers='{"Accept": "text/html"}'
+			hx-include="this"
+			{{ $disabled }}>
 
-		<input type="hidden" name="Completed" value="true">
-		Complete
-	</button>
+			<input type="hidden" name="Completed" value="true">
+			Complete
+		</button>
 
-	<button class="btn btn-danger" hx-delete="/todos/{{ .ID }}" hx-swap="swap:1s">
-		Delete
-	</button>
-</td>
+		<button class="uk-button uk-button-danger" hx-delete="/todos/{{ .ID }}" hx-swap="swap:1s">
+			Delete
+		</button>
+	</td>
 </tr>`
 )
 
