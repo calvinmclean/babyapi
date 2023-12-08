@@ -44,7 +44,7 @@ const (
 			</thead>
 
 			<tbody hx-ext="sse" sse-connect="/todos/listen" sse-swap="data" hx-swap="beforeend">
-				<form hx-post="/todos" hx-swap="none">
+				<form hx-post="/todos" hx-swap="none" hx-on::after-request="this.reset()">
 					<td>
 						<input class="uk-input" name="Title" type="text">
 					</td>
