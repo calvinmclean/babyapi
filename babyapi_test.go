@@ -64,20 +64,6 @@ func TestBabyAPI(t *testing.T) {
 
 	serverURL, stop := babyapi.TestServe[*Album](t, api)
 
-	defer func() {
-		// Test `Done()`
-		go func() {
-			timeout := time.After(2 * time.Second)
-			select {
-			case <-api.Done():
-			case <-timeout:
-				t.Error("timed out before graceful shutdown")
-			}
-		}()
-
-		stop()
-	}()
-
 	client := api.Client(serverURL)
 
 	t.Run("PostAlbum", func(t *testing.T) {
@@ -202,6 +188,18 @@ func TestBabyAPI(t *testing.T) {
 			require.Equal(t, "error deleting resource: unexpected response with text: Resource not found.", err.Error())
 		})
 	})
+
+	// Test `Done()`
+	go func() {
+		timeout := time.After(2 * time.Second)
+		select {
+		case <-api.Done():
+		case <-timeout:
+			t.Error("timed out before graceful shutdown")
+		}
+	}()
+
+	stop()
 }
 
 type Song struct {
@@ -528,7 +526,6 @@ func TestCLI(t *testing.T) {
 		err := api.RunWithArgs(os.Stdout, []string{"serve"}, 8080, "", false, nil)
 		require.NoError(t, err)
 	}()
-	defer api.Stop()
 
 	address := "http://localhost:8080"
 
@@ -565,6 +562,8 @@ func TestCLI(t *testing.T) {
 			}
 		})
 	}
+
+	api.Stop()
 }
 
 type UnorderedList struct {
@@ -575,10 +574,10 @@ func (ul *UnorderedList) Render(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (ul *UnorderedList) HTML() string {
+func (ul *UnorderedList) HTML(r *http.Request) string {
 	result := "<ul>\n"
 	for _, li := range ul.Items {
-		result += li.HTML() + "\n"
+		result += li.HTML(r) + "\n"
 	}
 	return result + "</ul>"
 }
@@ -588,7 +587,7 @@ type ListItem struct {
 	Content string
 }
 
-func (d *ListItem) HTML() string {
+func (d *ListItem) HTML(*http.Request) string {
 	tmpl := template.Must(template.New("li").Parse(`<li>{{ .Content }}</li>`))
 	return babyapi.MustRenderHTML(tmpl, d)
 }

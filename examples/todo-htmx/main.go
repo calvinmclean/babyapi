@@ -103,7 +103,7 @@ type TODO struct {
 	Completed   *bool
 }
 
-func (t *TODO) HTML() string {
+func (t *TODO) HTML(*http.Request) string {
 	tmpl := template.Must(template.New("todoRow").Parse(todoRowTemplate))
 	return babyapi.MustRenderHTML(tmpl, t)
 }
@@ -116,7 +116,7 @@ func (at *AllTODOs) Render(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (at *AllTODOs) HTML() string {
+func (at *AllTODOs) HTML(*http.Request) string {
 	tmpl := template.Must(template.New("todoRow").Parse(todoRowTemplate))
 	tmpl = template.Must(tmpl.New("allTODOs").Parse(allTODOsTemplate))
 	return babyapi.MustRenderHTML(tmpl, at)
@@ -140,7 +140,7 @@ func main() {
 	api.SetOnCreateOrUpdate(func(r *http.Request, t *TODO) *babyapi.ErrResponse {
 		if r.Method == http.MethodPost {
 			select {
-			case todoChan <- &babyapi.ServerSentEvent{Event: "data", Data: t.HTML()}:
+			case todoChan <- &babyapi.ServerSentEvent{Event: "data", Data: t.HTML(r)}:
 			default:
 			}
 		}
