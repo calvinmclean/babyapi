@@ -12,7 +12,7 @@ import (
 // HTMLer allows for easily represending reponses as HTML strings when accepted content
 // type is text/html
 type HTMLer interface {
-	HTML() string
+	HTML(*http.Request) string
 }
 
 // Create API routes on the given router
@@ -21,7 +21,7 @@ func (a *API[T]) Route(r chi.Router) {
 		if render.GetAcceptedContentType(r) == render.ContentTypeHTML {
 			htmler, ok := v.(HTMLer)
 			if ok {
-				render.HTML(w, r, htmler.HTML())
+				render.HTML(w, r, htmler.HTML(r))
 				return
 			}
 		}
