@@ -247,12 +247,11 @@ func TestNestedAPI(t *testing.T) {
 	musicVideoAPI := babyapi.NewAPI[*MusicVideo]("MusicVideos", "/music_videos", func() *MusicVideo { return &MusicVideo{} })
 	songAPI := babyapi.NewAPI[*Song]("Songs", "/songs", func() *Song { return &Song{} })
 
-	songAPI.ResponseWrapper(func(s *Song) render.Renderer {
+	songAPI.SetResponseWrapper(func(s *Song) render.Renderer {
 		return &SongResponse{Song: s, api: songAPI}
 	})
 
-	artistAPI.AddNestedAPI(albumAPI)
-	artistAPI.AddNestedAPI(musicVideoAPI)
+	artistAPI.AddNestedAPI(albumAPI).AddNestedAPI(musicVideoAPI)
 	albumAPI.AddNestedAPI(songAPI)
 
 	serverURL, stop := babyapi.TestServe[*Artist](t, artistAPI)
@@ -699,5 +698,61 @@ func TestMustRenderHTML(t *testing.T) {
 	tmpl := template.Must(template.New("test").Parse("{{ .UndefinedVariable }}"))
 	require.Panics(t, func() {
 		babyapi.MustRenderHTML(tmpl, "string is bad input")
+	})
+}
+
+func TestAPIModifiers(t *testing.T) {
+	middleware := 0
+	beforeDelete := 0
+	afterDelete := 0
+	onCreateOrUpdate := 0
+
+	api := babyapi.NewAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} }).
+		SetCustomResponseCode(http.MethodPut, http.StatusTeapot).
+		AddMiddlewares(chi.Middlewares{
+			func(next http.Handler) http.Handler {
+				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					middleware++
+					next.ServeHTTP(w, r)
+				})
+			},
+		}).
+		SetOnCreateOrUpdate(func(r *http.Request, a *Album) *babyapi.ErrResponse {
+			onCreateOrUpdate++
+			return nil
+		}).
+		SetBeforeDelete(func(r *http.Request) *babyapi.ErrResponse {
+			beforeDelete++
+			return nil
+		}).
+		SetAfterDelete(func(r *http.Request) *babyapi.ErrResponse {
+			afterDelete++
+			return nil
+		})
+
+	albumID := "cljcqg5o402e9s28rbp0"
+	t.Run("CreateResource", func(t *testing.T) {
+		body := bytes.NewBufferString(fmt.Sprintf(`{"Title": "NewAlbum", "ID": "%s"}`, albumID))
+		r, err := http.NewRequest(http.MethodPut, "/albums/"+albumID, body)
+		require.NoError(t, err)
+		r.Header.Add("Content-Type", "application/json")
+
+		w := babyapi.Test[*Album](t, api, r)
+		require.Equal(t, http.StatusTeapot, w.Result().StatusCode)
+	})
+
+	t.Run("DeleteResource", func(t *testing.T) {
+		r, err := http.NewRequest(http.MethodDelete, "/albums/"+albumID, http.NoBody)
+		require.NoError(t, err)
+
+		w := babyapi.Test[*Album](t, api, r)
+		require.Equal(t, http.StatusNoContent, w.Result().StatusCode)
+	})
+
+	t.Run("AssertAllMiddlewaresUsed", func(t *testing.T) {
+		require.Equal(t, 2, middleware)
+		require.Equal(t, 1, beforeDelete)
+		require.Equal(t, 1, afterDelete)
+		require.Equal(t, 1, onCreateOrUpdate)
 	})
 }

@@ -4,10 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 )
+
+var respondMtx sync.Mutex
 
 // HTMLer allows for easily represending reponses as HTML strings when accepted content
 // type is text/html
@@ -17,6 +20,7 @@ type HTMLer interface {
 
 // Create API routes on the given router
 func (a *API[T]) Route(r chi.Router) {
+	respondMtx.Lock()
 	render.Respond = func(w http.ResponseWriter, r *http.Request, v interface{}) {
 		if render.GetAcceptedContentType(r) == render.ContentTypeHTML {
 			htmler, ok := v.(HTMLer)
@@ -27,6 +31,11 @@ func (a *API[T]) Route(r chi.Router) {
 		}
 
 		render.DefaultResponder(w, r, v)
+	}
+	respondMtx.Unlock()
+
+	for _, middleware := range a.middlewares {
+		r.Use(middleware)
 	}
 
 	r.Route(a.base, func(r chi.Router) {
@@ -181,7 +190,6 @@ func (a *API[T]) Put(w http.ResponseWriter, r *http.Request) {
 		codeOverride, ok := a.customResponseCodes[http.MethodPut]
 		if ok {
 			render.Status(r, codeOverride)
-			return *new(T), nil
 		}
 
 		return resource, nil
