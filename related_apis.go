@@ -6,22 +6,22 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// relatedAPI declares a subset of methods from the API struct that are required to enable
+// RelatedAPI declares a subset of methods from the API struct that are required to enable
 // nested/parent-child API relationships
-type relatedAPI interface {
+type RelatedAPI interface {
 	Router() chi.Router
 	Route(chi.Router)
 	Base() string
 	Name() string
 	GetIDParam(*http.Request) string
-	Parent() relatedAPI
+	Parent() RelatedAPI
 
-	setParent(relatedAPI)
+	setParent(RelatedAPI)
 	buildClientMap(*Client[*AnyResource], map[string]*Client[*AnyResource], func(*http.Request) error)
 }
 
 // Parent returns the API's parent API
-func (a *API[T]) Parent() relatedAPI {
+func (a *API[T]) Parent() RelatedAPI {
 	return a.parent
 }
 
@@ -31,11 +31,13 @@ func (a *API[T]) GetParentIDParam(r *http.Request) string {
 }
 
 // AddNestedAPI adds a child API to this API and initializes the parent relationship on the child's side
-func (a *API[T]) AddNestedAPI(childAPI relatedAPI) {
+func (a *API[T]) AddNestedAPI(childAPI RelatedAPI) *API[T] {
 	a.subAPIs[childAPI.Name()] = childAPI
 	childAPI.setParent(a)
+
+	return a
 }
 
-func (a *API[T]) setParent(parent relatedAPI) {
+func (a *API[T]) setParent(parent RelatedAPI) {
 	a.parent = parent
 }

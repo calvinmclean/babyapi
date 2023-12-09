@@ -247,12 +247,11 @@ func TestNestedAPI(t *testing.T) {
 	musicVideoAPI := babyapi.NewAPI[*MusicVideo]("MusicVideos", "/music_videos", func() *MusicVideo { return &MusicVideo{} })
 	songAPI := babyapi.NewAPI[*Song]("Songs", "/songs", func() *Song { return &Song{} })
 
-	songAPI.ResponseWrapper(func(s *Song) render.Renderer {
+	songAPI.SetResponseWrapper(func(s *Song) render.Renderer {
 		return &SongResponse{Song: s, api: songAPI}
 	})
 
-	artistAPI.AddNestedAPI(albumAPI)
-	artistAPI.AddNestedAPI(musicVideoAPI)
+	artistAPI.AddNestedAPI(albumAPI).AddNestedAPI(musicVideoAPI)
 	albumAPI.AddNestedAPI(songAPI)
 
 	serverURL, stop := babyapi.TestServe[*Artist](t, artistAPI)

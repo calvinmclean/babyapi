@@ -38,7 +38,7 @@ func (p *mockParent) Router() chi.Router {
 func (p *mockParent) Route(chi.Router) {
 }
 
-func (p *mockParent) Parent() relatedAPI {
+func (p *mockParent) Parent() RelatedAPI {
 	return p
 }
 
@@ -54,7 +54,7 @@ func (p *mockParent) GetIDParam(r *http.Request) string {
 	return GetIDParam(r, p.name)
 }
 
-func (p *mockParent) setParent(relatedAPI) {}
+func (p *mockParent) setParent(RelatedAPI) {}
 
 func (p *mockParent) buildClientMap(*Client[*AnyResource], map[string]*Client[*AnyResource], func(*http.Request) error) {
 }

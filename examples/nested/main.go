@@ -66,7 +66,7 @@ func main() {
 	musicVideoAPI := babyapi.NewAPI[*MusicVideo]("MusicVideos", "/music_videos", func() *MusicVideo { return &MusicVideo{} })
 	songAPI := babyapi.NewAPI[*Song]("Songs", "/songs", func() *Song { return &Song{} })
 
-	songAPI.ResponseWrapper(func(s *Song) render.Renderer {
+	songAPI.SetResponseWrapper(func(s *Song) render.Renderer {
 		return &SongResponse{Song: s, api: songAPI}
 	})
 
