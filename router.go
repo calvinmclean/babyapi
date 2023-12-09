@@ -34,6 +34,10 @@ func (a *API[T]) Route(r chi.Router) {
 	}
 	respondMtx.Unlock()
 
+	for _, middleware := range a.middlewares {
+		r.Use(middleware)
+	}
+
 	r.Route(a.base, func(r chi.Router) {
 		// Only set these middleware for root-level API
 		if a.parent == nil {
@@ -186,7 +190,6 @@ func (a *API[T]) Put(w http.ResponseWriter, r *http.Request) {
 		codeOverride, ok := a.customResponseCodes[http.MethodPut]
 		if ok {
 			render.Status(r, codeOverride)
-			return *new(T), nil
 		}
 
 		return resource, nil
