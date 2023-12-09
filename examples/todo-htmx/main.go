@@ -56,7 +56,7 @@ const (
 					</td>
 				</form>
 
-				{{ range .Items }}
+				{{ range . }}
 				{{ template "todoRow" . }}
 				{{ end }}
 			</tbody>
@@ -108,15 +108,13 @@ func (t *TODO) HTML(*http.Request) string {
 	return babyapi.MustRenderHTML(tmpl, t)
 }
 
-type AllTODOs struct {
-	Items []*TODO
-}
+type AllTODOs []*TODO
 
-func (at *AllTODOs) Render(w http.ResponseWriter, r *http.Request) error {
+func (at AllTODOs) Render(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (at *AllTODOs) HTML(*http.Request) string {
+func (at AllTODOs) HTML(*http.Request) string {
 	tmpl := template.Must(template.New("todoRow").Parse(todoRowTemplate))
 	tmpl = template.Must(tmpl.New("allTODOs").Parse(allTODOsTemplate))
 	return babyapi.MustRenderHTML(tmpl, at)
@@ -127,7 +125,7 @@ func main() {
 
 	// Use AllTODOs in the GetAll response since it implements HTMLer
 	api.SetGetAllResponseWrapper(func(todos []*TODO) render.Renderer {
-		return &AllTODOs{todos}
+		return AllTODOs(todos)
 	})
 
 	// HTMX requires a 200 response code to do a swap after delete
