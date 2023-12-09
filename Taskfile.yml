@@ -1,0 +1,16 @@
+version: "3"
+
+tasks:
+  test:
+    desc: Run unit tests
+    cmds:
+      - go test -short -race -covermode=atomic -coverprofile=coverage.out -coverpkg=./... ./...
+
+  lint:
+    desc: Run linting
+    cmds:
+      - golangci-lint run
+
+  gofumpt:
+    desc: Run gofumpt to format
+    cmd: gofumpt -w .
