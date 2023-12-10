@@ -43,7 +43,7 @@ const (
 				</tr>
 			</thead>
 
-			<tbody hx-ext="sse" sse-connect="/todos/listen" sse-swap="data" hx-swap="beforeend">
+			<tbody hx-ext="sse" sse-connect="/todos/listen" sse-swap="newTODO" hx-swap="beforeend">
 				<form hx-post="/todos" hx-swap="none" hx-on::after-request="this.reset()">
 					<td>
 						<input class="uk-input" name="Title" type="text">
@@ -136,11 +136,15 @@ func main() {
 
 	// Push events onto the SSE channel when new TODOs are created
 	api.SetOnCreateOrUpdate(func(r *http.Request, t *TODO) *babyapi.ErrResponse {
-		if r.Method == http.MethodPost {
-			select {
-			case todoChan <- &babyapi.ServerSentEvent{Event: "data", Data: t.HTML(r)}:
-			default:
-			}
+		if r.Method != http.MethodPost {
+			return nil
+		}
+
+		select {
+		case todoChan <- &babyapi.ServerSentEvent{Event: "newTODO", Data: t.HTML(r)}:
+		default:
+			logger := babyapi.GetLoggerFromContext(r.Context())
+			logger.Info("no listeners for server-sent event")
 		}
 		return nil
 	})
