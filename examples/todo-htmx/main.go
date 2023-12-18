@@ -1,11 +1,16 @@
 package main
 
 import (
+	"fmt"
 	"html/template"
 	"net/http"
+	"os"
 
 	"github.com/calvinmclean/babyapi"
+	"github.com/calvinmclean/babyapi/storage"
+
 	"github.com/go-chi/render"
+	"github.com/madflojo/hord/drivers/redis"
 )
 
 const (
@@ -149,5 +154,32 @@ func main() {
 		return nil
 	})
 
+	err := setupStorage(api)
+	if err != nil {
+		panic(err)
+	}
+
 	api.RunCLI()
+}
+
+// Optionally setup redis storage if environment variables are defined
+func setupStorage(api *babyapi.API[*TODO]) error {
+	host := os.Getenv("REDIS_HOST")
+	password := os.Getenv("REDIS_PASS")
+
+	if password == "" && host == "" {
+		return nil
+	}
+
+	db, err := storage.NewRedisDB(redis.Config{
+		Server:   host + ":6379",
+		Password: password,
+	})
+	if err != nil {
+		return fmt.Errorf("error setting up redis storage: %w", err)
+	}
+
+	api.SetStorage(storage.NewClient[*TODO](db, "TODO"))
+
+	return nil
 }
