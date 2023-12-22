@@ -20,9 +20,10 @@ type API[T Resource] struct {
 	name string
 	base string
 
-	subAPIs     map[string]RelatedAPI
-	middlewares chi.Middlewares
-	storage     Storage[T]
+	subAPIs       map[string]RelatedAPI
+	middlewares   []func(http.Handler) http.Handler
+	idMiddlewares []func(http.Handler) http.Handler
+	storage       Storage[T]
 
 	server *http.Server
 	quit   chan os.Signal
@@ -57,6 +58,7 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 		name,
 		base,
 		map[string]RelatedAPI{},
+		nil,
 		nil,
 		MapStorage[T]{},
 		nil,
@@ -177,9 +179,15 @@ func (a *API[T]) Storage() Storage[T] {
 	return a.storage
 }
 
-// AddMiddlewares appends chi.Middlewares to existing middlewares
-func (a *API[T]) AddMiddlewares(m chi.Middlewares) *API[T] {
-	a.middlewares = append(a.middlewares, m...)
+// AddMiddleware adds a middleware which is active only on the paths without resource ID
+func (a *API[T]) AddMiddleware(m func(http.Handler) http.Handler) *API[T] {
+	a.middlewares = append(a.middlewares, m)
+	return a
+}
+
+// AddIDMiddleware adds a middleware which is active only on the paths including a resource ID
+func (a *API[T]) AddIDMiddleware(m func(http.Handler) http.Handler) *API[T] {
+	a.idMiddlewares = append(a.idMiddlewares, m)
 	return a
 }
 

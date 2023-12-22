@@ -64,6 +64,39 @@ func (a *API[T]) GetRequestedResourceAndDo(do func(*http.Request, T) (render.Ren
 	}
 }
 
+// GetRequestedResourceAndDoMiddleware is a shortcut for creating an ID-scoped middleware that gets the requested resource from storage,
+// calls the provided 'do' function, and calls next.ServeHTTP. If the resource is not found for a PUT request, the error is ignored
+func (a *API[T]) GetRequestedResourceAndDoMiddleware(do func(*http.Request, T) *ErrResponse) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+			logger := GetLoggerFromContext(r.Context())
+
+			resource, httpErr := a.GetRequestedResource(r)
+			if httpErr != nil {
+				// Skip for PUT because it can be used to create new resources
+				if errors.Is(httpErr, ErrNotFoundResponse) && r.Method == http.MethodPut {
+					logger.Warn("resource not found but continuing to next handler")
+					next.ServeHTTP(w, r)
+					return
+				}
+
+				logger.Error("error getting requested resource", "error", httpErr.Error())
+				_ = render.Render(w, r, httpErr)
+				return
+			}
+
+			httpErr = do(r, resource)
+			if httpErr != nil {
+				_ = render.Render(w, r, httpErr)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // ReadRequestBodyAndDo is a wrapper that handles decoding the request body into the resource type and rendering a response
 func (a *API[T]) ReadRequestBodyAndDo(do func(*http.Request, T) (T, *ErrResponse)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
