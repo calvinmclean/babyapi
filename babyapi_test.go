@@ -726,19 +726,19 @@ func TestMustRenderHTML(t *testing.T) {
 
 func TestAPIModifiers(t *testing.T) {
 	middleware := 0
+	idMiddlewareWithRequestResource := 0
+	idMiddleware := 0
 	beforeDelete := 0
 	afterDelete := 0
 	onCreateOrUpdate := 0
 
 	api := babyapi.NewAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} }).
 		SetCustomResponseCode(http.MethodPut, http.StatusTeapot).
-		AddMiddlewares(chi.Middlewares{
-			func(next http.Handler) http.Handler {
-				return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					middleware++
-					next.ServeHTTP(w, r)
-				})
-			},
+		AddMiddleware(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				middleware++
+				next.ServeHTTP(w, r)
+			})
 		}).
 		SetOnCreateOrUpdate(func(r *http.Request, a *Album) *babyapi.ErrResponse {
 			onCreateOrUpdate++
@@ -752,6 +752,19 @@ func TestAPIModifiers(t *testing.T) {
 			afterDelete++
 			return nil
 		})
+
+	api.AddIDMiddleware(api.GetRequestedResourceAndDoMiddleware(func(r *http.Request, a *Album) *babyapi.ErrResponse {
+		require.NotNil(t, a)
+		idMiddlewareWithRequestResource++
+		return nil
+	}))
+
+	api.AddIDMiddleware(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			idMiddleware++
+			next.ServeHTTP(w, r)
+		})
+	})
 
 	albumID := "cljcqg5o402e9s28rbp0"
 	t.Run("CreateResource", func(t *testing.T) {
@@ -772,8 +785,21 @@ func TestAPIModifiers(t *testing.T) {
 		require.Equal(t, http.StatusNoContent, w.Result().StatusCode)
 	})
 
+	t.Run("GetResourceNotFound", func(t *testing.T) {
+		r, err := http.NewRequest(http.MethodGet, "/albums/DoesNotExist", http.NoBody)
+		require.NoError(t, err)
+
+		w := babyapi.Test[*Album](t, api, r)
+		require.Equal(t, http.StatusNotFound, w.Result().StatusCode)
+	})
+
 	t.Run("AssertAllMiddlewaresUsed", func(t *testing.T) {
-		require.Equal(t, 2, middleware)
+		// All requests hit this middleware
+		require.Equal(t, 3, middleware)
+		// All ID requests hit this except for the GET 404
+		require.Equal(t, 2, idMiddleware)
+		// Only hit for DELETE because PUT doesn't use it for creating new resources and GET had 404
+		require.Equal(t, 1, idMiddlewareWithRequestResource)
 		require.Equal(t, 1, beforeDelete)
 		require.Equal(t, 1, afterDelete)
 		require.Equal(t, 1, onCreateOrUpdate)

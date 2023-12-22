@@ -34,8 +34,8 @@ func (a *API[T]) Route(r chi.Router) {
 	}
 	respondMtx.Unlock()
 
-	for _, middleware := range a.middlewares {
-		r.Use(middleware)
+	for _, m := range a.middlewares {
+		r.Use(m)
 	}
 
 	r.Route(a.base, func(r chi.Router) {
@@ -48,6 +48,10 @@ func (a *API[T]) Route(r chi.Router) {
 		r.Get("/", a.GetAll)
 
 		r.With(a.resourceExistsMiddleware).Route(fmt.Sprintf("/{%s}", a.IDParamKey()), func(r chi.Router) {
+			for _, m := range a.idMiddlewares {
+				r.Use(m)
+			}
+
 			r.Get("/", a.Get)
 			r.Delete("/", a.Delete)
 			r.With(a.requestBodyMiddleware).Put("/", a.Put)
