@@ -393,7 +393,7 @@ func TestCLI(t *testing.T) {
 		{
 			"GetAll",
 			[]string{"list", "Albums"},
-			`\[\{"id":"cljcqg5o402e9s28rbp0","title":"NewAlbum"\}\]`,
+			`\[\{"id":"cljcqg5o402e9s28rbp0","title":"New Album"\}\]`,
 			false,
 		},
 		{
@@ -522,14 +522,21 @@ func TestCLI(t *testing.T) {
 	songAPI := babyapi.NewAPI[*Song]("Songs", "/songs", func() *Song { return &Song{} })
 	api.AddNestedAPI(songAPI)
 	go func() {
-		err := api.RunWithArgs(os.Stdout, []string{"serve"}, 8080, "", false, nil)
+		err := api.RunWithArgs(os.Stdout, []string{"serve"}, 8080, "", false, nil, "")
 		require.NoError(t, err)
 	}()
+
+	api.SetGetAllFilter(func(r *http.Request) babyapi.FilterFunc[*Album] {
+		return func(a *Album) bool {
+			title := r.URL.Query().Get("title")
+			return title == "" || a.Title == title
+		}
+	})
 
 	address := "http://localhost:8080"
 
 	// Create hard-coded album so we can use the ID
-	album := &Album{DefaultResource: babyapi.NewDefaultResource(), Title: "NewAlbum"}
+	album := &Album{DefaultResource: babyapi.NewDefaultResource(), Title: "New Album"}
 	album.DefaultResource.ID.ID, _ = xid.FromString("cljcqg5o402e9s28rbp0")
 	_, err := api.Client(address).Put(context.Background(), album)
 	require.NoError(t, err)
@@ -545,10 +552,26 @@ func TestCLI(t *testing.T) {
 		api.RunCLI()
 	})
 
+	t.Run("GetAllQueryParams", func(t *testing.T) {
+		t.Run("Successful", func(t *testing.T) {
+			var out bytes.Buffer
+			err := api.RunWithArgs(&out, []string{"list", "Albums"}, 0, address, false, nil, "title=New Album")
+			require.NoError(t, err)
+			require.Equal(t, `{"items":[{"id":"cljcqg5o402e9s28rbp0","title":"New Album"}]}`, strings.TrimSpace(out.String()))
+		})
+
+		t.Run("NoMatch", func(t *testing.T) {
+			var out bytes.Buffer
+			err := api.RunWithArgs(&out, []string{"list", "Albums"}, 0, address, false, nil, "title=badTitle")
+			require.NoError(t, err)
+			require.Equal(t, `{"items":[]}`, strings.TrimSpace(out.String()))
+		})
+	})
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var out bytes.Buffer
-			err := api.RunWithArgs(&out, tt.args, 0, address, false, nil)
+			err := api.RunWithArgs(&out, tt.args, 0, address, false, nil, "")
 			if !tt.expectedErr {
 				require.NoError(t, err)
 				require.Regexp(t, tt.expectedRegexp, strings.TrimSpace(out.String()))

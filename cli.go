@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 
@@ -31,22 +32,24 @@ func (a *API[T]) RunCLI() {
 	var address string
 	var pretty bool
 	var headers stringSliceFlag
+	var query string
 	flag.IntVar(&port, "port", 8080, "http port for server")
 	flag.StringVar(&address, "address", "http://localhost:8080", "server address for client")
 	flag.BoolVar(&pretty, "pretty", true, "pretty print JSON if enabled")
 	flag.Var(&headers, "H", "add headers to request")
+	flag.StringVar(&query, "q", "", "add query parameters to request")
 
 	flag.Parse()
 
 	args := flag.Args()
 
-	err := a.RunWithArgs(os.Stdout, args, port, address, pretty, headers)
+	err := a.RunWithArgs(os.Stdout, args, port, address, pretty, headers, query)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 	}
 }
 
-func (a *API[T]) RunWithArgs(out io.Writer, args []string, port int, address string, pretty bool, headers []string) error {
+func (a *API[T]) RunWithArgs(out io.Writer, args []string, port int, address string, pretty bool, headers []string, query string) error {
 	if len(args) < 1 {
 		return fmt.Errorf("at least one argument required")
 	}
@@ -56,7 +59,7 @@ func (a *API[T]) RunWithArgs(out io.Writer, args []string, port int, address str
 		return nil
 	}
 
-	return a.runClientCLI(out, args, address, pretty, headers)
+	return a.runClientCLI(out, args, address, pretty, headers, query)
 }
 
 func (a *API[T]) buildClientMap(selfClient *Client[*AnyResource], clientMap map[string]*Client[*AnyResource], reqEditor func(*http.Request) error) {
@@ -69,7 +72,7 @@ func (a *API[T]) buildClientMap(selfClient *Client[*AnyResource], clientMap map[
 	}
 }
 
-func (a *API[T]) runClientCLI(out io.Writer, args []string, address string, pretty bool, headers []string) error {
+func (a *API[T]) runClientCLI(out io.Writer, args []string, address string, pretty bool, headers []string, query string) error {
 	if len(args) < 2 {
 		return fmt.Errorf("at least two arguments required")
 	}
@@ -85,6 +88,14 @@ func (a *API[T]) runClientCLI(out io.Writer, args []string, address string, pret
 
 			r.Header.Add(header, val)
 		}
+
+		params, err := url.ParseQuery(query)
+		if err != nil {
+			return fmt.Errorf("error parsing query string: %w", err)
+		}
+
+		r.URL.RawQuery = params.Encode()
+
 		return nil
 	}
 
