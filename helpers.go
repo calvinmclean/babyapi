@@ -66,7 +66,8 @@ func (a *API[T]) GetRequestedResourceAndDo(do func(*http.Request, T) (render.Ren
 
 // GetRequestedResourceAndDoMiddleware is a shortcut for creating an ID-scoped middleware that gets the requested resource from storage,
 // calls the provided 'do' function, and calls next.ServeHTTP. If the resource is not found for a PUT request, the error is ignored
-func (a *API[T]) GetRequestedResourceAndDoMiddleware(do func(*http.Request, T) *ErrResponse) func(next http.Handler) http.Handler {
+// The 'do' function returns *http.Request so the request context can be modified by middleware
+func (a *API[T]) GetRequestedResourceAndDoMiddleware(do func(*http.Request, T) (*http.Request, *ErrResponse)) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -86,7 +87,7 @@ func (a *API[T]) GetRequestedResourceAndDoMiddleware(do func(*http.Request, T) *
 				return
 			}
 
-			httpErr = do(r, resource)
+			r, httpErr = do(r, resource)
 			if httpErr != nil {
 				_ = render.Render(w, r, httpErr)
 				return
@@ -215,6 +216,28 @@ func (a *API[T]) HandleServerSentEvents(events <-chan *ServerSentEvent) http.Han
 func MustRenderHTML(tmpl *template.Template, data any) string {
 	var renderedOutput bytes.Buffer
 	err := tmpl.Execute(&renderedOutput, data)
+	if err != nil {
+		panic(err)
+	}
+
+	return renderedOutput.String()
+}
+
+// MustRenderHTMLMap accepts a map of template name to the template contents. It parses the template
+// strings and executes the template with provided data. Since the template map doesn't preserve order,
+// the name of the base/root template must be provided. Panics if there is an error
+func MustRenderHTMLMap(tmplMap map[string]string, name string, data any) string {
+	var tmpl *template.Template
+	for name, content := range tmplMap {
+		if tmpl == nil {
+			tmpl = template.Must(template.New(name).Parse(content))
+			continue
+		}
+		tmpl = template.Must(tmpl.New(name).Parse(content))
+	}
+
+	var renderedOutput bytes.Buffer
+	err := tmpl.ExecuteTemplate(&renderedOutput, name, data)
 	if err != nil {
 		panic(err)
 	}

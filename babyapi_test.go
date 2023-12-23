@@ -597,11 +597,16 @@ func (ul *UnorderedList) Render(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (ul *UnorderedList) HTML(r *http.Request) string {
-	result := "<ul>\n"
-	for _, li := range ul.Items {
-		result += li.HTML(r) + "\n"
+	templates := map[string]string{
+		"ul": `<ul>
+{{- range .Items }}
+{{ template "li" . }}
+{{- end }}
+</ul>`,
+		"li": `<li>{{ .Content }}</li>`,
 	}
-	return result + "</ul>"
+
+	return babyapi.MustRenderHTMLMap(templates, "ul", ul)
 }
 
 type ListItem struct {
@@ -753,11 +758,13 @@ func TestAPIModifiers(t *testing.T) {
 			return nil
 		})
 
-	api.AddIDMiddleware(api.GetRequestedResourceAndDoMiddleware(func(r *http.Request, a *Album) *babyapi.ErrResponse {
-		require.NotNil(t, a)
-		idMiddlewareWithRequestResource++
-		return nil
-	}))
+	api.AddIDMiddleware(api.GetRequestedResourceAndDoMiddleware(
+		func(r *http.Request, a *Album) (*http.Request, *babyapi.ErrResponse) {
+			require.NotNil(t, a)
+			idMiddlewareWithRequestResource++
+			return r, nil
+		},
+	))
 
 	api.AddIDMiddleware(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
