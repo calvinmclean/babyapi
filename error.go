@@ -9,6 +9,7 @@ import (
 
 var ErrNotFoundResponse = &ErrResponse{HTTPStatusCode: http.StatusNotFound, StatusText: "Resource not found."}
 var ErrMethodNotAllowedResponse = &ErrResponse{HTTPStatusCode: http.StatusMethodNotAllowed, StatusText: "Method not allowed."}
+var ErrForbidden = &ErrResponse{HTTPStatusCode: http.StatusForbidden, StatusText: "Forbidden"}
 
 // ErrResponse is an error that implements Renderer to be used in HTTP response
 type ErrResponse struct {

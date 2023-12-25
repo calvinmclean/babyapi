@@ -4,7 +4,7 @@ tasks:
   test:
     desc: Run unit tests
     cmds:
-      - go test -short -race -covermode=atomic -coverprofile=coverage.out -coverpkg=./... ./...
+      - go test -short -race -covermode=atomic -coverprofile=coverage.out -coverpkg=.,./storage ./...
 
   lint:
     desc: Run linting

@@ -30,15 +30,27 @@ type Patcher[T Resource] interface {
 	Patch(T) *ErrResponse
 }
 
+// DefaultRenderer implements an empty Render method and can be used to easily create render.Renderer implementations
+// without having to add the method
+type DefaultRenderer struct{}
+
+var _ render.Renderer = &DefaultRenderer{}
+
+func (*DefaultRenderer) Render(w http.ResponseWriter, r *http.Request) error {
+	return nil
+}
+
 // DefaultResource implements Resource and uses the provided ID type. Extending this type is the easiest way to implement a
 // Resource based around the provided ID type
 type DefaultResource struct {
+	*DefaultRenderer
+
 	ID ID `json:"id"`
 }
 
 // NewDefaultResource creates a DefaultResource with a new random ID
 func NewDefaultResource() DefaultResource {
-	return DefaultResource{NewID()}
+	return DefaultResource{nil, NewID()}
 }
 
 var _ render.Renderer = &DefaultResource{}
@@ -46,10 +58,6 @@ var _ render.Binder = &DefaultResource{}
 
 func (dr *DefaultResource) GetID() string {
 	return dr.ID.String()
-}
-
-func (*DefaultResource) Render(w http.ResponseWriter, r *http.Request) error {
-	return nil
 }
 
 func (dr *DefaultResource) Bind(r *http.Request) error {

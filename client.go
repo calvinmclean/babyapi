@@ -45,7 +45,7 @@ func (sr *Response[T]) Fprint(out io.Writer, pretty bool) error {
 // RequestEditor is a function that can modify the HTTP request before sending
 type RequestEditor = func(*http.Request) error
 
-var defaultRequestEditor RequestEditor = func(r *http.Request) error {
+var DefaultRequestEditor RequestEditor = func(r *http.Request) error {
 	return nil
 }
 
@@ -60,7 +60,7 @@ type Client[T Resource] struct {
 
 // NewClient initializes a Client for interacting with the Resource API
 func NewClient[T Resource](addr, base string) *Client[T] {
-	return &Client[T]{addr, strings.TrimPrefix(base, "/"), http.DefaultClient, defaultRequestEditor, []string{}}
+	return &Client[T]{addr, strings.TrimPrefix(base, "/"), http.DefaultClient, DefaultRequestEditor, []string{}}
 }
 
 // NewSubClient creates a Client as a child of an existing Client. This is useful for accessing nested API resources
@@ -105,7 +105,12 @@ func (c *Client[T]) GetAll(ctx context.Context, query url.Values, parentIDs ...s
 
 	req.URL.RawQuery = query.Encode()
 
-	return MakeRequest[*ResourceList[T]](req, c.client, http.StatusOK, c.requestEditor)
+	result, err := MakeRequest[*ResourceList[T]](req, c.client, http.StatusOK, c.requestEditor)
+	if err != nil {
+		return nil, fmt.Errorf("error getting all resources: %w", err)
+	}
+
+	return result, nil
 }
 
 // Put makes a PUT request to create/modify a resource by ID

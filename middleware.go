@@ -63,14 +63,13 @@ func (a *API[T]) requestBodyMiddleware(next http.Handler) http.Handler {
 
 func (a *API[T]) resourceExistsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Skip for PUT because it can be used to create new resources
-		if r.Method == http.MethodPut {
-			next.ServeHTTP(w, r)
-			return
-		}
-
 		resource, httpErr := a.GetRequestedResource(r)
 		if httpErr != nil {
+			// Skip for PUT because it can be used to create new resources
+			if r.Method == http.MethodPut {
+				next.ServeHTTP(w, r)
+				return
+			}
 			_ = render.Render(w, r, httpErr)
 			return
 		}
