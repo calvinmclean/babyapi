@@ -34,34 +34,28 @@ func (a *API[T]) GetIDParam(r *http.Request) string {
 
 // GetRequestedResourceAndDo is a wrapper that handles getting a resource from storage based on the ID in the request URL
 // and rendering the response. This is useful for imlementing a CustomIDRoute
-func (a *API[T]) GetRequestedResourceAndDo(do func(*http.Request, T) (render.Renderer, *ErrResponse)) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func (a *API[T]) GetRequestedResourceAndDo(do func(*http.Request, T) (render.Renderer, *ErrResponse)) http.Handler {
+	return Handler(func(w http.ResponseWriter, r *http.Request) render.Renderer {
 		logger := GetLoggerFromContext(r.Context())
 
 		resource, httpErr := a.GetRequestedResource(r)
 		if httpErr != nil {
 			logger.Error("error getting requested resource", "error", httpErr.Error())
-			_ = render.Render(w, r, httpErr)
-			return
+			return httpErr
 		}
 
 		resp, httpErr := do(r, resource)
 		if httpErr != nil {
-			_ = render.Render(w, r, httpErr)
-			return
+			return httpErr
 		}
 
 		if resp == nil {
 			render.NoContent(w, r)
-			return
+			return nil
 		}
 
-		err := render.Render(w, r, resp)
-		if err != nil {
-			logger.Error("unable to render response", "error", err)
-			_ = render.Render(w, r, ErrRender(err))
-		}
-	}
+		return resp
+	})
 }
 
 // GetRequestedResourceAndDoMiddleware is a shortcut for creating an ID-scoped middleware that gets the requested resource from storage,
@@ -99,34 +93,28 @@ func (a *API[T]) GetRequestedResourceAndDoMiddleware(do func(*http.Request, T) (
 }
 
 // ReadRequestBodyAndDo is a wrapper that handles decoding the request body into the resource type and rendering a response
-func (a *API[T]) ReadRequestBodyAndDo(do func(*http.Request, T) (T, *ErrResponse)) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func (a *API[T]) ReadRequestBodyAndDo(do func(*http.Request, T) (T, *ErrResponse)) http.Handler {
+	return Handler(func(w http.ResponseWriter, r *http.Request) render.Renderer {
 		logger := GetLoggerFromContext(r.Context())
 
 		resource, httpErr := a.GetFromRequest(r)
 		if httpErr != nil {
 			logger.Error("invalid request to create resource", "error", httpErr.Error())
-			_ = render.Render(w, r, httpErr)
-			return
+			return httpErr
 		}
 
 		resp, httpErr := do(r, resource)
 		if httpErr != nil {
-			_ = render.Render(w, r, httpErr)
-			return
+			return httpErr
 		}
 
 		if resp == *new(T) {
 			render.NoContent(w, r)
-			return
+			return nil
 		}
 
-		err := render.Render(w, r, a.responseWrapper(resp))
-		if err != nil {
-			logger.Error("unable to render response", "error", err)
-			_ = render.Render(w, r, ErrRender(err))
-		}
-	}
+		return a.responseWrapper(resp)
+	})
 }
 
 // GetFromRequest will read the API's resource type from the request body or request context
@@ -210,6 +198,23 @@ func (a *API[T]) HandleServerSentEvents(events <-chan *ServerSentEvent) http.Han
 			}
 		}
 	}
+}
+
+func Handler(do func(http.ResponseWriter, *http.Request) render.Renderer) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		response := do(w, r)
+
+		if response == nil {
+			return
+		}
+
+		err := render.Render(w, r, response)
+		if err != nil {
+			logger := GetLoggerFromContext(r.Context())
+			logger.Error("unable to render response", "error", err)
+			_ = render.Render(w, r, ErrRender(err))
+		}
+	})
 }
 
 // MustRenderHTML renders the provided template and data to a string. Panics if there is an error
