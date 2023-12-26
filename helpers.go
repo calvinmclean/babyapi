@@ -34,7 +34,7 @@ func (a *API[T]) GetIDParam(r *http.Request) string {
 
 // GetRequestedResourceAndDo is a wrapper that handles getting a resource from storage based on the ID in the request URL
 // and rendering the response. This is useful for imlementing a CustomIDRoute
-func (a *API[T]) GetRequestedResourceAndDo(do func(*http.Request, T) (render.Renderer, *ErrResponse)) http.Handler {
+func (a *API[T]) GetRequestedResourceAndDo(do func(*http.Request, T) (render.Renderer, *ErrResponse)) http.HandlerFunc {
 	return Handler(func(w http.ResponseWriter, r *http.Request) render.Renderer {
 		logger := GetLoggerFromContext(r.Context())
 
@@ -93,7 +93,7 @@ func (a *API[T]) GetRequestedResourceAndDoMiddleware(do func(*http.Request, T) (
 }
 
 // ReadRequestBodyAndDo is a wrapper that handles decoding the request body into the resource type and rendering a response
-func (a *API[T]) ReadRequestBodyAndDo(do func(*http.Request, T) (T, *ErrResponse)) http.Handler {
+func (a *API[T]) ReadRequestBodyAndDo(do func(*http.Request, T) (T, *ErrResponse)) http.HandlerFunc {
 	return Handler(func(w http.ResponseWriter, r *http.Request) render.Renderer {
 		logger := GetLoggerFromContext(r.Context())
 
@@ -137,7 +137,7 @@ func (a *API[T]) GetFromRequest(r *http.Request) (T, *ErrResponse) {
 func (a *API[T]) GetRequestedResource(r *http.Request) (T, *ErrResponse) {
 	id := a.GetIDParam(r)
 
-	resource, err := a.storage.Get(id)
+	resource, err := a.Storage.Get(id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return *new(T), ErrNotFoundResponse
@@ -200,8 +200,8 @@ func (a *API[T]) HandleServerSentEvents(events <-chan *ServerSentEvent) http.Han
 	}
 }
 
-func Handler(do func(http.ResponseWriter, *http.Request) render.Renderer) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func Handler(do func(http.ResponseWriter, *http.Request) render.Renderer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		response := do(w, r)
 
 		if response == nil {
@@ -214,7 +214,7 @@ func Handler(do func(http.ResponseWriter, *http.Request) render.Renderer) http.H
 			logger.Error("unable to render response", "error", err)
 			_ = render.Render(w, r, ErrRender(err))
 		}
-	})
+	}
 }
 
 // MustRenderHTML renders the provided template and data to a string. Panics if there is an error

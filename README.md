@@ -11,10 +11,11 @@ A Go CRUD API framework so simple a baby could use it.
 
 Implement custom request/response handling by implemented `Renderer` and `Binder` from [`go-chi/render`](https://github.com/go-chi/render). Use provided extension functions to add additional API functionality:
   - `OnCreateOrUpdate`: additional handling for create/update requests
-  - `SetStorage`: set a different storage backend implementing the `babyapi.Storage` interface
+  - `Storage`: set a different storage backend implementing the `babyapi.Storage` interface
   - `AddCustomRoute`: add more routes on the base API 
   - `Patch`: add custom logic for handling `PATCH` requests
   - And many more! (see [examples](https://github.com/calvinmclean/babyapi/tree/main/examples) and [docs](https://pkg.go.dev/github.com/calvinmclean/babyapi))
+  - Override any of the default handlers and use `babyapi.Handler` shortcut to easily render errors and responses
 
 
 ## Getting Started

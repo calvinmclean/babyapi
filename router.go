@@ -84,9 +84,8 @@ func (a *API[T]) doCustomRoutes(r chi.Router, routes []chi.Route) {
 	}
 }
 
-// Get is the handler for /base/{ID} and returns a requested resource by ID
-func (a *API[T]) Get(w http.ResponseWriter, r *http.Request) {
-	Handler(func(w http.ResponseWriter, r *http.Request) render.Renderer {
+func (a *API[T]) defaultGet() http.HandlerFunc {
+	return Handler(func(w http.ResponseWriter, r *http.Request) render.Renderer {
 		logger := GetLoggerFromContext(r.Context())
 
 		resource, httpErr := a.GetRequestedResource(r)
@@ -101,15 +100,14 @@ func (a *API[T]) Get(w http.ResponseWriter, r *http.Request) {
 		}
 
 		return a.responseWrapper(resource)
-	}).ServeHTTP(w, r)
+	})
 }
 
-// GetAll is the handler for /base and returns an array of resources
-func (a *API[T]) GetAll(w http.ResponseWriter, r *http.Request) {
-	Handler(func(w http.ResponseWriter, r *http.Request) render.Renderer {
+func (a *API[T]) defaultGetAll() http.HandlerFunc {
+	return Handler(func(w http.ResponseWriter, r *http.Request) render.Renderer {
 		logger := GetLoggerFromContext(r.Context())
 
-		resources, err := a.storage.GetAll(a.getAllFilter(r))
+		resources, err := a.Storage.GetAll(a.getAllFilter(r))
 		if err != nil {
 			logger.Error("error getting resources", "error", err)
 			return InternalServerError(err)
@@ -133,12 +131,11 @@ func (a *API[T]) GetAll(w http.ResponseWriter, r *http.Request) {
 		}
 
 		return resp
-	}).ServeHTTP(w, r)
+	})
 }
 
-// Post is used to create new resources at /base
-func (a *API[T]) Post(w http.ResponseWriter, r *http.Request) {
-	a.ReadRequestBodyAndDo(func(r *http.Request, resource T) (T, *ErrResponse) {
+func (a *API[T]) defaultPost() http.HandlerFunc {
+	return a.ReadRequestBodyAndDo(func(r *http.Request, resource T) (T, *ErrResponse) {
 		logger := GetLoggerFromContext(r.Context())
 
 		httpErr := a.onCreateOrUpdate(r, resource)
@@ -147,7 +144,7 @@ func (a *API[T]) Post(w http.ResponseWriter, r *http.Request) {
 		}
 
 		logger.Info("storing resource", "resource", resource)
-		err := a.storage.Set(resource)
+		err := a.Storage.Set(resource)
 		if err != nil {
 			logger.Error("error storing resource", "error", err)
 			return *new(T), InternalServerError(err)
@@ -161,12 +158,11 @@ func (a *API[T]) Post(w http.ResponseWriter, r *http.Request) {
 		}
 
 		return resource, nil
-	}).ServeHTTP(w, r)
+	})
 }
 
-// Put is used to idempotently create or modify resources at /base/{ID}
-func (a *API[T]) Put(w http.ResponseWriter, r *http.Request) {
-	a.ReadRequestBodyAndDo(func(r *http.Request, resource T) (T, *ErrResponse) {
+func (a *API[T]) defaultPut() http.HandlerFunc {
+	return a.ReadRequestBodyAndDo(func(r *http.Request, resource T) (T, *ErrResponse) {
 		logger := GetLoggerFromContext(r.Context())
 
 		if resource.GetID() != a.GetIDParam(r) {
@@ -179,7 +175,7 @@ func (a *API[T]) Put(w http.ResponseWriter, r *http.Request) {
 		}
 
 		logger.Info("storing resource", "resource", resource)
-		err := a.storage.Set(resource)
+		err := a.Storage.Set(resource)
 		if err != nil {
 			logger.Error("error storing resource", "error", err)
 			return *new(T), InternalServerError(err)
@@ -191,12 +187,11 @@ func (a *API[T]) Put(w http.ResponseWriter, r *http.Request) {
 		}
 
 		return resource, nil
-	}).ServeHTTP(w, r)
+	})
 }
 
-// Put is used to modify resources at /base/{ID}
-func (a *API[T]) Patch(w http.ResponseWriter, r *http.Request) {
-	a.ReadRequestBodyAndDo(func(r *http.Request, patchRequest T) (T, *ErrResponse) {
+func (a *API[T]) defaultPatch() http.HandlerFunc {
+	return a.ReadRequestBodyAndDo(func(r *http.Request, patchRequest T) (T, *ErrResponse) {
 		logger := GetLoggerFromContext(r.Context())
 
 		resource, httpErr := a.GetRequestedResource(r)
@@ -223,7 +218,7 @@ func (a *API[T]) Patch(w http.ResponseWriter, r *http.Request) {
 
 		logger.Info("storing updated resource", "resource", resource)
 
-		err := a.storage.Set(resource)
+		err := a.Storage.Set(resource)
 		if err != nil {
 			logger.Error("error storing updated resource", "error", err)
 			return *new(T), InternalServerError(err)
@@ -235,12 +230,11 @@ func (a *API[T]) Patch(w http.ResponseWriter, r *http.Request) {
 		}
 
 		return resource, nil
-	}).ServeHTTP(w, r)
+	})
 }
 
-// Delete is used to delete the resource at /base/{ID}
-func (a *API[T]) Delete(w http.ResponseWriter, r *http.Request) {
-	Handler(func(w http.ResponseWriter, r *http.Request) render.Renderer {
+func (a *API[T]) defaultDelete() http.HandlerFunc {
+	return Handler(func(w http.ResponseWriter, r *http.Request) render.Renderer {
 		logger := GetLoggerFromContext(r.Context())
 		httpErr := a.beforeDelete(r)
 		if httpErr != nil {
@@ -252,7 +246,7 @@ func (a *API[T]) Delete(w http.ResponseWriter, r *http.Request) {
 
 		logger.Info("deleting resource", "id", id)
 
-		err := a.storage.Delete(id)
+		err := a.Storage.Delete(id)
 		if err != nil {
 			logger.Error("error deleting resource", "error", err)
 
@@ -277,5 +271,5 @@ func (a *API[T]) Delete(w http.ResponseWriter, r *http.Request) {
 
 		render.NoContent(w, r)
 		return nil
-	}).ServeHTTP(w, r)
+	})
 }

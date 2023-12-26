@@ -23,7 +23,9 @@ type API[T Resource] struct {
 	subAPIs       map[string]RelatedAPI
 	middlewares   []func(http.Handler) http.Handler
 	idMiddlewares []func(http.Handler) http.Handler
-	storage       Storage[T]
+
+	// Storage is the interface used by the API server to read/write resources
+	Storage[T]
 
 	server *http.Server
 	quit   chan os.Signal
@@ -49,12 +51,30 @@ type API[T Resource] struct {
 
 	customResponseCodes map[string]int
 	serverCtx           context.Context
+
+	// GetAll is the handler for /base and returns an array of resources
+	GetAll http.HandlerFunc
+
+	// Get is the handler for /base/{ID} and returns a requested resource by ID
+	Get http.HandlerFunc
+
+	// Post is used to create new resources at /base
+	Post http.HandlerFunc
+
+	// Put is used to idempotently create or modify resources at /base/{ID}
+	Put http.HandlerFunc
+
+	// Patch is used to modify resources at /base/{ID}
+	Patch http.HandlerFunc
+
+	// Delete is used to delete the resource at /base/{ID}
+	Delete http.HandlerFunc
 }
 
 // NewAPI initializes an API using the provided name, base URL path, and function to create a new instance of
 // the resource with defaults
 func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
-	return &API[T]{
+	api := &API[T]{
 		name,
 		base,
 		map[string]RelatedAPI{},
@@ -75,7 +95,22 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 		nil,
 		map[string]int{},
 		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
 	}
+
+	api.GetAll = api.defaultGetAll()
+	api.Get = api.defaultGet()
+	api.Post = api.defaultPost()
+	api.Put = api.defaultPut()
+	api.Patch = api.defaultPatch()
+	api.Delete = api.defaultDelete()
+
+	return api
 }
 
 // Base returns the API's base path
@@ -166,17 +201,6 @@ func (a *API[T]) AddCustomRoute(route chi.Route) *API[T] {
 func (a *API[T]) AddCustomIDRoute(route chi.Route) *API[T] {
 	a.customIDRoutes = append(a.customIDRoutes, route)
 	return a
-}
-
-// SetStorage sets a custom storage interface for the API
-func (a *API[T]) SetStorage(s Storage[T]) *API[T] {
-	a.storage = s
-	return a
-}
-
-// Storage returns the storage interface for the API so it can be used in custom routes or other use cases
-func (a *API[T]) Storage() Storage[T] {
-	return a.storage
 }
 
 // AddMiddleware adds a middleware which is active only on the paths without resource ID
