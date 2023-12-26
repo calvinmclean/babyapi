@@ -179,7 +179,7 @@ func setupStorage(api *babyapi.API[*TODO]) error {
 		return fmt.Errorf("error setting up redis storage: %w", err)
 	}
 
-	api.SetStorage(storage.NewClient[*TODO](db, "TODO"))
+	api.Storage = storage.NewClient[*TODO](db, "TODO")
 
 	return nil
 }

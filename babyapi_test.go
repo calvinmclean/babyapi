@@ -637,7 +637,7 @@ func TestHTML(t *testing.T) {
 	client := api.Client(address)
 
 	t.Run("CreateItem", func(t *testing.T) {
-		err := api.Storage().Set(item1)
+		err := api.Storage.Set(item1)
 		require.NoError(t, err)
 	})
 
@@ -693,7 +693,7 @@ func TestServerSentEvents(t *testing.T) {
 		Content:         "Item1",
 	}
 	t.Run("CreateItem", func(t *testing.T) {
-		err := api.Storage().Set(item1)
+		err := api.Storage.Set(item1)
 		require.NoError(t, err)
 	})
 
