@@ -27,13 +27,7 @@ func TestAPI(t *testing.T) {
 
 	var event *Event
 	t.Run("CreateEvent", func(t *testing.T) {
-		eventClient.SetRequestEditor(func(r *http.Request) error {
-			r.URL.RawQuery = "&password=secret"
-			return nil
-		})
-		defer eventClient.SetRequestEditor(babyapi.DefaultRequestEditor)
-
-		resp, err := eventClient.Post(context.Background(), &Event{Name: "Party"})
+		resp, err := eventClient.Post(context.Background(), &Event{Name: "Party", Password: "secret"})
 		require.NoError(t, err)
 
 		event = resp.Data
@@ -55,7 +49,7 @@ func TestAPI(t *testing.T) {
 
 	t.Run("GetEventWithPassword", func(t *testing.T) {
 		eventClient.SetRequestEditor(func(r *http.Request) error {
-			r.URL.RawQuery = "&password=secret"
+			r.URL.RawQuery = "password=secret"
 			return nil
 		})
 		defer eventClient.SetRequestEditor(babyapi.DefaultRequestEditor)
@@ -78,7 +72,7 @@ func TestAPI(t *testing.T) {
 
 	t.Run("PUTNotAllowed", func(t *testing.T) {
 		eventClient.SetRequestEditor(func(r *http.Request) error {
-			r.URL.RawQuery = "&password=secret"
+			r.URL.RawQuery = "password=secret"
 			return nil
 		})
 		defer eventClient.SetRequestEditor(babyapi.DefaultRequestEditor)
@@ -100,7 +94,7 @@ func TestAPI(t *testing.T) {
 	var invite *Invite
 	t.Run("CreateInvite", func(t *testing.T) {
 		inviteClient.SetRequestEditor(func(r *http.Request) error {
-			r.URL.RawQuery = "&password=secret"
+			r.URL.RawQuery = "password=secret"
 			return nil
 		})
 		defer inviteClient.SetRequestEditor(babyapi.DefaultRequestEditor)

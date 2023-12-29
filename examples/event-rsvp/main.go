@@ -319,6 +319,15 @@ func createAPI() *babyapi.API[*Event] {
 		},
 	})
 
+	eventAPI.AddCustomRootRoute(chi.Route{
+		Pattern: "/",
+		Handlers: map[string]http.Handler{
+			http.MethodGet: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.Redirect(w, r, eventAPI.Base(), http.StatusSeeOther)
+			}),
+		},
+	})
+
 	eventAPI.AddNestedAPI(inviteAPI)
 
 	eventAPI.GetAll = func(w http.ResponseWriter, r *http.Request) {

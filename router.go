@@ -38,6 +38,10 @@ func (a *API[T]) Route(r chi.Router) {
 		r.Use(m)
 	}
 
+	if a.parent == nil {
+		a.doCustomRoutes(r, a.rootRoutes)
+	}
+
 	r.Route(a.base, func(r chi.Router) {
 		// Only set these middleware for root-level API
 		if a.parent == nil {
