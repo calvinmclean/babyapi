@@ -34,6 +34,9 @@ type API[T Resource] struct {
 	// I need to have pointer receivers on Bind and Render implementations, `new(T)` creates a nil instance
 	instance func() T
 
+	// rootRoutes only applies if there are no parent APIs because otherwise it would conflict
+	rootRoutes []chi.Route
+
 	customRoutes   []chi.Route
 	customIDRoutes []chi.Route
 
@@ -84,6 +87,7 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 		nil,
 		make(chan os.Signal, 1),
 		instance,
+		nil,
 		nil,
 		nil,
 		func(r T) render.Renderer { return r },
@@ -188,6 +192,16 @@ func (a *API[T]) Client(addr string) *Client[T] {
 // AnyClient returns a new Client based on the API's configuration. It is a shortcut for NewClient
 func (a *API[T]) AnyClient(addr string) *Client[*AnyResource] {
 	return NewClient[*AnyResource](addr, a.base)
+}
+
+// AddCustomRootRoute appends a custom API route to the absolute root path ("/"). It does not work for APIs with
+// parents because it would conflict with the parent's route. Panics if the API is already a child when this is called
+func (a *API[T]) AddCustomRootRoute(route chi.Route) *API[T] {
+	if a.parent != nil {
+		panic("cannot be applied to child APIs")
+	}
+	a.rootRoutes = append(a.rootRoutes, route)
+	return a
 }
 
 // AddCustomRoute appends a custom API route to the base path: /base/custom-route
