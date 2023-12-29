@@ -35,6 +35,170 @@ const (
 	passwordCtxKey babyapi.ContextKey = "password"
 )
 
+type API struct {
+	Events  *babyapi.API[*Event]
+	Invites *babyapi.API[*Invite]
+}
+
+// Export invites to CSV format for use with external tools
+func (api *API) export(w http.ResponseWriter, r *http.Request) render.Renderer {
+	event, httpErr := api.Events.GetRequestedResource(r)
+	if httpErr != nil {
+		return httpErr
+	}
+
+	invites, err := api.Invites.Storage.GetAll(func(i *Invite) bool {
+		return i.EventID == event.GetID()
+	})
+	if err != nil {
+		return babyapi.InternalServerError(err)
+	}
+
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment;filename=event_%s_invites.csv", event.GetID()))
+
+	csvWriter := csv.NewWriter(w)
+	err = csvWriter.Write([]string{"ID", "Name", "Contact", "RSVP", "Link"})
+	if err != nil {
+		return babyapi.InternalServerError(err)
+	}
+
+	for _, invite := range invites {
+		rsvp := ""
+		if invite.RSVP != nil {
+			rsvp = fmt.Sprintf("%t", *invite.RSVP)
+		}
+		err = csvWriter.Write([]string{
+			invite.GetID(),
+			invite.Name,
+			invite.Contact,
+			rsvp,
+			invite.link(r),
+		})
+		if err != nil {
+			return babyapi.InternalServerError(err)
+		}
+	}
+
+	csvWriter.Flush()
+
+	err = csvWriter.Error()
+	if err != nil {
+		return babyapi.InternalServerError(err)
+	}
+
+	return nil
+}
+
+// Use a custom route to set RSVP so rsvpResponse can be used to return HTML buttons
+func (api *API) rsvp(r *http.Request, invite *Invite) (render.Renderer, *babyapi.ErrResponse) {
+	if err := r.ParseForm(); err != nil {
+		return nil, babyapi.ErrInvalidRequest(fmt.Errorf("error parsing form data: %w", err))
+	}
+
+	rsvp := r.Form.Get("RSVP") == "true"
+	invite.RSVP = &rsvp
+
+	err := api.Invites.Storage.Set(invite)
+	if err != nil {
+		return nil, babyapi.InternalServerError(err)
+	}
+	return &rsvpResponse{invite}, nil
+}
+
+// Allow adding bulk invites with a single request
+func (api *API) addBulkInvites(r *http.Request, event *Event) (render.Renderer, *babyapi.ErrResponse) {
+	if err := r.ParseForm(); err != nil {
+		return nil, babyapi.ErrInvalidRequest(fmt.Errorf("error parsing form data: %w", err))
+	}
+
+	inputs := strings.Split(r.Form.Get("invites"), ";")
+
+	invites := []*Invite{}
+	for _, invite := range inputs {
+		split := strings.Split(invite, ",")
+
+		name := split[0]
+
+		var contact string
+		if len(split) > 1 {
+			contact = split[1]
+		}
+
+		inv := &Invite{
+			DefaultResource: babyapi.NewDefaultResource(),
+			Name:            strings.TrimSpace(name),
+			Contact:         strings.TrimSpace(contact),
+			EventID:         event.GetID(),
+		}
+		invites = append(invites, inv)
+
+		err := api.Invites.Storage.Set(inv)
+		if err != nil {
+			return nil, babyapi.InternalServerError(err)
+		}
+	}
+
+	return &bulkInvitesResponse{nil, invites}, nil
+}
+
+// authenticationMiddleware enforces access to Events and Invites. Admin access to an Event requires a password query parameter.
+// Access to Invites is allowed by the invite ID and requires no extra auth. The invite ID in the path or query parameter allows
+// read-only access to the Event
+func (api *API) authenticationMiddleware(r *http.Request, event *Event) (*http.Request, *babyapi.ErrResponse) {
+	password := r.URL.Query().Get("password")
+	inviteID := r.URL.Query().Get("invite")
+	if inviteID == "" {
+		// TODO: this should be more easily accessible through go-chi or babyapi if I can't get go-chi to work
+		inviteID = strings.TrimPrefix(r.URL.String(), fmt.Sprintf("/events/%s/invites/", event.ID))
+		inviteID = strings.TrimSuffix(inviteID, "/rsvp")
+	}
+
+	switch {
+	case password != "":
+		err := event.Authenticate(password)
+		if err == nil {
+			return r, nil
+		}
+	case inviteID != "":
+		invite, err := api.Invites.Storage.Get(inviteID)
+		if err != nil {
+			if errors.Is(err, babyapi.ErrNotFound) {
+				return r, babyapi.ErrForbidden
+			}
+			return r, babyapi.InternalServerError(err)
+		}
+		if invite.EventID == event.GetID() {
+			return r, nil
+		}
+	}
+
+	return r, babyapi.ErrForbidden
+}
+
+// getAllInvitesMiddleware will get all invites when rendering HTML so it is accessible to the endpoint
+func (api *API) getAllInvitesMiddleware(r *http.Request, event *Event) (*http.Request, *babyapi.ErrResponse) {
+	if render.GetAcceptedContentType(r) != render.ContentTypeHTML {
+		return r, nil
+	}
+	// If password auth is used and this middleware is reached, we know it's admin
+	// Otherwise, don't fetch invites
+	if r.URL.Query().Get("password") == "" {
+		return r, nil
+	}
+
+	invites, err := api.Invites.Storage.GetAll(func(i *Invite) bool {
+		return i.EventID == event.GetID()
+	})
+	if err != nil {
+		return r, babyapi.InternalServerError(err)
+	}
+
+	ctx := context.WithValue(r.Context(), invitesCtxKey, invites)
+	r = r.WithContext(ctx)
+	return r, nil
+}
+
 type Event struct {
 	babyapi.DefaultResource
 
@@ -190,147 +354,52 @@ func main() {
 }
 
 func createAPI() *babyapi.API[*Event] {
-	eventAPI := babyapi.NewAPI[*Event](
-		"Event", "/events",
-		func() *Event { return &Event{} },
-	)
+	api := &API{
+		Events: babyapi.NewAPI[*Event](
+			"Event", "/events",
+			func() *Event { return &Event{} },
+		),
+		Invites: babyapi.NewAPI[*Invite](
+			"Invite", "/invites",
+			func() *Invite { return &Invite{} },
+		),
+	}
 
-	inviteAPI := babyapi.NewAPI[*Invite](
-		"Invite", "/invites",
-		func() *Invite { return &Invite{} },
-	)
+	api.Invites.SetCustomResponseCode(http.MethodDelete, http.StatusOK)
 
-	inviteAPI.SetCustomResponseCode(http.MethodDelete, http.StatusOK)
-
-	// Allow adding bulk invites with a single request
-	inviteAPI.AddCustomRoute(chi.Route{
+	api.Invites.AddCustomRoute(chi.Route{
 		Pattern: "/bulk",
 		Handlers: map[string]http.Handler{
-			http.MethodPost: eventAPI.GetRequestedResourceAndDo(func(r *http.Request, event *Event) (render.Renderer, *babyapi.ErrResponse) {
-				if err := r.ParseForm(); err != nil {
-					return nil, babyapi.ErrInvalidRequest(fmt.Errorf("error parsing form data: %w", err))
-				}
-
-				inputs := strings.Split(r.Form.Get("invites"), ";")
-
-				invites := []*Invite{}
-				for _, invite := range inputs {
-					split := strings.Split(invite, ",")
-
-					name := split[0]
-
-					var contact string
-					if len(split) > 1 {
-						contact = split[1]
-					}
-
-					inv := &Invite{
-						DefaultResource: babyapi.NewDefaultResource(),
-						Name:            strings.TrimSpace(name),
-						Contact:         strings.TrimSpace(contact),
-						EventID:         event.GetID(),
-					}
-					invites = append(invites, inv)
-
-					err := inviteAPI.Storage.Set(inv)
-					if err != nil {
-						return nil, babyapi.InternalServerError(err)
-					}
-				}
-
-				return &bulkInvitesResponse{nil, invites}, nil
-			}),
+			http.MethodPost: api.Events.GetRequestedResourceAndDo(api.addBulkInvites),
 		},
 	})
 
-	// Export invites to CSV format for use with external tools
-	inviteAPI.AddCustomRoute(chi.Route{
+	api.Invites.AddCustomRoute(chi.Route{
 		Pattern: "/export",
 		Handlers: map[string]http.Handler{
-			http.MethodGet: babyapi.Handler(func(w http.ResponseWriter, r *http.Request) render.Renderer {
-				event, httpErr := eventAPI.GetRequestedResource(r)
-				if httpErr != nil {
-					return httpErr
-				}
-
-				invites, err := inviteAPI.Storage.GetAll(func(i *Invite) bool {
-					return i.EventID == event.GetID()
-				})
-				if err != nil {
-					return babyapi.InternalServerError(err)
-				}
-
-				w.Header().Set("Content-Type", "text/csv")
-				w.Header().Set("Content-Disposition", fmt.Sprintf("attachment;filename=event_%s_invites.csv", event.GetID()))
-
-				csvWriter := csv.NewWriter(w)
-				err = csvWriter.Write([]string{"ID", "Name", "Contact", "RSVP", "Link"})
-				if err != nil {
-					return babyapi.InternalServerError(err)
-				}
-
-				for _, invite := range invites {
-					rsvp := ""
-					if invite.RSVP != nil {
-						rsvp = fmt.Sprintf("%t", *invite.RSVP)
-					}
-					err = csvWriter.Write([]string{
-						invite.GetID(),
-						invite.Name,
-						invite.Contact,
-						rsvp,
-						invite.link(r),
-					})
-					if err != nil {
-						return babyapi.InternalServerError(err)
-					}
-				}
-
-				csvWriter.Flush()
-
-				err = csvWriter.Error()
-				if err != nil {
-					return babyapi.InternalServerError(err)
-				}
-
-				return nil
-			}),
+			http.MethodGet: babyapi.Handler(api.export),
 		},
 	})
 
-	// Use a custom route to set RSVP so rsvpResponse can be used to return HTML buttons
-	inviteAPI.AddCustomIDRoute(chi.Route{
+	api.Invites.AddCustomIDRoute(chi.Route{
 		Pattern: "/rsvp",
 		Handlers: map[string]http.Handler{
-			http.MethodPut: inviteAPI.GetRequestedResourceAndDo(func(r *http.Request, invite *Invite) (render.Renderer, *babyapi.ErrResponse) {
-				if err := r.ParseForm(); err != nil {
-					return nil, babyapi.ErrInvalidRequest(fmt.Errorf("error parsing form data: %w", err))
-				}
-
-				rsvp := r.Form.Get("RSVP") == "true"
-				invite.RSVP = &rsvp
-
-				err := inviteAPI.Storage.Set(invite)
-				if err != nil {
-					return nil, babyapi.InternalServerError(err)
-				}
-				return &rsvpResponse{invite}, nil
-			}),
+			http.MethodPut: api.Invites.GetRequestedResourceAndDo(api.rsvp),
 		},
 	})
 
-	eventAPI.AddCustomRootRoute(chi.Route{
+	api.Events.AddCustomRootRoute(chi.Route{
 		Pattern: "/",
 		Handlers: map[string]http.Handler{
 			http.MethodGet: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				http.Redirect(w, r, eventAPI.Base(), http.StatusSeeOther)
+				http.Redirect(w, r, api.Events.Base(), http.StatusSeeOther)
 			}),
 		},
 	})
 
-	eventAPI.AddNestedAPI(inviteAPI)
+	api.Events.AddNestedAPI(api.Invites)
 
-	eventAPI.GetAll = func(w http.ResponseWriter, r *http.Request) {
+	api.Events.GetAll = func(w http.ResponseWriter, r *http.Request) {
 		if render.GetAcceptedContentType(r) != render.ContentTypeHTML {
 			render.Render(w, r, babyapi.ErrForbidden)
 			return
@@ -339,73 +408,19 @@ func createAPI() *babyapi.API[*Event] {
 		render.HTML(w, r, renderTemplate(r, "createEventPage", map[string]any{}))
 	}
 
-	// This middleware is responsible for authentication. It uses a password for admin access or the invite ID from URL or
-	// query parameter for read-only access to the Event
-	eventAPI.AddIDMiddleware(eventAPI.GetRequestedResourceAndDoMiddleware(func(r *http.Request, event *Event) (*http.Request, *babyapi.ErrResponse) {
-		password := r.URL.Query().Get("password")
-		inviteID := r.URL.Query().Get("invite")
-		if inviteID == "" {
-			// TODO: this should be more easily accessible through go-chi or babyapi if I can't get go-chi to work
-			inviteID = strings.TrimPrefix(r.URL.String(), fmt.Sprintf("/events/%s/invites/", event.ID))
-			inviteID = strings.TrimSuffix(inviteID, "/rsvp")
-		}
+	api.Events.AddIDMiddleware(api.Events.GetRequestedResourceAndDoMiddleware(api.authenticationMiddleware))
 
-		switch {
-		case password != "":
-			err := event.Authenticate(password)
-			if err == nil {
-				return r, nil
-			}
-		case inviteID != "":
-			invite, err := inviteAPI.Storage.Get(inviteID)
-			if err != nil {
-				if errors.Is(err, babyapi.ErrNotFound) {
-					return r, babyapi.ErrForbidden
-				}
-				return r, babyapi.InternalServerError(err)
-			}
-			if invite.EventID == event.GetID() {
-				return r, nil
-			}
-		}
-
-		return r, babyapi.ErrForbidden
-	}))
-
-	// Get all invites when rendering HTML so it is accessible to the endpoint
-	eventAPI.AddIDMiddleware(eventAPI.GetRequestedResourceAndDoMiddleware(
-		func(r *http.Request, event *Event) (*http.Request, *babyapi.ErrResponse) {
-			if render.GetAcceptedContentType(r) != render.ContentTypeHTML {
-				return r, nil
-			}
-			// If password auth is used and this middleware is reached, we know it's admin
-			// Otherwise, don't fetch invites
-			if r.URL.Query().Get("password") == "" {
-				return r, nil
-			}
-
-			invites, err := inviteAPI.Storage.GetAll(func(i *Invite) bool {
-				return i.EventID == event.GetID()
-			})
-			if err != nil {
-				return r, babyapi.InternalServerError(err)
-			}
-
-			ctx := context.WithValue(r.Context(), invitesCtxKey, invites)
-			r = r.WithContext(ctx)
-			return r, nil
-		},
-	))
+	api.Events.AddIDMiddleware(api.Events.GetRequestedResourceAndDoMiddleware(api.getAllInvitesMiddleware))
 
 	db, err := createDB()
 	if err != nil {
 		panic(err)
 	}
 
-	eventAPI.Storage = storage.NewClient[*Event](db, "Event")
-	inviteAPI.Storage = storage.NewClient[*Invite](db, "Invite")
+	api.Events.Storage = storage.NewClient[*Event](db, "Event")
+	api.Invites.Storage = storage.NewClient[*Invite](db, "Invite")
 
-	return eventAPI
+	return api.Events
 }
 
 func hash(salt, password string) string {
