@@ -29,7 +29,33 @@ func (a *API[T]) IDParamKey() string {
 
 // GetIDParam gets resource ID from the request URL for this API's resource
 func (a *API[T]) GetIDParam(r *http.Request) string {
-	return GetIDParam(r, a.name)
+	param := GetIDParam(r, a.name)
+	if param == "" && a.parent != nil {
+		param = a.findIDParam(r)
+	}
+	return param
+}
+
+// findIDParam will loop through the whole path to manually find the ID parameter that follows this
+// API's base path name. This is used when a parent API has a middleware which applies to child APIs
+// and attempts to get the child's ID, but the middleware is not aware of child ID URL parameters
+func (a *API[T]) findIDParam(r *http.Request) string {
+	index := strings.Index(r.URL.Path, a.base)
+	if index == -1 {
+		return ""
+	}
+
+	result := r.URL.Path[index+len(a.base):]
+	result = strings.TrimPrefix(result, "/")
+
+	index = strings.Index(result, "/")
+	if index == -1 {
+		return result
+	}
+
+	result = result[0:index]
+
+	return result
 }
 
 // GetRequestedResourceAndDo is a wrapper that handles getting a resource from storage based on the ID in the request URL

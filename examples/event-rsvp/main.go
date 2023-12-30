@@ -1,7 +1,5 @@
 package main
 
-// TODO: redirect / -> /events
-
 import (
 	"context"
 	"crypto/rand"
@@ -149,9 +147,7 @@ func (api *API) authenticationMiddleware(r *http.Request, event *Event) (*http.R
 	password := r.URL.Query().Get("password")
 	inviteID := r.URL.Query().Get("invite")
 	if inviteID == "" {
-		// TODO: this should be more easily accessible through go-chi or babyapi if I can't get go-chi to work
-		inviteID = strings.TrimPrefix(r.URL.String(), fmt.Sprintf("/events/%s/invites/", event.ID))
-		inviteID = strings.TrimSuffix(inviteID, "/rsvp")
+		inviteID = api.Invites.GetIDParam(r)
 	}
 
 	switch {
