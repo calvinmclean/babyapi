@@ -62,22 +62,32 @@ func (a *API[T]) RunWithArgs(out io.Writer, args []string, bindAddress string, a
 	return a.runClientCLI(out, args, address, pretty, headers, query)
 }
 
-func (a *API[T]) buildClientMap(selfClient *Client[*AnyResource], clientMap map[string]*Client[*AnyResource], reqEditor func(*http.Request) error) {
-	for name, child := range a.subAPIs {
-		base := makePathWithRoot(child.Base(), a)
+// CreateClientMap returns a map of API names to the corresponding Client for that child API. This makes it easy to use
+// child APIs dynamically. The initial parent/base client must be provided so child APIs can use NewSubClient
+func (a *API[T]) CreateClientMap(parent *Client[*AnyResource]) map[string]*Client[*AnyResource] {
+	clientMap := map[string]*Client[*AnyResource]{}
+	if !a.rootAPI {
+		clientMap[a.name] = parent
+	}
 
+	for _, child := range a.subAPIs {
+		base := makePathWithRoot(child.Base(), a)
 		var childClient *Client[*AnyResource]
+
 		if a.rootAPI && a.parent == nil {
 			// If the current API is a root API and has no parent, then this client has no need for parent IDs
-			childClient = NewClient[*AnyResource](selfClient.addr, base)
+			childClient = NewClient[*AnyResource](parent.addr, base)
 		} else {
-			childClient = NewSubClient[*AnyResource, *AnyResource](selfClient, base)
+			childClient = NewSubClient[*AnyResource, *AnyResource](parent, base)
 		}
 
-		childClient.SetRequestEditor(reqEditor)
-		clientMap[name] = childClient
-		child.buildClientMap(childClient, clientMap, reqEditor)
+		childMap := child.CreateClientMap(childClient)
+		for n, c := range childMap {
+			clientMap[n] = c
+		}
 	}
+
+	return clientMap
 }
 
 func (a *API[T]) runClientCLI(out io.Writer, args []string, address string, pretty bool, headers []string, query string) error {
@@ -107,20 +117,15 @@ func (a *API[T]) runClientCLI(out io.Writer, args []string, address string, pret
 		return nil
 	}
 
-	selfClient := a.AnyClient(address)
-	selfClient.SetRequestEditor(reqEditor)
-
-	clientMap := map[string]*Client[*AnyResource]{}
-	if !a.rootAPI {
-		clientMap[a.name] = selfClient
-	}
-	a.buildClientMap(selfClient, clientMap, reqEditor)
+	clientMap := a.CreateClientMap(a.AnyClient(address))
 
 	targetAPI := args[1]
 	client, ok := clientMap[targetAPI]
 	if !ok {
 		return fmt.Errorf("invalid API %q. valid options are: %v", targetAPI, maps.Keys[map[string]*Client[*AnyResource]](clientMap))
 	}
+
+	client.SetRequestEditor(reqEditor)
 
 	var cmd func([]string, *Client[*AnyResource]) (*Response[*AnyResource], error)
 	switch args[0] {

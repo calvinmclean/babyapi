@@ -346,10 +346,10 @@ func (bi *bulkInvitesResponse) HTML(r *http.Request) string {
 
 func main() {
 	api := createAPI()
-	api.RunCLI()
+	api.Events.RunCLI()
 }
 
-func createAPI() *babyapi.API[*Event] {
+func createAPI() *API {
 	api := &API{
 		Events: babyapi.NewAPI[*Event](
 			"Event", "/events",
@@ -416,7 +416,7 @@ func createAPI() *babyapi.API[*Event] {
 	api.Events.Storage = storage.NewClient[*Event](db, "Event")
 	api.Invites.Storage = storage.NewClient[*Invite](db, "Invite")
 
-	return api.Events
+	return api
 }
 
 func hash(salt, password string) string {

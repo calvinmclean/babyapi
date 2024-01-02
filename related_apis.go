@@ -16,13 +16,13 @@ type RelatedAPI interface {
 	Name() string
 	GetIDParam(*http.Request) string
 	Parent() RelatedAPI
+	CreateClientMap(*Client[*AnyResource]) map[string]*Client[*AnyResource]
 }
 
 type relatedAPI interface {
 	RelatedAPI
 
-	setParent(RelatedAPI)
-	buildClientMap(*Client[*AnyResource], map[string]*Client[*AnyResource], func(*http.Request) error)
+	setParent(relatedAPI)
 	isRoot() bool
 }
 
@@ -49,7 +49,7 @@ func (a *API[T]) AddNestedAPI(childAPI RelatedAPI) *API[T] {
 	return a
 }
 
-func (a *API[T]) setParent(parent RelatedAPI) {
+func (a *API[T]) setParent(parent relatedAPI) {
 	a.parent = parent
 }
 

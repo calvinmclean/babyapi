@@ -50,7 +50,7 @@ type API[T Resource] struct {
 
 	onCreateOrUpdate func(*http.Request, T) *ErrResponse
 
-	parent RelatedAPI
+	parent relatedAPI
 
 	customResponseCodes map[string]int
 	serverCtx           context.Context

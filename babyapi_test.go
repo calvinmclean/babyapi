@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/calvinmclean/babyapi"
-	babyapi_testing "github.com/calvinmclean/babyapi/testing"
+	babytest "github.com/calvinmclean/babyapi/test"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"github.com/rs/xid"
@@ -286,7 +286,7 @@ func TestNestedAPI(t *testing.T) {
 	artistAPI.AddNestedAPI(albumAPI).AddNestedAPI(musicVideoAPI)
 	albumAPI.AddNestedAPI(songAPI)
 
-	serverURL, stop := babyapi_testing.TestServe[*Artist](t, artistAPI)
+	serverURL, stop := babytest.TestServe[*Artist](t, artistAPI)
 	defer stop()
 
 	artist1 := &Artist{Name: "Artist1"}
@@ -665,7 +665,7 @@ func TestHTML(t *testing.T) {
 		Content:         "Item1",
 	}
 
-	address, closer := babyapi_testing.TestServe[*ListItem](t, api)
+	address, closer := babytest.TestServe[*ListItem](t, api)
 	defer closer()
 
 	client := api.Client(address)
@@ -719,7 +719,7 @@ func TestServerSentEvents(t *testing.T) {
 
 	events := api.AddServerSentEventHandler("/events")
 
-	address, closer := babyapi_testing.TestServe[*ListItem](t, api)
+	address, closer := babytest.TestServe[*ListItem](t, api)
 	defer closer()
 
 	item1 := &ListItem{
@@ -814,7 +814,7 @@ func TestAPIModifiers(t *testing.T) {
 		require.NoError(t, err)
 		r.Header.Add("Content-Type", "application/json")
 
-		w := babyapi_testing.Test[*Album](t, api, r)
+		w := babytest.TestRequest[*Album](t, api, r)
 		require.Equal(t, http.StatusTeapot, w.Result().StatusCode)
 	})
 
@@ -822,7 +822,7 @@ func TestAPIModifiers(t *testing.T) {
 		r, err := http.NewRequest(http.MethodDelete, "/albums/"+albumID, http.NoBody)
 		require.NoError(t, err)
 
-		w := babyapi_testing.Test[*Album](t, api, r)
+		w := babytest.TestRequest[*Album](t, api, r)
 		require.Equal(t, http.StatusNoContent, w.Result().StatusCode)
 	})
 
@@ -830,7 +830,7 @@ func TestAPIModifiers(t *testing.T) {
 		r, err := http.NewRequest(http.MethodGet, "/albums/DoesNotExist", http.NoBody)
 		require.NoError(t, err)
 
-		w := babyapi_testing.Test[*Album](t, api, r)
+		w := babytest.TestRequest[*Album](t, api, r)
 		require.Equal(t, http.StatusNotFound, w.Result().StatusCode)
 	})
 
@@ -920,7 +920,7 @@ func TestRootAPIWithMiddlewareAndCustomHandlers(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.method+tt.path, func(t *testing.T) {
 			r := httptest.NewRequest(tt.method, tt.path, http.NoBody)
-			w := babyapi.Test[*babyapi.NilResource](t, api, r)
+			w := babytest.TestRequest[*babyapi.NilResource](t, api, r)
 
 			require.Equal(t, tt.expectedStatus, w.Result().StatusCode)
 		})

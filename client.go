@@ -178,7 +178,7 @@ func (c *Client[T]) post(ctx context.Context, body io.Reader, parentIDs ...strin
 
 	result, err := c.MakeRequest(req, http.StatusCreated)
 	if err != nil {
-		return nil, fmt.Errorf("error posting resource: %w", err)
+		return result, fmt.Errorf("error posting resource: %w", err)
 	}
 
 	return result, nil
@@ -305,7 +305,8 @@ func MakeRequest[T any](req *http.Request, client *http.Client, expectedStatusCo
 		if err != nil {
 			return nil, fmt.Errorf("error decoding error response %q: %w", result.Body, err)
 		}
-		return nil, httpErr
+		httpErr.HTTPStatusCode = resp.StatusCode
+		return result, httpErr
 	}
 
 	if result.ContentType == "application/json" {
@@ -320,7 +321,7 @@ func MakeRequest[T any](req *http.Request, client *http.Client, expectedStatusCo
 
 // makePathWithRoot will create a base API route if the parent is a root path. This is necessary because the parent
 // root path could be defined as something other than / (slash)
-func makePathWithRoot(base string, parent RelatedAPI) string {
+func makePathWithRoot(base string, parent relatedAPI) string {
 	if parent != nil && parent.isRoot() {
 		return path.Join(parent.Base(), base)
 	}

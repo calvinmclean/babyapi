@@ -1,128 +1,183 @@
 package main
 
 import (
-	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"testing"
 
-	"github.com/calvinmclean/babyapi"
-	babyapi_testing "github.com/calvinmclean/babyapi/testing"
+	babytest "github.com/calvinmclean/babyapi/test"
 	"github.com/stretchr/testify/require"
 )
 
 func TestAPI(t *testing.T) {
-	api := createAPI()
-	serverURL, stop := babyapi_testing.TestServe[*Event](t, api)
-	defer stop()
-	eventClient := api.Client(serverURL)
-	inviteClient := babyapi.NewSubClient[*Event, *Invite](eventClient, "/invites")
-
 	defer os.RemoveAll("storage.json")
 
-	t.Run("ErrorCreatingEventWithoutPassword", func(t *testing.T) {
-		_, err := eventClient.Post(context.Background(), &Event{Name: "Party"})
-		require.Error(t, err)
-		require.Equal(t, "error posting resource: unexpected response with text: Invalid request.", err.Error())
-	})
+	api := createAPI()
 
-	var event *Event
-	t.Run("CreateEvent", func(t *testing.T) {
-		resp, err := eventClient.Post(context.Background(), &Event{Name: "Party", Password: "secret"})
-		require.NoError(t, err)
+	babytest.RunTableTest(t, api.Events, []babytest.Test{
+		{
+			Name: "ErrorCreatingEventWithoutPassword",
+			ClientRequest: &babytest.Request{
+				Method: http.MethodPost,
+				Body:   `{"Name": "Party"}`,
+			},
+			ExpectedResponse: babytest.ExpectedResponse{
+				Status: http.StatusBadRequest,
+				Body:   `{"status":"Invalid request.","error":"missing required 'password' field"}`,
+				Error:  "error posting resource: unexpected response with text: Invalid request.",
+			},
+		},
+		{
+			Name: "CreateEvent",
+			ClientRequest: &babytest.Request{
+				Method: http.MethodPost,
+				Body:   `{"Name": "Party", "Password": "secret"}`,
+			},
+			ExpectedResponse: babytest.ExpectedResponse{
+				Status:     http.StatusCreated,
+				BodyRegexp: `{"id":"[0-9a-v]{20}","Name":"Party","Contact":"","Date":"","Location":"","Details":""}`,
+			},
+		},
+		{
+			Name: "GetEventForbidden",
+			RequestFunc: func(getResponse babytest.PreviousResponseGetter, url string) *http.Request {
+				id := getResponse("CreateEvent").Data.GetID()
+				url = fmt.Sprintf("%s/%s", url, id)
 
-		event = resp.Data
-		require.Empty(t, event.Salt)
-		require.Empty(t, event.Key)
-	})
-
-	t.Run("GetAllEventsError", func(t *testing.T) {
-		_, err := eventClient.GetAll(context.Background(), nil)
-		require.Error(t, err)
-		require.Equal(t, "error getting all resources: unexpected response with text: Forbidden", err.Error())
-	})
-
-	t.Run("GetEventWithoutPassword", func(t *testing.T) {
-		_, err := eventClient.Get(context.Background(), event.GetID())
-		require.Error(t, err)
-		require.Equal(t, "error getting resource: unexpected response with text: Forbidden", err.Error())
-	})
-
-	t.Run("GetEventWithPassword", func(t *testing.T) {
-		eventClient.SetRequestEditor(func(r *http.Request) error {
-			r.URL.RawQuery = "password=secret"
-			return nil
-		})
-		defer eventClient.SetRequestEditor(babyapi.DefaultRequestEditor)
-
-		_, err := eventClient.Get(context.Background(), event.GetID())
-		require.NoError(t, err)
-	})
-
-	t.Run("GetEventWithInvalidInvite", func(t *testing.T) {
-		eventClient.SetRequestEditor(func(r *http.Request) error {
-			r.URL.RawQuery = "&invite=DoesNotExist"
-			return nil
-		})
-		defer eventClient.SetRequestEditor(babyapi.DefaultRequestEditor)
-
-		_, err := eventClient.Get(context.Background(), event.GetID())
-		require.Error(t, err)
-		require.Equal(t, "error getting resource: unexpected response with text: Forbidden", err.Error())
-	})
-
-	t.Run("PUTNotAllowed", func(t *testing.T) {
-		eventClient.SetRequestEditor(func(r *http.Request) error {
-			r.URL.RawQuery = "password=secret"
-			return nil
-		})
-		defer eventClient.SetRequestEditor(babyapi.DefaultRequestEditor)
-
-		_, err := eventClient.Put(context.Background(), &Event{
-			DefaultResource: event.DefaultResource,
-			Name:            "New Name",
-		})
-		require.Error(t, err)
-		require.Equal(t, "error putting resource: unexpected response with text: Invalid request.", err.Error())
-	})
-
-	t.Run("CannotCreateInviteWithoutEventPassword", func(t *testing.T) {
-		_, err := inviteClient.Post(context.Background(), &Invite{Name: "Name"}, event.GetID())
-		require.Error(t, err)
-		require.Equal(t, "error posting resource: unexpected response with text: Forbidden", err.Error())
-	})
-
-	var invite *Invite
-	t.Run("CreateInvite", func(t *testing.T) {
-		inviteClient.SetRequestEditor(func(r *http.Request) error {
-			r.URL.RawQuery = "password=secret"
-			return nil
-		})
-		defer inviteClient.SetRequestEditor(babyapi.DefaultRequestEditor)
-
-		resp, err := inviteClient.Post(context.Background(), &Invite{Name: "Firstname Lastname"}, event.GetID())
-		require.NoError(t, err)
-
-		invite = resp.Data
-		require.Equal(t, event.GetID(), invite.EventID)
-	})
-
-	t.Run("GetInvite", func(t *testing.T) {
-		resp, err := inviteClient.Get(context.Background(), invite.GetID(), event.GetID())
-		require.NoError(t, err)
-
-		invite = resp.Data
-		require.Equal(t, event.GetID(), invite.EventID)
-	})
-
-	t.Run("GetEventWithInviteIDAsPassword", func(t *testing.T) {
-		eventClient.SetRequestEditor(func(r *http.Request) error {
-			r.URL.RawQuery = "&invite=" + invite.GetID()
-			return nil
-		})
-		defer eventClient.SetRequestEditor(babyapi.DefaultRequestEditor)
-
-		_, err := eventClient.Get(context.Background(), event.GetID())
-		require.NoError(t, err)
+				r, err := http.NewRequest(http.MethodGet, url, http.NoBody)
+				require.NoError(t, err)
+				return r
+			},
+			ExpectedResponse: babytest.ExpectedResponse{
+				Status:     http.StatusForbidden,
+				BodyRegexp: `{"status":"Forbidden"}`,
+			},
+		},
+		{
+			Name: "GetEvent",
+			ClientRequest: &babytest.Request{
+				Method:   http.MethodGet,
+				RawQuery: "password=secret",
+				IDFunc: func(getResponse babytest.PreviousResponseGetter) string {
+					return getResponse("CreateEvent").Data.GetID()
+				},
+			},
+			ExpectedResponse: babytest.ExpectedResponse{
+				Status:     http.StatusOK,
+				BodyRegexp: `{"id":"[0-9a-v]{20}","Name":"Party","Contact":"","Date":"","Location":"","Details":""}`,
+			},
+		},
+		{
+			Name: "GetAllEventsForbidden",
+			RequestFunc: func(getResponse babytest.PreviousResponseGetter, url string) *http.Request {
+				r, err := http.NewRequest(http.MethodGet, url, http.NoBody)
+				require.NoError(t, err)
+				return r
+			},
+			ExpectedResponse: babytest.ExpectedResponse{
+				Status:     http.StatusForbidden,
+				BodyRegexp: `{"status":"Forbidden"}`,
+			},
+		},
+		{
+			Name: "GetEventWithInvalidInvite",
+			ClientRequest: &babytest.Request{
+				Method:   http.MethodGet,
+				RawQuery: "invite=DoesNotExist",
+				IDFunc: func(getResponse babytest.PreviousResponseGetter) string {
+					return getResponse("CreateEvent").Data.GetID()
+				},
+			},
+			ExpectedResponse: babytest.ExpectedResponse{
+				Status: http.StatusForbidden,
+				Error:  "error getting resource: unexpected response with text: Forbidden",
+			},
+		},
+		{
+			Name: "PUTNotAllowed",
+			ClientRequest: &babytest.Request{
+				Method:   http.MethodPut,
+				RawQuery: "password=secret",
+				IDFunc: func(getResponse babytest.PreviousResponseGetter) string {
+					return getResponse("CreateEvent").Data.GetID()
+				},
+				BodyFunc: func(getResponse babytest.PreviousResponseGetter) string {
+					return fmt.Sprintf(`{"id": "%s", "name": "New Name"}`, getResponse("CreateEvent").Data.GetID())
+				},
+			},
+			ExpectedResponse: babytest.ExpectedResponse{
+				Status: http.StatusBadRequest,
+				Error:  "error putting resource: unexpected response with text: Invalid request.",
+			},
+		},
+		{
+			Name: "CannotCreateInviteWithoutEventPassword",
+			ClientRequest: &babytest.Request{
+				Method: http.MethodPost,
+				ParentIDsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
+					return []string{getResponse("CreateEvent").Data.GetID()}
+				},
+				Body: `{"Name": "Name"}`,
+			},
+			ClientName: "Invite",
+			ExpectedResponse: babytest.ExpectedResponse{
+				Status: http.StatusForbidden,
+				Error:  "error posting resource: unexpected response with text: Forbidden",
+			},
+		},
+		{
+			Name: "CreateInvite",
+			ClientRequest: &babytest.Request{
+				Method:   http.MethodPost,
+				RawQuery: "password=secret",
+				ParentIDsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
+					return []string{getResponse("CreateEvent").Data.GetID()}
+				},
+				Body: `{"Name": "Firstname Lastname"}`,
+			},
+			ClientName: "Invite",
+			ExpectedResponse: babytest.ExpectedResponse{
+				Status:     http.StatusOK,
+				BodyRegexp: `{"id":"[0-9a-v]{20}","Name":"Firstname Lastname","Contact":"","EventID":"[0-9a-v]{20}","RSVP":null}`,
+			},
+		},
+		{
+			Name: "GetInvite",
+			ClientRequest: &babytest.Request{
+				Method: http.MethodGet,
+				ParentIDsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
+					return []string{getResponse("CreateEvent").Data.GetID()}
+				},
+				IDFunc: func(getResponse babytest.PreviousResponseGetter) string {
+					return getResponse("CreateInvite").Data.GetID()
+				},
+			},
+			ClientName: "Invite",
+			ExpectedResponse: babytest.ExpectedResponse{
+				Status:     http.StatusOK,
+				BodyRegexp: `{"id":"[0-9a-v]{20}","Name":"Firstname Lastname","Contact":"","EventID":"[0-9a-v]{20}","RSVP":null}`,
+			},
+		},
+		{
+			Name: "GetEventWithInviteIDAsPassword",
+			ClientRequest: &babytest.Request{
+				Method: http.MethodGet,
+				RawQueryFunc: func(getResponse babytest.PreviousResponseGetter) string {
+					return "invite=" + getResponse("CreateInvite").Data.GetID()
+				},
+				ParentIDsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
+					return []string{getResponse("CreateEvent").Data.GetID()}
+				},
+				IDFunc: func(getResponse babytest.PreviousResponseGetter) string {
+					return getResponse("CreateInvite").Data.GetID()
+				},
+			},
+			ClientName: "Invite",
+			ExpectedResponse: babytest.ExpectedResponse{
+				Status:     http.StatusOK,
+				BodyRegexp: `{"id":"[0-9a-v]{20}","Name":"Firstname Lastname","Contact":"","EventID":"[0-9a-v]{20}","RSVP":null}`,
+			},
+		},
 	})
 }

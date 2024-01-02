@@ -1,4 +1,4 @@
-package babyapi_testing
+package babytest
 
 import (
 	"context"
@@ -17,8 +17,8 @@ func TestServe[T babyapi.Resource](t *testing.T, api *babyapi.API[T]) (string, f
 	return server.URL, server.Close
 }
 
-// Test is meant to be used in external tests to automatically handle setting up routes and using httptest
-func Test[T babyapi.Resource](t *testing.T, api *babyapi.API[T], r *http.Request) *httptest.ResponseRecorder {
+// TestRequest is meant to be used in external tests to automatically handle setting up routes and using httptest
+func TestRequest[T babyapi.Resource](t *testing.T, api *babyapi.API[T], r *http.Request) *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
 
 	router := chi.NewRouter()
@@ -58,12 +58,15 @@ func (p *mockParent) GetIDParam(r *http.Request) string {
 func (p *mockParent) setParent(relatedAPI) {}
 func (p *mockParent) isRoot() bool         { return false }
 
-func (p *mockParent) buildClientMap(*babyapi.Client[*babyapi.AnyResource], map[string]*babyapi.Client[*babyapi.AnyResource], func(*http.Request) error) {
+func (p *mockParent) CreateClientMap(*babyapi.Client[*babyapi.AnyResource]) map[string]*babyapi.Client[*babyapi.AnyResource] {
+	return nil
 }
 
 type relatedAPI interface {
-	setParent(babyapi.RelatedAPI)
-	buildClientMap(*babyapi.Client[*babyapi.AnyResource], map[string]*babyapi.Client[*babyapi.AnyResource], func(*http.Request) error)
+	babyapi.RelatedAPI
+
+	setParent(relatedAPI)
+	isRoot() bool
 }
 
 // Test is meant to be used in external tests of nested APIs
