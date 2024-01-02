@@ -7,12 +7,13 @@ import (
 	"testing"
 
 	"github.com/calvinmclean/babyapi"
+	babyapi_testing "github.com/calvinmclean/babyapi/testing"
 	"github.com/stretchr/testify/require"
 )
 
 func TestAPI(t *testing.T) {
 	api := createAPI()
-	serverURL, stop := babyapi.TestServe[*Event](t, api)
+	serverURL, stop := babyapi_testing.TestServe[*Event](t, api)
 	defer stop()
 	eventClient := api.Client(serverURL)
 	inviteClient := babyapi.NewSubClient[*Event, *Invite](eventClient, "/invites")

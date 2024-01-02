@@ -20,7 +20,7 @@ type API[T Resource] struct {
 	name string
 	base string
 
-	subAPIs       map[string]RelatedAPI
+	subAPIs       map[string]relatedAPI
 	middlewares   []func(http.Handler) http.Handler
 	idMiddlewares []func(http.Handler) http.Handler
 
@@ -82,7 +82,7 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 	api := &API[T]{
 		name,
 		base,
-		map[string]RelatedAPI{},
+		map[string]relatedAPI{},
 		nil,
 		nil,
 		MapStorage[T]{},

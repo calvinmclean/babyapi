@@ -1,6 +1,7 @@
 package babyapi
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -15,6 +16,10 @@ type RelatedAPI interface {
 	Name() string
 	GetIDParam(*http.Request) string
 	Parent() RelatedAPI
+}
+
+type relatedAPI interface {
+	RelatedAPI
 
 	setParent(RelatedAPI)
 	buildClientMap(*Client[*AnyResource], map[string]*Client[*AnyResource], func(*http.Request) error)
@@ -33,8 +38,13 @@ func (a *API[T]) GetParentIDParam(r *http.Request) string {
 
 // AddNestedAPI adds a child API to this API and initializes the parent relationship on the child's side
 func (a *API[T]) AddNestedAPI(childAPI RelatedAPI) *API[T] {
-	a.subAPIs[childAPI.Name()] = childAPI
-	childAPI.setParent(a)
+	relAPI, ok := childAPI.(relatedAPI)
+	if !ok {
+		panic(fmt.Sprintf("incompatible type for child API: %T", childAPI))
+	}
+
+	a.subAPIs[childAPI.Name()] = relAPI
+	relAPI.setParent(a)
 
 	return a
 }

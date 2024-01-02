@@ -10,7 +10,7 @@ import (
 	"github.com/go-chi/render"
 )
 
-func (a *API[T]) defaultMiddleware(r chi.Router) {
+func (a *API[T]) DefaultMiddleware(r chi.Router) {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
