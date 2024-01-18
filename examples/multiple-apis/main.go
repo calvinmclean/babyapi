@@ -1,10 +1,11 @@
 package main
 
 import (
-	"github.com/calvinmclean/babyapi"
-	"github.com/go-chi/chi/v5"
 	"log/slog"
 	"net/http"
+
+	"github.com/calvinmclean/babyapi"
+	"github.com/go-chi/chi/v5"
 )
 
 type TODO struct {
@@ -35,7 +36,7 @@ type RoutableAPI interface {
 func serveAll(addr string, apis ...RoutableAPI) {
 	router := chi.NewRouter()
 	for _, api := range apis {
-		slog.Info("Setting up API", api.Name())
+		slog.Info("Setting up API", "name", api.Name())
 		api.Route(router)
 	}
 	slog.Info("starting server", "address", addr)
