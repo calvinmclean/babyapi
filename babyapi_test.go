@@ -1188,5 +1188,4 @@ func TestRootAPICLI(t *testing.T) {
 			rootAPI.Stop()
 		})
 	}
-
 }
