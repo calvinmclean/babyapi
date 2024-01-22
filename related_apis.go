@@ -18,6 +18,7 @@ type RelatedAPI interface {
 
 	setParent(RelatedAPI)
 	buildClientMap(*Client[*AnyResource], map[string]*Client[*AnyResource], func(*http.Request) error)
+	isRoot() bool
 }
 
 // Parent returns the API's parent API
@@ -40,4 +41,8 @@ func (a *API[T]) AddNestedAPI(childAPI RelatedAPI) *API[T] {
 
 func (a *API[T]) setParent(parent RelatedAPI) {
 	a.parent = parent
+}
+
+func (a *API[T]) isRoot() bool {
+	return a.rootAPI
 }

@@ -48,6 +48,13 @@ func (a *API[T]) Route(r chi.Router) {
 			a.defaultMiddleware(r)
 		}
 
+		if a.rootAPI {
+			for _, subAPI := range a.subAPIs {
+				subAPI.Route(r)
+			}
+			return
+		}
+
 		r.With(a.requestBodyMiddleware).Post("/", a.Post)
 		r.Get("/", a.GetAll)
 

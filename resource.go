@@ -40,6 +40,20 @@ func (*DefaultRenderer) Render(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
+// NilResource is an empty resource type which should be used when creating APIs without any real resource
+type NilResource struct{ *DefaultRenderer }
+
+func (*NilResource) Bind(r *http.Request) error {
+	return nil
+}
+
+func (*NilResource) GetID() string {
+	return ""
+}
+
+var _ render.Renderer = &NilResource{}
+var _ render.Binder = &NilResource{}
+
 // DefaultResource implements Resource and uses the provided ID type. Extending this type is the easiest way to implement a
 // Resource based around the provided ID type
 type DefaultResource struct {

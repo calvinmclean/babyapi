@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path"
 	"strings"
 )
 
@@ -60,13 +61,19 @@ type Client[T Resource] struct {
 
 // NewClient initializes a Client for interacting with the Resource API
 func NewClient[T Resource](addr, base string) *Client[T] {
-	return &Client[T]{addr, strings.TrimPrefix(base, "/"), http.DefaultClient, DefaultRequestEditor, []string{}}
+	return &Client[T]{addr, strings.TrimLeft(base, "/"), http.DefaultClient, DefaultRequestEditor, []string{}}
 }
 
 // NewSubClient creates a Client as a child of an existing Client. This is useful for accessing nested API resources
 func NewSubClient[T, R Resource](parent *Client[T], path string) *Client[R] {
 	newClient := NewClient[R](parent.addr, path)
-	newClient.parentPaths = append(parent.parentPaths, parent.base)
+
+	newClient.parentPaths = make([]string, len(parent.parentPaths))
+	copy(newClient.parentPaths, parent.parentPaths)
+
+	if parent.base != "" {
+		newClient.parentPaths = append(newClient.parentPaths, parent.base)
+	}
 	return newClient
 }
 
@@ -309,4 +316,14 @@ func MakeRequest[T any](req *http.Request, client *http.Client, expectedStatusCo
 	}
 
 	return result, nil
+}
+
+// makePathWithRoot will create a base API route if the parent is a root path. This is necessary because the parent
+// root path could be defined as something other than / (slash)
+func makePathWithRoot(base string, parent RelatedAPI) string {
+	if parent != nil && parent.isRoot() {
+		return path.Join(parent.Base(), base)
+	}
+
+	return base
 }
