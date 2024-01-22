@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"strings"
@@ -830,10 +831,88 @@ func TestAPIModifiers(t *testing.T) {
 	})
 }
 
-// TODO: test with middlewares
-// TODO: error if trying to set custom routes for multiparent?
 func TestRootAPIWithMiddlewareAndCustomHandlers(t *testing.T) {
+	api := babyapi.NewRootAPI("root", "/")
 
+	t.Run("CustomizationsForIDsPanics", func(t *testing.T) {
+		require.Panics(t, func() {
+			api.AddCustomIDRoute(chi.Route{})
+		})
+		require.Panics(t, func() {
+			api.AddIDMiddleware(func(h http.Handler) http.Handler {
+				return nil
+			})
+		})
+	})
+
+	api.Get = func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(201)
+	}
+	api.Delete = func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(202)
+	}
+	api.Patch = func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(203)
+	}
+	api.Post = func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(204)
+	}
+	api.Put = func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(205)
+	}
+
+	api.AddCustomRoute(chi.Route{
+		Handlers: map[string]http.Handler{
+			http.MethodGet: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(206)
+			}),
+		},
+		Pattern: "/customRoute",
+	})
+
+	api.AddCustomRootRoute(chi.Route{
+		Handlers: map[string]http.Handler{
+			http.MethodGet: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(207)
+			}),
+		},
+		Pattern: "/customRootRoute",
+	})
+
+	middlewareHits := 0
+	api.AddMiddleware(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			middlewareHits++
+			next.ServeHTTP(w, r)
+		})
+	})
+
+	tests := []struct {
+		method         string
+		path           string
+		expectedStatus int
+	}{
+		{http.MethodGet, "/", 201},
+		{http.MethodDelete, "/", 202},
+		{http.MethodPatch, "/", 203},
+		{http.MethodPost, "/", 204},
+		{http.MethodPut, "/", 205},
+		{http.MethodGet, "/customRoute", 206},
+		{http.MethodGet, "/customRootRoute", 207},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.method+tt.path, func(t *testing.T) {
+			r := httptest.NewRequest(tt.method, tt.path, http.NoBody)
+			w := babyapi.Test[*babyapi.NilResource](t, api, r)
+
+			require.Equal(t, tt.expectedStatus, w.Result().StatusCode)
+		})
+	}
+
+	t.Run("MiddlewareIsHitForEachRequest", func(t *testing.T) {
+		require.Equal(t, len(tests), middlewareHits)
+	})
 }
 
 func TestRootAPIAsChildOfResourceAPI(t *testing.T) {

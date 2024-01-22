@@ -122,13 +122,11 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 
 // NewRootAPI initializes an API which can serve as a top-level parent of other APIs, so multiple unrelated resources
 // can exist without any parent/child relationship. This API does not have any default handlers, but custom handlers can
-// still be added
+// still be added. Since there are no IDs in the path, Get and GetAll routes cannot be differentiated so only Get is used
 func NewRootAPI(name, base string) *API[*NilResource] {
 	api := NewAPI[*NilResource](name, base, nil)
 	api.rootAPI = true
 
-	// Reset all default handlers to be nil since the defaults don't work without a resource, but it is still
-	// possible to implement custom handelrs
 	api.GetAll = nil
 	api.Get = nil
 	api.Post = nil
@@ -235,6 +233,9 @@ func (a *API[T]) AddCustomRoute(route chi.Route) *API[T] {
 // AddCustomIDRoute appends a custom API route to the base path after the ID URL parameter: /base/{ID}/custom-route.
 // The handler for this route can access the requested resource using GetResourceFromContext
 func (a *API[T]) AddCustomIDRoute(route chi.Route) *API[T] {
+	if a.rootAPI {
+		panic("ID routes cannot be used with a root API")
+	}
 	a.customIDRoutes = append(a.customIDRoutes, route)
 	return a
 }
@@ -247,6 +248,9 @@ func (a *API[T]) AddMiddleware(m func(http.Handler) http.Handler) *API[T] {
 
 // AddIDMiddleware adds a middleware which is active only on the paths including a resource ID
 func (a *API[T]) AddIDMiddleware(m func(http.Handler) http.Handler) *API[T] {
+	if a.rootAPI {
+		panic("ID middleware cannot be used with a root API")
+	}
 	a.idMiddlewares = append(a.idMiddlewares, m)
 	return a
 }

@@ -49,24 +49,22 @@ func (a *API[T]) Route(r chi.Router) {
 		}
 
 		if a.rootAPI {
-			for _, subAPI := range a.subAPIs {
-				subAPI.Route(r)
-			}
+			a.rootAPIRoutes(r)
 			return
 		}
 
-		r.With(a.requestBodyMiddleware).Post("/", a.Post)
-		r.Get("/", a.GetAll)
+		routeIfNotNil(r.With(a.requestBodyMiddleware).Post, "/", a.Post)
+		routeIfNotNil(r.Get, "/", a.GetAll)
 
 		r.With(a.resourceExistsMiddleware).Route(fmt.Sprintf("/{%s}", a.IDParamKey()), func(r chi.Router) {
 			for _, m := range a.idMiddlewares {
 				r.Use(m)
 			}
 
-			r.Get("/", a.Get)
-			r.Delete("/", a.Delete)
-			r.With(a.requestBodyMiddleware).Put("/", a.Put)
-			r.With(a.requestBodyMiddleware).Patch("/", a.Patch)
+			routeIfNotNil(r.Get, "/", a.Get)
+			routeIfNotNil(r.Delete, "/", a.Delete)
+			routeIfNotNil(r.With(a.requestBodyMiddleware).Put, "/", a.Put)
+			routeIfNotNil(r.With(a.requestBodyMiddleware).Patch, "/", a.Patch)
 
 			for _, subAPI := range a.subAPIs {
 				subAPI.Route(r)
@@ -77,6 +75,22 @@ func (a *API[T]) Route(r chi.Router) {
 
 		a.doCustomRoutes(r, a.customRoutes)
 	})
+}
+
+// rootAPIRoutes creates different routes for a root API that doesn't deal with any resources
+func (a *API[T]) rootAPIRoutes(r chi.Router) {
+	routeIfNotNil(r.Post, "/", a.Post)
+	routeIfNotNil(r.Get, "/", a.Get)
+	routeIfNotNil(r.Delete, "/", a.Delete)
+	routeIfNotNil(r.Put, "/", a.Put)
+	routeIfNotNil(r.Patch, "/", a.Patch)
+
+	for _, subAPI := range a.subAPIs {
+		subAPI.Route(r)
+	}
+
+	a.doCustomRoutes(r, a.rootRoutes)
+	a.doCustomRoutes(r, a.customRoutes)
 }
 
 // Create a new router with API routes
@@ -283,4 +297,11 @@ func (a *API[T]) defaultDelete() http.HandlerFunc {
 		render.NoContent(w, r)
 		return nil
 	})
+}
+
+func routeIfNotNil(routeFunc func(string, http.HandlerFunc), pattern string, h http.HandlerFunc) {
+	if h == nil {
+		return
+	}
+	routeFunc(pattern, h)
 }
