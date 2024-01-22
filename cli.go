@@ -64,9 +64,17 @@ func (a *API[T]) RunWithArgs(out io.Writer, args []string, port int, address str
 
 func (a *API[T]) buildClientMap(selfClient *Client[*AnyResource], clientMap map[string]*Client[*AnyResource], reqEditor func(*http.Request) error) {
 	for name, child := range a.subAPIs {
-		childClient := NewSubClient[*AnyResource, *AnyResource](selfClient, child.Base())
-		childClient.SetRequestEditor(reqEditor)
+		base := makePathWithRoot(child.Base(), a)
 
+		var childClient *Client[*AnyResource]
+		if a.rootAPI && a.parent == nil {
+			// If the current API is a root API and has no parent, then this client has no need for parent IDs
+			childClient = NewClient[*AnyResource](selfClient.addr, base)
+		} else {
+			childClient = NewSubClient[*AnyResource, *AnyResource](selfClient, base)
+		}
+
+		childClient.SetRequestEditor(reqEditor)
 		clientMap[name] = childClient
 		child.buildClientMap(childClient, clientMap, reqEditor)
 	}
@@ -102,8 +110,9 @@ func (a *API[T]) runClientCLI(out io.Writer, args []string, address string, pret
 	selfClient := a.AnyClient(address)
 	selfClient.SetRequestEditor(reqEditor)
 
-	clientMap := map[string]*Client[*AnyResource]{
-		a.name: selfClient,
+	clientMap := map[string]*Client[*AnyResource]{}
+	if !a.rootAPI {
+		clientMap[a.name] = selfClient
 	}
 	a.buildClientMap(selfClient, clientMap, reqEditor)
 

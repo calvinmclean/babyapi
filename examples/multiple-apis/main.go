@@ -1,11 +1,7 @@
 package main
 
 import (
-	"log/slog"
-	"net/http"
-
 	"github.com/calvinmclean/babyapi"
-	"github.com/go-chi/chi/v5"
 )
 
 type TODO struct {
@@ -24,31 +20,9 @@ type GOAL struct {
 	Completed   bool
 }
 
-// RoutableAPI defines a minimum interface to register APIs to the router, along with displaying usable logs.
-type RoutableAPI interface {
-	Route(chi.Router)
-	Name() string
-}
-
-// Takes an addr string same as http.ListenAndServe and one or more APIs and will serve all of them.
-// The APIs must not have conflicting base routes.
-// This does not allow CLI functionality.
-func serveAll(addr string, apis ...RoutableAPI) {
-	router := chi.NewRouter()
-	for _, api := range apis {
-		slog.Info("Setting up API", "name", api.Name())
-		api.Route(router)
-	}
-	slog.Info("starting server", "address", addr)
-	err := http.ListenAndServe(addr, router)
-	if err != nil && err != http.ErrServerClosed {
-		slog.Error("server shutdown error", "error", err)
-	}
-}
-
 func main() {
-	TodoApi := babyapi.NewAPI[*TODO]("TODOs", "/todos", func() *TODO { return &TODO{} })
-	GoalApi := babyapi.NewAPI[*GOAL]("GOALs", "/goals", func() *GOAL { return &GOAL{} })
-
-	serveAll(":3000", TodoApi, GoalApi)
+	babyapi.NewRootAPI("root", "/").
+		AddNestedAPI(babyapi.NewAPI[*TODO]("TODOs", "/todos", func() *TODO { return &TODO{} })).
+		AddNestedAPI(babyapi.NewAPI[*GOAL]("GOALs", "/goals", func() *GOAL { return &GOAL{} })).
+		RunCLI()
 }

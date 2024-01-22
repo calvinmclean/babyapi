@@ -72,6 +72,8 @@ type API[T Resource] struct {
 
 	// Delete is used to delete the resource at /base/{ID}
 	Delete http.HandlerFunc
+
+	rootAPI bool
 }
 
 // NewAPI initializes an API using the provided name, base URL path, and function to create a new instance of
@@ -105,6 +107,7 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 		nil,
 		nil,
 		nil,
+		false,
 	}
 
 	api.GetAll = api.defaultGetAll()
@@ -113,6 +116,23 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 	api.Put = api.defaultPut()
 	api.Patch = api.defaultPatch()
 	api.Delete = api.defaultDelete()
+
+	return api
+}
+
+// NewRootAPI initializes an API which can serve as a top-level parent of other APIs, so multiple unrelated resources
+// can exist without any parent/child relationship. This API does not have any default handlers, but custom handlers can
+// still be added. Since there are no IDs in the path, Get and GetAll routes cannot be differentiated so only Get is used
+func NewRootAPI(name, base string) *API[*NilResource] {
+	api := NewAPI[*NilResource](name, base, nil)
+	api.rootAPI = true
+
+	api.GetAll = nil
+	api.Get = nil
+	api.Post = nil
+	api.Put = nil
+	api.Patch = nil
+	api.Delete = nil
 
 	return api
 }
@@ -186,12 +206,12 @@ func (a *API[T]) SetResponseWrapper(responseWrapper func(T) render.Renderer) *AP
 
 // Client returns a new Client based on the API's configuration. It is a shortcut for NewClient
 func (a *API[T]) Client(addr string) *Client[T] {
-	return NewClient[T](addr, a.base)
+	return NewClient[T](addr, makePathWithRoot(a.base, a.parent))
 }
 
 // AnyClient returns a new Client based on the API's configuration. It is a shortcut for NewClient
 func (a *API[T]) AnyClient(addr string) *Client[*AnyResource] {
-	return NewClient[*AnyResource](addr, a.base)
+	return NewClient[*AnyResource](addr, makePathWithRoot(a.base, a.parent))
 }
 
 // AddCustomRootRoute appends a custom API route to the absolute root path ("/"). It does not work for APIs with
@@ -213,6 +233,9 @@ func (a *API[T]) AddCustomRoute(route chi.Route) *API[T] {
 // AddCustomIDRoute appends a custom API route to the base path after the ID URL parameter: /base/{ID}/custom-route.
 // The handler for this route can access the requested resource using GetResourceFromContext
 func (a *API[T]) AddCustomIDRoute(route chi.Route) *API[T] {
+	if a.rootAPI {
+		panic("ID routes cannot be used with a root API")
+	}
 	a.customIDRoutes = append(a.customIDRoutes, route)
 	return a
 }
@@ -225,6 +248,9 @@ func (a *API[T]) AddMiddleware(m func(http.Handler) http.Handler) *API[T] {
 
 // AddIDMiddleware adds a middleware which is active only on the paths including a resource ID
 func (a *API[T]) AddIDMiddleware(m func(http.Handler) http.Handler) *API[T] {
+	if a.rootAPI {
+		panic("ID middleware cannot be used with a root API")
+	}
 	a.idMiddlewares = append(a.idMiddlewares, m)
 	return a
 }
@@ -240,6 +266,7 @@ func (a *API[T]) Serve(port string) {
 
 	go func() {
 		<-a.quit
+		close(a.quit)
 
 		shutdownCtx, cancel := context.WithTimeout(a.serverCtx, 10*time.Second)
 		defer cancel()
@@ -261,7 +288,7 @@ func (a *API[T]) Serve(port string) {
 	slog.Info("starting server", "port", port, "api", a.name)
 	err := a.server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
-		slog.Error("server shutdown error", "error", err)
+		slog.Error("error starting the server", "error", err)
 	}
 
 	<-a.serverCtx.Done()

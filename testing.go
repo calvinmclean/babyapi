@@ -55,6 +55,7 @@ func (p *mockParent) GetIDParam(r *http.Request) string {
 }
 
 func (p *mockParent) setParent(RelatedAPI) {}
+func (p *mockParent) isRoot() bool         { return false }
 
 func (p *mockParent) buildClientMap(*Client[*AnyResource], map[string]*Client[*AnyResource], func(*http.Request) error) {
 }

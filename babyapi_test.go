@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -62,7 +64,8 @@ func TestBabyAPI(t *testing.T) {
 
 	album1 := &Album{Title: "Album1"}
 
-	serverURL, stop := babyapi.TestServe[*Album](t, api)
+	go api.Serve(":8080")
+	serverURL := "http://localhost:8080"
 
 	client := api.Client(serverURL)
 
@@ -189,17 +192,24 @@ func TestBabyAPI(t *testing.T) {
 		})
 	})
 
-	// Test `Done()`
-	go func() {
-		timeout := time.After(2 * time.Second)
-		select {
-		case <-api.Done():
-		case <-timeout:
-			t.Error("timed out before graceful shutdown")
-		}
-	}()
+	t.Run("Done", func(t *testing.T) {
+		var wg sync.WaitGroup
+		wg.Add(1)
 
-	stop()
+		go func() {
+			timeout := time.After(2 * time.Second)
+			select {
+			case <-api.Done():
+				t.Log("successfully stopped")
+			case <-timeout:
+				t.Error("timed out before graceful shutdown")
+			}
+			wg.Done()
+		}()
+
+		api.Stop()
+		wg.Wait()
+	})
 }
 
 type Song struct {
@@ -234,6 +244,14 @@ func (sr *SongResponse) Render(w http.ResponseWriter, r *http.Request) error {
 type MusicVideo struct {
 	babyapi.DefaultResource
 	Title string `json:"title"`
+}
+
+func (m *MusicVideo) Patch(newVideo *MusicVideo) *babyapi.ErrResponse {
+	if newVideo.Title != "" {
+		m.Title = newVideo.Title
+	}
+
+	return nil
 }
 
 type Artist struct {
@@ -811,4 +829,363 @@ func TestAPIModifiers(t *testing.T) {
 		require.Equal(t, 1, afterDelete)
 		require.Equal(t, 1, onCreateOrUpdate)
 	})
+}
+
+func TestRootAPIWithMiddlewareAndCustomHandlers(t *testing.T) {
+	api := babyapi.NewRootAPI("root", "/")
+
+	t.Run("CustomizationsForIDsPanics", func(t *testing.T) {
+		require.Panics(t, func() {
+			api.AddCustomIDRoute(chi.Route{})
+		})
+		require.Panics(t, func() {
+			api.AddIDMiddleware(func(h http.Handler) http.Handler {
+				return nil
+			})
+		})
+	})
+
+	api.Get = func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(201)
+	}
+	api.Delete = func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(202)
+	}
+	api.Patch = func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(203)
+	}
+	api.Post = func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(204)
+	}
+	api.Put = func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(205)
+	}
+
+	api.AddCustomRoute(chi.Route{
+		Handlers: map[string]http.Handler{
+			http.MethodGet: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(206)
+			}),
+		},
+		Pattern: "/customRoute",
+	})
+
+	api.AddCustomRootRoute(chi.Route{
+		Handlers: map[string]http.Handler{
+			http.MethodGet: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(207)
+			}),
+		},
+		Pattern: "/customRootRoute",
+	})
+
+	middlewareHits := 0
+	api.AddMiddleware(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			middlewareHits++
+			next.ServeHTTP(w, r)
+		})
+	})
+
+	tests := []struct {
+		method         string
+		path           string
+		expectedStatus int
+	}{
+		{http.MethodGet, "/", 201},
+		{http.MethodDelete, "/", 202},
+		{http.MethodPatch, "/", 203},
+		{http.MethodPost, "/", 204},
+		{http.MethodPut, "/", 205},
+		{http.MethodGet, "/customRoute", 206},
+		{http.MethodGet, "/customRootRoute", 207},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.method+tt.path, func(t *testing.T) {
+			r := httptest.NewRequest(tt.method, tt.path, http.NoBody)
+			w := babyapi.Test[*babyapi.NilResource](t, api, r)
+
+			require.Equal(t, tt.expectedStatus, w.Result().StatusCode)
+		})
+	}
+
+	t.Run("MiddlewareIsHitForEachRequest", func(t *testing.T) {
+		require.Equal(t, len(tests), middlewareHits)
+	})
+}
+
+func TestRootAPIAsChildOfResourceAPI(t *testing.T) {
+	musicVideoAPI := babyapi.NewAPI[*MusicVideo]("MusicVideos", "/music_videos", func() *MusicVideo { return &MusicVideo{} })
+	songAPI := babyapi.NewAPI[*Song]("Songs", "/songs", func() *Song { return &Song{} })
+	rootAPI := babyapi.
+		NewRootAPI("root", "/").
+		AddNestedAPI(musicVideoAPI).
+		AddNestedAPI(songAPI)
+
+	artistAPI := babyapi.NewAPI[*Artist]("Artists", "/artists", func() *Artist { return &Artist{} })
+	artistAPI.AddNestedAPI(rootAPI)
+
+	go func() {
+		err := artistAPI.RunWithArgs(os.Stdout, []string{"serve"}, 8080, "", false, nil, "")
+		require.NoError(t, err)
+	}()
+
+	address := "http://localhost:8080"
+
+	artist1 := &Artist{Name: "Artist1"}
+	t.Run("CreateParentArtist", func(t *testing.T) {
+		result, err := artistAPI.Client(address).Post(context.Background(), artist1)
+		require.NoError(t, err)
+		artist1 = result.Data
+	})
+
+	t.Run("TestGetAllSongsEmpty", func(t *testing.T) {
+		var out bytes.Buffer
+		err := artistAPI.RunWithArgs(&out, []string{"list", "Songs", artist1.GetID()}, 0, address, false, nil, "")
+		require.NoError(t, err)
+		require.Regexp(t, `{"items":\[\]}`, strings.TrimSpace(out.String()))
+	})
+
+	t.Run("CreateSong", func(t *testing.T) {
+		var out bytes.Buffer
+		err := artistAPI.RunWithArgs(&out, []string{"post", "Songs", `{"title": "new song"}`, artist1.GetID()}, 0, address, false, nil, "")
+		require.NoError(t, err)
+		require.Regexp(t, `\{"id":"[0-9a-v]{20}","title":"new song"\}`, strings.TrimSpace(out.String()))
+	})
+
+	artistAPI.Stop()
+}
+
+func TestRootAPICLI(t *testing.T) {
+	tests := []struct {
+		name           string
+		args           []string
+		expectedRegexp string
+		expectedErr    bool
+	}{
+		{
+			"MissingTargetAPIArg",
+			[]string{},
+			"at least one argument required",
+			true,
+		},
+		{
+			"InvalidTargetAPIArg",
+			[]string{"bad", "bad"},
+			`invalid API \"bad\". valid options are: (\[MusicVideos Songs\]|\[Songs MusicVideos\])`,
+			true,
+		},
+		{
+			"MissingArgs",
+			[]string{"MusicVideos"},
+			"at least two arguments required",
+			true,
+		},
+		{
+			"GetAll",
+			[]string{"list", "MusicVideos"},
+			`\[\{"id":"cljcqg5o402e9s28rbp0","title":"New Video"\}\]`,
+			false,
+		},
+		{
+			"Post",
+			[]string{"post", "MusicVideos", `{"title": "OtherNewMusicVideo"}`},
+			`\{"id":"[0-9a-v]{20}","title":"OtherNewMusicVideo"\}`,
+			false,
+		},
+		{
+			"PostIncorrectParentArgs",
+			[]string{"post", "MusicVideos", `{"title": "OtherNewMusicVideo"}`, "ExtraID"},
+			"error running client from CLI: error running Post: error creating request: error creating target URL: expected 0 parentIDs",
+			true,
+		},
+		{
+			"PostMissingArgs",
+			[]string{"post", "MusicVideos"},
+			"error running client from CLI: at least one argument required",
+			true,
+		},
+		{
+			"PostError",
+			[]string{"post", "MusicVideos", `bad request`},
+			"error running client from CLI: error running Post: error posting resource: unexpected response with text: Invalid request.",
+			true,
+		},
+		{
+			"Patch",
+			[]string{"patch", "MusicVideos", "cljcqg5o402e9s28rbp0", `{"title":"NewTitle"}`},
+			`\{"id":"cljcqg5o402e9s28rbp0","title":"NewTitle"\}`,
+			false,
+		},
+		{
+			"Put",
+			[]string{"put", "MusicVideos", "cljcqg5o402e9s28rbp0", `{"id":"cljcqg5o402e9s28rbp0","title":"NewMusicVideo"}`},
+			`\{"id":"cljcqg5o402e9s28rbp0","title":"NewMusicVideo"\}`,
+			false,
+		},
+		{
+			"PutError",
+			[]string{"put", "MusicVideos", "cljcqg5o402e9s28rbp0", `{"title":"NewMusicVideo"}`},
+			"error running client from CLI: error running Put: error putting resource: unexpected response with text: Invalid request.",
+			true,
+		},
+		{
+			"GetByID",
+			[]string{"get", "MusicVideos", "cljcqg5o402e9s28rbp0"},
+			`\{"id":"cljcqg5o402e9s28rbp0","title":"NewMusicVideo"\}`,
+			false,
+		},
+		{
+			"GetByIDMissingArgs",
+			[]string{"get", "MusicVideos"},
+			"error running client from CLI: at least one argument required",
+			true,
+		},
+		{
+			"GetAllSongs",
+			[]string{"list", "Songs"},
+			`\[{"id":"clknc0do4023onrn3bqg","title":"NewSong"}\]`,
+			false,
+		},
+		{
+			"GetSongByID",
+			[]string{"get", "Songs", "clknc0do4023onrn3bqg"},
+			`{"id":"clknc0do4023onrn3bqg","title":"NewSong"}`,
+			false,
+		},
+		{
+			"PostSong",
+			[]string{"post", "Songs", `{"title": "new song"}`},
+			`\{"id":"[0-9a-v]{20}","title":"new song"\}`,
+			false,
+		},
+		{
+			"Delete",
+			[]string{"delete", "MusicVideos", "cljcqg5o402e9s28rbp0"},
+			`null`,
+			false,
+		},
+		{
+			"DeleteMissingArgs",
+			[]string{"delete", "MusicVideos"},
+			"error running client from CLI: at least one argument required",
+			true,
+		},
+		{
+			"GetByIDNotFound",
+			[]string{"get", "MusicVideos", "cljcqg5o402e9s28rbp0"},
+			"error running client from CLI: error running Get: error getting resource: unexpected response with text: Resource not found.",
+			true,
+		},
+		{
+			"DeleteNotFound",
+			[]string{"delete", "MusicVideos", "cljcqg5o402e9s28rbp0"},
+			"error running client from CLI: error running Delete: error deleting resource: unexpected response with text: Resource not found.",
+			true,
+		},
+		{
+			"PatchNotFound",
+			[]string{"patch", "MusicVideos", "cljcqg5o402e9s28rbp0", ""},
+			"error running client from CLI: error running Patch: error patching resource: unexpected response with text: Resource not found.",
+			true,
+		},
+		{
+			"PatchMissingArgs",
+			[]string{"patch", "MusicVideos"},
+			"error running client from CLI: at least two arguments required",
+			true,
+		},
+		{
+			"PutMissingArgs",
+			[]string{"put", "MusicVideos"},
+			"error running client from CLI: at least two arguments required",
+			true,
+		},
+	}
+
+	basePaths := []string{
+		"/",
+		"/api",
+	}
+
+	for _, base := range basePaths {
+		t.Run("BasePath"+base, func(t *testing.T) {
+
+			musicVideoAPI := babyapi.NewAPI[*MusicVideo]("MusicVideos", "/music_videos", func() *MusicVideo { return &MusicVideo{} })
+			songAPI := babyapi.NewAPI[*Song]("Songs", "/songs", func() *Song { return &Song{} })
+			rootAPI := babyapi.
+				NewRootAPI("root", base).
+				AddNestedAPI(musicVideoAPI).
+				AddNestedAPI(songAPI)
+
+			go func() {
+				err := rootAPI.RunWithArgs(os.Stdout, []string{"serve"}, 8080, "", false, nil, "")
+				require.NoError(t, err)
+			}()
+
+			songAPI.SetGetAllFilter(func(r *http.Request) babyapi.FilterFunc[*Song] {
+				return func(s *Song) bool {
+					title := r.URL.Query().Get("title")
+					return title == "" || s.Title == title
+				}
+			})
+
+			musicVideoAPI.SetGetAllFilter(func(r *http.Request) babyapi.FilterFunc[*MusicVideo] {
+				return func(m *MusicVideo) bool {
+					title := r.URL.Query().Get("title")
+					return title == "" || m.Title == title
+				}
+			})
+
+			address := "http://localhost:8080"
+
+			// Create hard-coded musicVideo so we can use the ID
+			musicVideo := &MusicVideo{DefaultResource: babyapi.NewDefaultResource(), Title: "New Video"}
+			musicVideo.DefaultResource.ID.ID, _ = xid.FromString("cljcqg5o402e9s28rbp0")
+			_, err := musicVideoAPI.Client(address).Put(context.Background(), musicVideo)
+			require.NoError(t, err)
+
+			// Create hard-coded song so we can use the ID
+			song := &Song{DefaultResource: babyapi.NewDefaultResource(), Title: "NewSong"}
+			song.DefaultResource.ID.ID, _ = xid.FromString("clknc0do4023onrn3bqg")
+			_, err = songAPI.Client(address).Put(context.Background(), song)
+			require.NoError(t, err)
+
+			t.Run("GetAllQueryParams", func(t *testing.T) {
+				t.Run("Successful", func(t *testing.T) {
+					var out bytes.Buffer
+					err := rootAPI.RunWithArgs(&out, []string{"list", "MusicVideos"}, 0, address, false, nil, "title=New Video")
+					require.NoError(t, err)
+					require.Equal(t, `{"items":[{"id":"cljcqg5o402e9s28rbp0","title":"New Video"}]}`, strings.TrimSpace(out.String()))
+				})
+
+				t.Run("NoMatch", func(t *testing.T) {
+					var out bytes.Buffer
+					err := rootAPI.RunWithArgs(&out, []string{"list", "MusicVideos"}, 0, address, false, nil, "title=badTitle")
+					require.NoError(t, err)
+					require.Equal(t, `{"items":[]}`, strings.TrimSpace(out.String()))
+				})
+			})
+
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					var out bytes.Buffer
+					err := rootAPI.RunWithArgs(&out, tt.args, 0, address, false, nil, "")
+					if !tt.expectedErr {
+						require.NoError(t, err)
+						require.Regexp(t, tt.expectedRegexp, strings.TrimSpace(out.String()))
+						if tt.expectedRegexp == "" {
+							require.Equal(t, tt.expectedRegexp, strings.TrimSpace(out.String()))
+						}
+					} else {
+						require.Error(t, err)
+						require.Regexp(t, tt.expectedRegexp, err.Error())
+					}
+				})
+			}
+
+			rootAPI.Stop()
+		})
+	}
 }
