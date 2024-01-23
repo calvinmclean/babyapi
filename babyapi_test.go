@@ -34,6 +34,17 @@ func (a *Album) Patch(newAlbum *Album) *babyapi.ErrResponse {
 	return nil
 }
 
+func waitForAPI(address string) {
+	const maxLoops = 10
+	for loops := 0; loops < maxLoops; loops++ {
+		_, err := http.Get(address)
+		if err == nil { // Connection timeout is always an error
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
 func TestBabyAPI(t *testing.T) {
 	api := babyapi.NewAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} })
 	api.AddCustomRoute(chi.Route{
@@ -66,6 +77,8 @@ func TestBabyAPI(t *testing.T) {
 
 	go api.Serve("localhost:8080")
 	serverURL := "http://localhost:8080"
+
+	waitForAPI(serverURL)
 
 	client := api.Client(serverURL)
 
@@ -553,6 +566,8 @@ func TestCLI(t *testing.T) {
 
 	address := "http://localhost:8080"
 
+	waitForAPI(address)
+
 	// Create hard-coded album so we can use the ID
 	album := &Album{DefaultResource: babyapi.NewDefaultResource(), Title: "New Album"}
 	album.DefaultResource.ID.ID, _ = xid.FromString("cljcqg5o402e9s28rbp0")
@@ -933,6 +948,8 @@ func TestRootAPIAsChildOfResourceAPI(t *testing.T) {
 
 	address := "http://localhost:8080"
 
+	waitForAPI(address)
+
 	artist1 := &Artist{Name: "Artist1"}
 	t.Run("CreateParentArtist", func(t *testing.T) {
 		result, err := artistAPI.Client(address).Post(context.Background(), artist1)
@@ -1139,6 +1156,8 @@ func TestRootAPICLI(t *testing.T) {
 			})
 
 			address := "http://localhost:8080"
+
+			waitForAPI(address)
 
 			// Create hard-coded musicVideo so we can use the ID
 			musicVideo := &MusicVideo{DefaultResource: babyapi.NewDefaultResource(), Title: "New Video"}
