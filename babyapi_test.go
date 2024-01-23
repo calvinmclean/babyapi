@@ -64,7 +64,7 @@ func TestBabyAPI(t *testing.T) {
 
 	album1 := &Album{Title: "Album1"}
 
-	go api.Serve(":8080")
+	go api.Serve("localhost:8080")
 	serverURL := "http://localhost:8080"
 
 	client := api.Client(serverURL)
