@@ -28,14 +28,12 @@ func (ssf *stringSliceFlag) Set(value string) error {
 }
 
 func (a *API[T]) RunCLI() {
-	var port int
-	var bindip string
+	var bindAddress string
 	var address string
 	var pretty bool
 	var headers stringSliceFlag
 	var query string
-	flag.IntVar(&port, "port", 8080, "http port for server")
-	flag.StringVar(&bindip, "bindip", "", "IP address or hostname to bind server to")
+	flag.StringVar(&bindAddress, "bindAddress", "", "Address and port to bind to for example :8080 for port only, localhost:8080 or 172.0.0.1:8080")
 	flag.StringVar(&address, "address", "http://localhost:8080", "server address for client")
 	flag.BoolVar(&pretty, "pretty", true, "pretty print JSON if enabled")
 	flag.Var(&headers, "H", "add headers to request")
@@ -45,19 +43,19 @@ func (a *API[T]) RunCLI() {
 
 	args := flag.Args()
 
-	err := a.RunWithArgs(os.Stdout, args, port, bindip, address, pretty, headers, query)
+	err := a.RunWithArgs(os.Stdout, args, bindAddress, address, pretty, headers, query)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 	}
 }
 
-func (a *API[T]) RunWithArgs(out io.Writer, args []string, port int, bindip string, address string, pretty bool, headers []string, query string) error {
+func (a *API[T]) RunWithArgs(out io.Writer, args []string, bindAddress string, address string, pretty bool, headers []string, query string) error {
 	if len(args) < 1 {
 		return fmt.Errorf("at least one argument required")
 	}
 
 	if args[0] == "serve" {
-		a.Serve(fmt.Sprintf("%s:%d", bindip, port))
+		a.Serve(bindAddress)
 		return nil
 	}
 

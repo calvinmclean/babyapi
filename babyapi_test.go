@@ -540,7 +540,7 @@ func TestCLI(t *testing.T) {
 	songAPI := babyapi.NewAPI[*Song]("Songs", "/songs", func() *Song { return &Song{} })
 	api.AddNestedAPI(songAPI)
 	go func() {
-		err := api.RunWithArgs(os.Stdout, []string{"serve"}, 8080, "localhost", "", false, nil, "")
+		err := api.RunWithArgs(os.Stdout, []string{"serve"}, "localhost:8080", "", false, nil, "")
 		require.NoError(t, err)
 	}()
 
@@ -573,14 +573,14 @@ func TestCLI(t *testing.T) {
 	t.Run("GetAllQueryParams", func(t *testing.T) {
 		t.Run("Successful", func(t *testing.T) {
 			var out bytes.Buffer
-			err := api.RunWithArgs(&out, []string{"list", "Albums"}, 0, "", address, false, nil, "title=New Album")
+			err := api.RunWithArgs(&out, []string{"list", "Albums"}, "", address, false, nil, "title=New Album")
 			require.NoError(t, err)
 			require.Equal(t, `{"items":[{"id":"cljcqg5o402e9s28rbp0","title":"New Album"}]}`, strings.TrimSpace(out.String()))
 		})
 
 		t.Run("NoMatch", func(t *testing.T) {
 			var out bytes.Buffer
-			err := api.RunWithArgs(&out, []string{"list", "Albums"}, 0, "", address, false, nil, "title=badTitle")
+			err := api.RunWithArgs(&out, []string{"list", "Albums"}, "", address, false, nil, "title=badTitle")
 			require.NoError(t, err)
 			require.Equal(t, `{"items":[]}`, strings.TrimSpace(out.String()))
 		})
@@ -589,7 +589,7 @@ func TestCLI(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var out bytes.Buffer
-			err := api.RunWithArgs(&out, tt.args, 0, "", address, false, nil, "")
+			err := api.RunWithArgs(&out, tt.args, "", address, false, nil, "")
 			if !tt.expectedErr {
 				require.NoError(t, err)
 				require.Regexp(t, tt.expectedRegexp, strings.TrimSpace(out.String()))
@@ -927,7 +927,7 @@ func TestRootAPIAsChildOfResourceAPI(t *testing.T) {
 	artistAPI.AddNestedAPI(rootAPI)
 
 	go func() {
-		err := artistAPI.RunWithArgs(os.Stdout, []string{"serve"}, 8080, "localhost", "", false, nil, "")
+		err := artistAPI.RunWithArgs(os.Stdout, []string{"serve"}, "localhost:8080", "", false, nil, "")
 		require.NoError(t, err)
 	}()
 
@@ -942,14 +942,14 @@ func TestRootAPIAsChildOfResourceAPI(t *testing.T) {
 
 	t.Run("TestGetAllSongsEmpty", func(t *testing.T) {
 		var out bytes.Buffer
-		err := artistAPI.RunWithArgs(&out, []string{"list", "Songs", artist1.GetID()}, 0, "", address, false, nil, "")
+		err := artistAPI.RunWithArgs(&out, []string{"list", "Songs", artist1.GetID()}, "", address, false, nil, "")
 		require.NoError(t, err)
 		require.Regexp(t, `{"items":\[\]}`, strings.TrimSpace(out.String()))
 	})
 
 	t.Run("CreateSong", func(t *testing.T) {
 		var out bytes.Buffer
-		err := artistAPI.RunWithArgs(&out, []string{"post", "Songs", `{"title": "new song"}`, artist1.GetID()}, 0, "", address, false, nil, "")
+		err := artistAPI.RunWithArgs(&out, []string{"post", "Songs", `{"title": "new song"}`, artist1.GetID()}, "", address, false, nil, "")
 		require.NoError(t, err)
 		require.Regexp(t, `\{"id":"[0-9a-v]{20}","title":"new song"\}`, strings.TrimSpace(out.String()))
 	})
@@ -1120,7 +1120,7 @@ func TestRootAPICLI(t *testing.T) {
 				AddNestedAPI(songAPI)
 
 			go func() {
-				err := rootAPI.RunWithArgs(os.Stdout, []string{"serve"}, 8080, "localhost", "", false, nil, "")
+				err := rootAPI.RunWithArgs(os.Stdout, []string{"serve"}, "localhost:8080", "", false, nil, "")
 				require.NoError(t, err)
 			}()
 
@@ -1155,14 +1155,14 @@ func TestRootAPICLI(t *testing.T) {
 			t.Run("GetAllQueryParams", func(t *testing.T) {
 				t.Run("Successful", func(t *testing.T) {
 					var out bytes.Buffer
-					err := rootAPI.RunWithArgs(&out, []string{"list", "MusicVideos"}, 0, "", address, false, nil, "title=New Video")
+					err := rootAPI.RunWithArgs(&out, []string{"list", "MusicVideos"}, "", address, false, nil, "title=New Video")
 					require.NoError(t, err)
 					require.Equal(t, `{"items":[{"id":"cljcqg5o402e9s28rbp0","title":"New Video"}]}`, strings.TrimSpace(out.String()))
 				})
 
 				t.Run("NoMatch", func(t *testing.T) {
 					var out bytes.Buffer
-					err := rootAPI.RunWithArgs(&out, []string{"list", "MusicVideos"}, 0, "", address, false, nil, "title=badTitle")
+					err := rootAPI.RunWithArgs(&out, []string{"list", "MusicVideos"}, "", address, false, nil, "title=badTitle")
 					require.NoError(t, err)
 					require.Equal(t, `{"items":[]}`, strings.TrimSpace(out.String()))
 				})
@@ -1171,7 +1171,7 @@ func TestRootAPICLI(t *testing.T) {
 			for _, tt := range tests {
 				t.Run(tt.name, func(t *testing.T) {
 					var out bytes.Buffer
-					err := rootAPI.RunWithArgs(&out, tt.args, 0, "", address, false, nil, "")
+					err := rootAPI.RunWithArgs(&out, tt.args, "", address, false, nil, "")
 					if !tt.expectedErr {
 						require.NoError(t, err)
 						require.Regexp(t, tt.expectedRegexp, strings.TrimSpace(out.String()))
