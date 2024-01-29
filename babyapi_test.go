@@ -195,12 +195,13 @@ func TestBabyAPI(t *testing.T) {
 
 	t.Run("DeleteAlbum", func(t *testing.T) {
 		t.Run("Successful", func(t *testing.T) {
-			err := client.Delete(context.Background(), album1.GetID())
+			resp, err := client.Delete(context.Background(), album1.GetID())
 			require.NoError(t, err)
+			require.Equal(t, http.NoBody, resp.Response.Body)
 		})
 
 		t.Run("NotFound", func(t *testing.T) {
-			err := client.Delete(context.Background(), album1.GetID())
+			_, err := client.Delete(context.Background(), album1.GetID())
 			require.Error(t, err)
 			require.Equal(t, "error deleting resource: unexpected response with text: Resource not found.", err.Error())
 		})
@@ -509,7 +510,7 @@ func TestCLI(t *testing.T) {
 		{
 			"Delete",
 			[]string{"delete", "Albums", "cljcqg5o402e9s28rbp0"},
-			`null`,
+			``,
 			false,
 		},
 		{
@@ -1081,7 +1082,7 @@ func TestRootAPICLI(t *testing.T) {
 		{
 			"Delete",
 			[]string{"delete", "MusicVideos", "cljcqg5o402e9s28rbp0"},
-			`null`,
+			``,
 			false,
 		},
 		{

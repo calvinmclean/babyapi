@@ -52,8 +52,8 @@ type API[T Resource] struct {
 
 	parent relatedAPI
 
-	customResponseCodes map[string]int
-	serverCtx           context.Context
+	responseCodes map[string]int
+	serverCtx     context.Context
 
 	// GetAll is the handler for /base and returns an array of resources
 	GetAll http.HandlerFunc
@@ -99,7 +99,7 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 		defaultBeforeAfter,
 		func(*http.Request, T) *ErrResponse { return nil },
 		nil,
-		map[string]int{},
+		defaultResponseCodes(),
 		nil,
 		nil,
 		nil,
@@ -149,7 +149,7 @@ func (a *API[T]) Name() string {
 
 // SetCustomResponseCode will override the default response codes for the specified HTTP verb
 func (a *API[T]) SetCustomResponseCode(verb string, code int) *API[T] {
-	a.customResponseCodes[verb] = code
+	a.responseCodes[verb] = code
 	return a
 }
 
@@ -206,12 +206,14 @@ func (a *API[T]) SetResponseWrapper(responseWrapper func(T) render.Renderer) *AP
 
 // Client returns a new Client based on the API's configuration. It is a shortcut for NewClient
 func (a *API[T]) Client(addr string) *Client[T] {
-	return NewClient[T](addr, makePathWithRoot(a.base, a.parent))
+	return NewClient[T](addr, makePathWithRoot(a.base, a.parent)).
+		SetCustomResponseCodeMap(a.responseCodes)
 }
 
 // AnyClient returns a new Client based on the API's configuration. It is a shortcut for NewClient
 func (a *API[T]) AnyClient(addr string) *Client[*AnyResource] {
-	return NewClient[*AnyResource](addr, makePathWithRoot(a.base, a.parent))
+	return NewClient[*AnyResource](addr, makePathWithRoot(a.base, a.parent)).
+		SetCustomResponseCodeMap(a.responseCodes)
 }
 
 // AddCustomRootRoute appends a custom API route to the absolute root path ("/"). It does not work for APIs with

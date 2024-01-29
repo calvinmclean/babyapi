@@ -44,6 +44,9 @@ type Request struct {
 
 // ExpectedResponse sets up the expectations when running a test
 type ExpectedResponse struct {
+	// NoBody sets the expectation that the response will have an empty body. This is used because leaving Body
+	// empty will just skip the test, not assert the response is empty
+	NoBody bool
 	// Body is the expected response body string
 	Body string
 	// BodyRegexp allows comparing a request body by regex
@@ -120,7 +123,7 @@ func (tt Test) requestTest(t *testing.T, client *babyapi.Client[*babyapi.AnyReso
 	url, err := client.URL("")
 	require.NoError(t, err)
 
-	return client.MakeRequest(tt.RequestFunc(getResponse, url), tt.ExpectedResponse.Status)
+	return client.MakeRequest(tt.RequestFunc(getResponse, url), 0)
 }
 
 // clientTest executes the ClientRequest of a Test
@@ -163,8 +166,7 @@ func (tt Test) clientTest(t *testing.T, client *babyapi.Client[*babyapi.AnyResou
 	case http.MethodPatch:
 		return client.PatchRaw(context.Background(), id, body, parentIDs...)
 	case http.MethodDelete:
-		err := client.Delete(context.Background(), id, parentIDs...)
-		return nil, err
+		return client.Delete(context.Background(), id, parentIDs...)
 	}
 
 	return nil, nil
@@ -187,6 +189,9 @@ func (tt Test) assertError(t *testing.T, err error) {
 
 func (tt Test) assertBody(t *testing.T, r *babyapi.Response[*babyapi.AnyResource]) {
 	switch {
+	case tt.NoBody:
+		require.Equal(t, http.NoBody, r.Response.Body)
+		require.Equal(t, "", r.Body)
 	case tt.BodyRegexp != "":
 		require.Regexp(t, tt.ExpectedResponse.BodyRegexp, strings.TrimSpace(r.Body))
 	case tt.Body != "":

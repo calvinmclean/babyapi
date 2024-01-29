@@ -52,6 +52,7 @@ func TestAPI(t *testing.T) {
 			ExpectedResponse: babytest.ExpectedResponse{
 				Status:     http.StatusForbidden,
 				BodyRegexp: `{"status":"Forbidden"}`,
+				Error:      "unexpected response with text: Forbidden",
 			},
 		},
 		{
@@ -78,6 +79,7 @@ func TestAPI(t *testing.T) {
 			ExpectedResponse: babytest.ExpectedResponse{
 				Status:     http.StatusForbidden,
 				BodyRegexp: `{"status":"Forbidden"}`,
+				Error:      "unexpected response with text: Forbidden",
 			},
 		},
 		{
@@ -177,6 +179,23 @@ func TestAPI(t *testing.T) {
 			ExpectedResponse: babytest.ExpectedResponse{
 				Status:     http.StatusOK,
 				BodyRegexp: `{"id":"[0-9a-v]{20}","Name":"Firstname Lastname","Contact":"","EventID":"[0-9a-v]{20}","RSVP":null}`,
+			},
+		},
+		{
+			Name: "DeleteInvite",
+			ClientRequest: &babytest.Request{
+				Method: http.MethodDelete,
+				ParentIDsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
+					return []string{getResponse("CreateEvent").Data.GetID()}
+				},
+				IDFunc: func(getResponse babytest.PreviousResponseGetter) string {
+					return getResponse("CreateInvite").Data.GetID()
+				},
+			},
+			ClientName: "Invite",
+			ExpectedResponse: babytest.ExpectedResponse{
+				Status: http.StatusOK,
+				NoBody: true,
 			},
 		},
 	})

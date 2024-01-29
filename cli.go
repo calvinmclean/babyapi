@@ -176,12 +176,12 @@ func (a *API[T]) runDeleteCommand(args []string, client *Client[*AnyResource]) (
 	if len(args) < 1 {
 		return nil, fmt.Errorf("at least one argument required")
 	}
-	err := client.Delete(context.Background(), args[0], args[1:]...)
+	result, err := client.Delete(context.Background(), args[0], args[1:]...)
 	if err != nil {
 		return nil, fmt.Errorf("error running Delete: %w", err)
 	}
 
-	return nil, nil
+	return result, nil
 }
 
 func (a *API[T]) runListCommand(args []string, client *Client[*AnyResource]) (*Response[*ResourceList[*AnyResource]], error) {
