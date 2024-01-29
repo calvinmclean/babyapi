@@ -55,13 +55,11 @@ type ExpectedResponse struct {
 	Status int
 	// Error is an expected error string to be returned by the client
 	Error string
-	// Assert allows setting a function for custom assertions after making a request
-	Assert func(*babyapi.Response[*babyapi.AnyResource])
 }
 
 // Test is a single test step that executes the provided ClientRequest or RequestFunc and compares to the
 // ExpectedResponse
-type Test struct {
+type Test[T babyapi.Resource] struct {
 	Name string
 
 	// RequestFunc is used to create an *http.Request from the provided URL. Mutually exclusive with ClientRequest
@@ -76,13 +74,17 @@ type Test struct {
 	// This is only available for TableTest because it has the ClientMap
 	ClientName string
 
+	// Assert allows setting a function for custom assertions after making a request. It is part of the Test instead
+	// of the ExpectedResponse because it needs the type parameter
+	Assert func(*babyapi.Response[T])
+
 	// Expected response to compare
 	ExpectedResponse
 }
 
 // Run will execute a Test using t.Run to run with the test name. The API is expected to already be running. If your
 // test uses any PreviousResponseGetter, it will have a nil panic since that is used only for TableTest
-func (tt Test) Run(t *testing.T, client *babyapi.Client[*babyapi.AnyResource]) {
+func (tt Test[T]) Run(t *testing.T, client *babyapi.Client[T]) {
 	t.Run(tt.Name, func(t *testing.T) {
 		if tt.ClientName != "" {
 			t.Errorf("cannot use ClientName field when executing without TableTest")
@@ -93,13 +95,13 @@ func (tt Test) Run(t *testing.T, client *babyapi.Client[*babyapi.AnyResource]) {
 	})
 }
 
-func (tt Test) run(t *testing.T, client *babyapi.Client[*babyapi.AnyResource], getResponse PreviousResponseGetter) *babyapi.Response[*babyapi.AnyResource] {
+func (tt Test[T]) run(t *testing.T, client *babyapi.Client[T], getResponse PreviousResponseGetter) *babyapi.Response[T] {
 	if tt.RequestFunc != nil && tt.ClientRequest != nil {
 		t.Error("invalid test: defines RequestFunc and ClientRequest")
 		t.FailNow()
 	}
 
-	var r *babyapi.Response[*babyapi.AnyResource]
+	var r *babyapi.Response[T]
 	var err error
 	switch {
 	case tt.RequestFunc != nil:
@@ -119,7 +121,7 @@ func (tt Test) run(t *testing.T, client *babyapi.Client[*babyapi.AnyResource], g
 }
 
 // requestTest executes the RequestFunc of a Test
-func (tt Test) requestTest(t *testing.T, client *babyapi.Client[*babyapi.AnyResource], getResponse PreviousResponseGetter) (*babyapi.Response[*babyapi.AnyResource], error) {
+func (tt Test[T]) requestTest(t *testing.T, client *babyapi.Client[T], getResponse PreviousResponseGetter) (*babyapi.Response[T], error) {
 	url, err := client.URL("")
 	require.NoError(t, err)
 
@@ -127,7 +129,7 @@ func (tt Test) requestTest(t *testing.T, client *babyapi.Client[*babyapi.AnyReso
 }
 
 // clientTest executes the ClientRequest of a Test
-func (tt Test) clientTest(t *testing.T, client *babyapi.Client[*babyapi.AnyResource], getResponse PreviousResponseGetter) (*babyapi.Response[*babyapi.AnyResource], error) {
+func (tt Test[T]) clientTest(t *testing.T, client *babyapi.Client[T], getResponse PreviousResponseGetter) (*babyapi.Response[T], error) {
 	id := tt.ClientRequest.ID
 	if tt.ClientRequest.IDFunc != nil {
 		id = tt.ClientRequest.IDFunc(getResponse)
@@ -172,7 +174,7 @@ func (tt Test) clientTest(t *testing.T, client *babyapi.Client[*babyapi.AnyResou
 	return nil, nil
 }
 
-func (tt Test) assertError(t *testing.T, err error) {
+func (tt Test[T]) assertError(t *testing.T, err error) {
 	if tt.ExpectedResponse.Error == "" {
 		require.NoError(t, err)
 		return
@@ -187,7 +189,7 @@ func (tt Test) assertError(t *testing.T, err error) {
 	}
 }
 
-func (tt Test) assertBody(t *testing.T, r *babyapi.Response[*babyapi.AnyResource]) {
+func (tt Test[T]) assertBody(t *testing.T, r *babyapi.Response[T]) {
 	switch {
 	case tt.NoBody:
 		require.Equal(t, http.NoBody, r.Response.Body)
@@ -195,6 +197,10 @@ func (tt Test) assertBody(t *testing.T, r *babyapi.Response[*babyapi.AnyResource
 	case tt.BodyRegexp != "":
 		require.Regexp(t, tt.ExpectedResponse.BodyRegexp, strings.TrimSpace(r.Body))
 	case tt.Body != "":
+		if r == nil {
+			t.Error("response is nil")
+			return
+		}
 		require.Equal(t, tt.ExpectedResponse.Body, strings.TrimSpace(r.Body))
 	}
 }
@@ -202,14 +208,14 @@ func (tt Test) assertBody(t *testing.T, r *babyapi.Response[*babyapi.AnyResource
 // tableTest allows
 type tableTest[T babyapi.Resource] struct {
 	api     *babyapi.API[T]
-	tests   []Test
+	tests   []Test[*babyapi.AnyResource]
 	results map[string]*babyapi.Response[*babyapi.AnyResource]
 }
 
 // RunTableTest will start the provided API and execute all provided tests in-order. This allows the usage of a
 // PreviousResponseGetter in each test to access data from previous tests. The API's ClientMap is used to execute
 // tests with child clients if the test uses ClientName field
-func RunTableTest[T babyapi.Resource](t *testing.T, api *babyapi.API[T], tests []Test) {
+func RunTableTest[T babyapi.Resource](t *testing.T, api *babyapi.API[T], tests []Test[*babyapi.AnyResource]) {
 	tt := tableTest[T]{
 		api,
 		tests,

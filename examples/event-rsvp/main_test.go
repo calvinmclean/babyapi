@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/calvinmclean/babyapi"
 	babytest "github.com/calvinmclean/babyapi/test"
 	"github.com/stretchr/testify/require"
 )
@@ -15,7 +16,7 @@ func TestAPI(t *testing.T) {
 
 	api := createAPI()
 
-	babytest.RunTableTest(t, api.Events, []babytest.Test{
+	babytest.RunTableTest(t, api.Events, []babytest.Test[*babyapi.AnyResource]{
 		{
 			Name: "ErrorCreatingEventWithoutPassword",
 			ClientRequest: &babytest.Request{
@@ -198,5 +199,44 @@ func TestAPI(t *testing.T) {
 				NoBody: true,
 			},
 		},
+		{
+			Name: "PatchErrorNotConfigured",
+			ClientRequest: &babytest.Request{
+				Method:   http.MethodPatch,
+				RawQuery: "password=secret",
+				IDFunc: func(getResponse babytest.PreviousResponseGetter) string {
+					return getResponse("CreateEvent").Data.GetID()
+				},
+				Body: `{"Name": "NEW"}`,
+			},
+			ExpectedResponse: babytest.ExpectedResponse{
+				Status: http.StatusMethodNotAllowed,
+				Error:  "error patching resource: unexpected response with text: Method not allowed.",
+			},
+		},
 	})
+}
+
+func TestIndividualTest(t *testing.T) {
+	defer os.RemoveAll("storage.json")
+
+	api := createAPI()
+
+	client, stop := babytest.NewTestClient[*Event](t, api.Events)
+	defer stop()
+
+	babytest.Test[*Event]{
+		Name: "CreateEvent",
+		ClientRequest: &babytest.Request{
+			Method: http.MethodPost,
+			Body:   `{"Name": "Party", "Password": "secret"}`,
+		},
+		ExpectedResponse: babytest.ExpectedResponse{
+			Status:     http.StatusCreated,
+			BodyRegexp: `{"id":"[0-9a-v]{20}","Name":"Party","Contact":"","Date":"","Location":"","Details":""}`,
+		},
+		Assert: func(r *babyapi.Response[*Event]) {
+			require.Equal(t, "Party", r.Data.Name)
+		},
+	}.Run(t, client)
 }
