@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/calvinmclean/babyapi"
+	babytest "github.com/calvinmclean/babyapi/test"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"github.com/rs/xid"
@@ -194,12 +195,13 @@ func TestBabyAPI(t *testing.T) {
 
 	t.Run("DeleteAlbum", func(t *testing.T) {
 		t.Run("Successful", func(t *testing.T) {
-			err := client.Delete(context.Background(), album1.GetID())
+			resp, err := client.Delete(context.Background(), album1.GetID())
 			require.NoError(t, err)
+			require.Equal(t, http.NoBody, resp.Response.Body)
 		})
 
 		t.Run("NotFound", func(t *testing.T) {
-			err := client.Delete(context.Background(), album1.GetID())
+			_, err := client.Delete(context.Background(), album1.GetID())
 			require.Error(t, err)
 			require.Equal(t, "error deleting resource: unexpected response with text: Resource not found.", err.Error())
 		})
@@ -285,7 +287,7 @@ func TestNestedAPI(t *testing.T) {
 	artistAPI.AddNestedAPI(albumAPI).AddNestedAPI(musicVideoAPI)
 	albumAPI.AddNestedAPI(songAPI)
 
-	serverURL, stop := babyapi.TestServe[*Artist](t, artistAPI)
+	serverURL, stop := babytest.TestServe[*Artist](t, artistAPI)
 	defer stop()
 
 	artist1 := &Artist{Name: "Artist1"}
@@ -508,7 +510,7 @@ func TestCLI(t *testing.T) {
 		{
 			"Delete",
 			[]string{"delete", "Albums", "cljcqg5o402e9s28rbp0"},
-			`null`,
+			``,
 			false,
 		},
 		{
@@ -664,7 +666,7 @@ func TestHTML(t *testing.T) {
 		Content:         "Item1",
 	}
 
-	address, closer := babyapi.TestServe[*ListItem](t, api)
+	address, closer := babytest.TestServe[*ListItem](t, api)
 	defer closer()
 
 	client := api.Client(address)
@@ -718,7 +720,7 @@ func TestServerSentEvents(t *testing.T) {
 
 	events := api.AddServerSentEventHandler("/events")
 
-	address, closer := babyapi.TestServe[*ListItem](t, api)
+	address, closer := babytest.TestServe[*ListItem](t, api)
 	defer closer()
 
 	item1 := &ListItem{
@@ -813,7 +815,7 @@ func TestAPIModifiers(t *testing.T) {
 		require.NoError(t, err)
 		r.Header.Add("Content-Type", "application/json")
 
-		w := babyapi.Test[*Album](t, api, r)
+		w := babytest.TestRequest[*Album](t, api, r)
 		require.Equal(t, http.StatusTeapot, w.Result().StatusCode)
 	})
 
@@ -821,7 +823,7 @@ func TestAPIModifiers(t *testing.T) {
 		r, err := http.NewRequest(http.MethodDelete, "/albums/"+albumID, http.NoBody)
 		require.NoError(t, err)
 
-		w := babyapi.Test[*Album](t, api, r)
+		w := babytest.TestRequest[*Album](t, api, r)
 		require.Equal(t, http.StatusNoContent, w.Result().StatusCode)
 	})
 
@@ -829,7 +831,7 @@ func TestAPIModifiers(t *testing.T) {
 		r, err := http.NewRequest(http.MethodGet, "/albums/DoesNotExist", http.NoBody)
 		require.NoError(t, err)
 
-		w := babyapi.Test[*Album](t, api, r)
+		w := babytest.TestRequest[*Album](t, api, r)
 		require.Equal(t, http.StatusNotFound, w.Result().StatusCode)
 	})
 
@@ -919,7 +921,7 @@ func TestRootAPIWithMiddlewareAndCustomHandlers(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.method+tt.path, func(t *testing.T) {
 			r := httptest.NewRequest(tt.method, tt.path, http.NoBody)
-			w := babyapi.Test[*babyapi.NilResource](t, api, r)
+			w := babytest.TestRequest[*babyapi.NilResource](t, api, r)
 
 			require.Equal(t, tt.expectedStatus, w.Result().StatusCode)
 		})
@@ -1080,7 +1082,7 @@ func TestRootAPICLI(t *testing.T) {
 		{
 			"Delete",
 			[]string{"delete", "MusicVideos", "cljcqg5o402e9s28rbp0"},
-			`null`,
+			``,
 			false,
 		},
 		{

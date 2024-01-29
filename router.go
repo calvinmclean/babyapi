@@ -12,6 +12,16 @@ import (
 
 var respondMtx sync.Mutex
 
+func defaultResponseCodes() map[string]int {
+	return map[string]int{
+		http.MethodGet:    http.StatusOK,
+		http.MethodDelete: http.StatusNoContent,
+		http.MethodPost:   http.StatusCreated,
+		http.MethodPatch:  http.StatusOK,
+		http.MethodPut:    http.StatusOK,
+	}
+}
+
 // HTMLer allows for easily represending reponses as HTML strings when accepted content
 // type is text/html
 type HTMLer interface {
@@ -45,7 +55,7 @@ func (a *API[T]) Route(r chi.Router) {
 	r.Route(a.base, func(r chi.Router) {
 		// Only set these middleware for root-level API
 		if a.parent == nil {
-			a.defaultMiddleware(r)
+			a.DefaultMiddleware(r)
 		}
 
 		if a.rootAPI {
@@ -119,10 +129,7 @@ func (a *API[T]) defaultGet() http.HandlerFunc {
 			return httpErr
 		}
 
-		codeOverride, ok := a.customResponseCodes[http.MethodGet]
-		if ok {
-			render.Status(r, codeOverride)
-		}
+		render.Status(r, a.responseCodes[http.MethodGet])
 
 		return a.responseWrapper(resource)
 	})
@@ -150,10 +157,7 @@ func (a *API[T]) defaultGetAll() http.HandlerFunc {
 			resp = &ResourceList[render.Renderer]{Items: items}
 		}
 
-		codeOverride, ok := a.customResponseCodes[http.MethodGet]
-		if ok {
-			render.Status(r, codeOverride)
-		}
+		render.Status(r, a.responseCodes[http.MethodGet])
 
 		return resp
 	})
@@ -175,12 +179,7 @@ func (a *API[T]) defaultPost() http.HandlerFunc {
 			return *new(T), InternalServerError(err)
 		}
 
-		codeOverride, ok := a.customResponseCodes[http.MethodPost]
-		if ok {
-			render.Status(r, codeOverride)
-		} else {
-			render.Status(r, http.StatusCreated)
-		}
+		render.Status(r, a.responseCodes[http.MethodPost])
 
 		return resource, nil
 	})
@@ -206,10 +205,7 @@ func (a *API[T]) defaultPut() http.HandlerFunc {
 			return *new(T), InternalServerError(err)
 		}
 
-		codeOverride, ok := a.customResponseCodes[http.MethodPut]
-		if ok {
-			render.Status(r, codeOverride)
-		}
+		render.Status(r, a.responseCodes[http.MethodPut])
 
 		return resource, nil
 	})
@@ -249,10 +245,7 @@ func (a *API[T]) defaultPatch() http.HandlerFunc {
 			return *new(T), InternalServerError(err)
 		}
 
-		codeOverride, ok := a.customResponseCodes[http.MethodPatch]
-		if ok {
-			render.Status(r, codeOverride)
-		}
+		render.Status(r, a.responseCodes[http.MethodPatch])
 
 		return resource, nil
 	})
@@ -288,11 +281,7 @@ func (a *API[T]) defaultDelete() http.HandlerFunc {
 			return httpErr
 		}
 
-		codeOverride, ok := a.customResponseCodes[http.MethodDelete]
-		if ok {
-			render.Status(r, codeOverride)
-			return nil
-		}
+		render.Status(r, a.responseCodes[http.MethodDelete])
 
 		render.NoContent(w, r)
 		return nil

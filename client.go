@@ -52,16 +52,24 @@ var DefaultRequestEditor RequestEditor = func(r *http.Request) error {
 
 // Client is used to interact with the provided Resource's API
 type Client[T Resource] struct {
-	addr          string
-	base          string
-	client        *http.Client
-	requestEditor RequestEditor
-	parentPaths   []string
+	addr                string
+	base                string
+	client              *http.Client
+	requestEditor       RequestEditor
+	parentPaths         []string
+	customResponseCodes map[string]int
 }
 
 // NewClient initializes a Client for interacting with the Resource API
 func NewClient[T Resource](addr, base string) *Client[T] {
-	return &Client[T]{addr, strings.TrimLeft(base, "/"), http.DefaultClient, DefaultRequestEditor, []string{}}
+	return &Client[T]{
+		addr,
+		strings.TrimLeft(base, "/"),
+		http.DefaultClient,
+		DefaultRequestEditor,
+		[]string{},
+		defaultResponseCodes(),
+	}
 }
 
 // NewSubClient creates a Client as a child of an existing Client. This is useful for accessing nested API resources
@@ -77,15 +85,29 @@ func NewSubClient[T, R Resource](parent *Client[T], path string) *Client[R] {
 	return newClient
 }
 
+// SetCustomResponseCode will override the default expected response codes for the specified HTTP verb
+func (c *Client[T]) SetCustomResponseCode(verb string, code int) *Client[T] {
+	c.customResponseCodes[verb] = code
+	return c
+}
+
+// SetCustomResponseCodeMap sets the whole map for custom expected response codes
+func (c *Client[T]) SetCustomResponseCodeMap(customResponseCodes map[string]int) *Client[T] {
+	c.customResponseCodes = customResponseCodes
+	return c
+}
+
 // SetHTTPClient allows overriding the Clients HTTP client with a custom one
-func (c *Client[T]) SetHTTPClient(client *http.Client) {
+func (c *Client[T]) SetHTTPClient(client *http.Client) *Client[T] {
 	c.client = client
+	return c
 }
 
 // SetRequestEditor sets a request editor function that is used to modify all requests before sending. This is useful
 // for adding custom request headers or authorization
-func (c *Client[T]) SetRequestEditor(requestEditor RequestEditor) {
+func (c *Client[T]) SetRequestEditor(requestEditor RequestEditor) *Client[T] {
 	c.requestEditor = requestEditor
+	return c
 }
 
 // Get will get a resource by ID
@@ -95,7 +117,7 @@ func (c *Client[T]) Get(ctx context.Context, id string, parentIDs ...string) (*R
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	result, err := c.MakeRequest(req, http.StatusOK)
+	result, err := c.MakeRequest(req, c.customResponseCodes[http.MethodGet])
 	if err != nil {
 		return nil, fmt.Errorf("error getting resource: %w", err)
 	}
@@ -144,7 +166,7 @@ func (c *Client[T]) put(ctx context.Context, id string, body io.Reader, parentID
 
 	req.Header.Add("Content-Type", "application/json")
 
-	result, err := c.MakeRequest(req, http.StatusOK)
+	result, err := c.MakeRequest(req, c.customResponseCodes[http.MethodPut])
 	if err != nil {
 		return nil, fmt.Errorf("error putting resource: %w", err)
 	}
@@ -176,9 +198,9 @@ func (c *Client[T]) post(ctx context.Context, body io.Reader, parentIDs ...strin
 
 	req.Header.Add("Content-Type", "application/json")
 
-	result, err := c.MakeRequest(req, http.StatusCreated)
+	result, err := c.MakeRequest(req, c.customResponseCodes[http.MethodPost])
 	if err != nil {
-		return nil, fmt.Errorf("error posting resource: %w", err)
+		return result, fmt.Errorf("error posting resource: %w", err)
 	}
 
 	return result, nil
@@ -208,7 +230,7 @@ func (c *Client[T]) patch(ctx context.Context, id string, body io.Reader, parent
 
 	req.Header.Add("Content-Type", "application/json")
 
-	resp, err := c.MakeRequest(req, http.StatusOK)
+	resp, err := c.MakeRequest(req, c.customResponseCodes[http.MethodPatch])
 	if err != nil {
 		return nil, fmt.Errorf("error patching resource: %w", err)
 	}
@@ -217,18 +239,18 @@ func (c *Client[T]) patch(ctx context.Context, id string, body io.Reader, parent
 }
 
 // Delete makes a DELETE request to delete a resource by ID
-func (c *Client[T]) Delete(ctx context.Context, id string, parentIDs ...string) error {
+func (c *Client[T]) Delete(ctx context.Context, id string, parentIDs ...string) (*Response[T], error) {
 	req, err := c.NewRequestWithParentIDs(ctx, http.MethodDelete, http.NoBody, id, parentIDs...)
 	if err != nil {
-		return fmt.Errorf("error creating request: %w", err)
+		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	_, err = c.MakeRequest(req, http.StatusNoContent)
+	resp, err := c.MakeRequest(req, c.customResponseCodes[http.MethodDelete])
 	if err != nil {
-		return fmt.Errorf("error deleting resource: %w", err)
+		return nil, fmt.Errorf("error deleting resource: %w", err)
 	}
 
-	return nil
+	return resp, nil
 }
 
 // NewRequestWithParentIDs uses http.NewRequestWithContext to create a new request using the URL created from the provided ID and parent IDs
@@ -265,6 +287,9 @@ func (c *Client[T]) URL(id string, parentIDs ...string) (string, error) {
 // It returns a babyapi.Response which contains the http.Response after extracting the body to Body string and
 // JSON decoding the resource type into Data if the response is JSON
 func (c *Client[T]) MakeRequest(req *http.Request, expectedStatusCode int) (*Response[T], error) {
+	if expectedStatusCode == 0 {
+		expectedStatusCode = c.customResponseCodes[req.Method]
+	}
 	return MakeRequest[T](req, c.client, expectedStatusCode, c.requestEditor)
 }
 
@@ -305,7 +330,8 @@ func MakeRequest[T any](req *http.Request, client *http.Client, expectedStatusCo
 		if err != nil {
 			return nil, fmt.Errorf("error decoding error response %q: %w", result.Body, err)
 		}
-		return nil, httpErr
+		httpErr.HTTPStatusCode = resp.StatusCode
+		return result, httpErr
 	}
 
 	if result.ContentType == "application/json" {
@@ -320,7 +346,7 @@ func MakeRequest[T any](req *http.Request, client *http.Client, expectedStatusCo
 
 // makePathWithRoot will create a base API route if the parent is a root path. This is necessary because the parent
 // root path could be defined as something other than / (slash)
-func makePathWithRoot(base string, parent RelatedAPI) string {
+func makePathWithRoot(base string, parent relatedAPI) string {
 	if parent != nil && parent.isRoot() {
 		return path.Join(parent.Base(), base)
 	}
