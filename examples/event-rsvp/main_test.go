@@ -16,10 +16,10 @@ func TestAPI(t *testing.T) {
 
 	api := createAPI()
 
-	babytest.RunTableTest(t, api.Events, []babytest.Test[*babyapi.AnyResource]{
+	babytest.RunTableTest(t, api.Events, []babytest.TestCase[*babyapi.AnyResource]{
 		{
 			Name: "ErrorCreatingEventWithoutPassword",
-			ClientRequest: &babytest.Request{
+			Test: babytest.RequestTest[*babyapi.AnyResource]{
 				Method: http.MethodPost,
 				Body:   `{"Name": "Party"}`,
 			},
@@ -31,7 +31,7 @@ func TestAPI(t *testing.T) {
 		},
 		{
 			Name: "CreateEvent",
-			ClientRequest: &babytest.Request{
+			Test: babytest.RequestTest[*babyapi.AnyResource]{
 				Method: http.MethodPost,
 				Body:   `{"Name": "Party", "Password": "secret"}`,
 			},
@@ -42,14 +42,14 @@ func TestAPI(t *testing.T) {
 		},
 		{
 			Name: "GetEventForbidden",
-			RequestFunc: func(getResponse babytest.PreviousResponseGetter, url string) *http.Request {
+			Test: babytest.RequestFuncTest[*babyapi.AnyResource](func(getResponse babytest.PreviousResponseGetter, url string) *http.Request {
 				id := getResponse("CreateEvent").Data.GetID()
 				url = fmt.Sprintf("%s/%s", url, id)
 
 				r, err := http.NewRequest(http.MethodGet, url, http.NoBody)
 				require.NoError(t, err)
 				return r
-			},
+			}),
 			ExpectedResponse: babytest.ExpectedResponse{
 				Status:     http.StatusForbidden,
 				BodyRegexp: `{"status":"Forbidden"}`,
@@ -58,7 +58,7 @@ func TestAPI(t *testing.T) {
 		},
 		{
 			Name: "GetEvent",
-			ClientRequest: &babytest.Request{
+			Test: babytest.RequestTest[*babyapi.AnyResource]{
 				Method:   http.MethodGet,
 				RawQuery: "password=secret",
 				IDFunc: func(getResponse babytest.PreviousResponseGetter) string {
@@ -72,11 +72,11 @@ func TestAPI(t *testing.T) {
 		},
 		{
 			Name: "GetAllEventsForbidden",
-			RequestFunc: func(getResponse babytest.PreviousResponseGetter, url string) *http.Request {
+			Test: babytest.RequestFuncTest[*babyapi.AnyResource](func(getResponse babytest.PreviousResponseGetter, url string) *http.Request {
 				r, err := http.NewRequest(http.MethodGet, url, http.NoBody)
 				require.NoError(t, err)
 				return r
-			},
+			}),
 			ExpectedResponse: babytest.ExpectedResponse{
 				Status:     http.StatusForbidden,
 				BodyRegexp: `{"status":"Forbidden"}`,
@@ -85,7 +85,7 @@ func TestAPI(t *testing.T) {
 		},
 		{
 			Name: "GetEventWithInvalidInvite",
-			ClientRequest: &babytest.Request{
+			Test: babytest.RequestTest[*babyapi.AnyResource]{
 				Method:   http.MethodGet,
 				RawQuery: "invite=DoesNotExist",
 				IDFunc: func(getResponse babytest.PreviousResponseGetter) string {
@@ -99,7 +99,7 @@ func TestAPI(t *testing.T) {
 		},
 		{
 			Name: "PUTNotAllowed",
-			ClientRequest: &babytest.Request{
+			Test: babytest.RequestTest[*babyapi.AnyResource]{
 				Method:   http.MethodPut,
 				RawQuery: "password=secret",
 				IDFunc: func(getResponse babytest.PreviousResponseGetter) string {
@@ -116,7 +116,7 @@ func TestAPI(t *testing.T) {
 		},
 		{
 			Name: "CannotCreateInviteWithoutEventPassword",
-			ClientRequest: &babytest.Request{
+			Test: babytest.RequestTest[*babyapi.AnyResource]{
 				Method: http.MethodPost,
 				ParentIDsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
 					return []string{getResponse("CreateEvent").Data.GetID()}
@@ -131,7 +131,7 @@ func TestAPI(t *testing.T) {
 		},
 		{
 			Name: "CreateInvite",
-			ClientRequest: &babytest.Request{
+			Test: babytest.RequestTest[*babyapi.AnyResource]{
 				Method:   http.MethodPost,
 				RawQuery: "password=secret",
 				ParentIDsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
@@ -147,7 +147,7 @@ func TestAPI(t *testing.T) {
 		},
 		{
 			Name: "GetInvite",
-			ClientRequest: &babytest.Request{
+			Test: babytest.RequestTest[*babyapi.AnyResource]{
 				Method: http.MethodGet,
 				ParentIDsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
 					return []string{getResponse("CreateEvent").Data.GetID()}
@@ -164,7 +164,7 @@ func TestAPI(t *testing.T) {
 		},
 		{
 			Name: "GetEventWithInviteIDAsPassword",
-			ClientRequest: &babytest.Request{
+			Test: babytest.RequestTest[*babyapi.AnyResource]{
 				Method: http.MethodGet,
 				RawQueryFunc: func(getResponse babytest.PreviousResponseGetter) string {
 					return "invite=" + getResponse("CreateInvite").Data.GetID()
@@ -184,7 +184,7 @@ func TestAPI(t *testing.T) {
 		},
 		{
 			Name: "DeleteInvite",
-			ClientRequest: &babytest.Request{
+			Test: babytest.RequestTest[*babyapi.AnyResource]{
 				Method: http.MethodDelete,
 				ParentIDsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
 					return []string{getResponse("CreateEvent").Data.GetID()}
@@ -201,7 +201,7 @@ func TestAPI(t *testing.T) {
 		},
 		{
 			Name: "PatchErrorNotConfigured",
-			ClientRequest: &babytest.Request{
+			Test: babytest.RequestTest[*babyapi.AnyResource]{
 				Method:   http.MethodPatch,
 				RawQuery: "password=secret",
 				IDFunc: func(getResponse babytest.PreviousResponseGetter) string {
@@ -225,9 +225,9 @@ func TestIndividualTest(t *testing.T) {
 	client, stop := babytest.NewTestClient[*Event](t, api.Events)
 	defer stop()
 
-	babytest.Test[*Event]{
+	babytest.TestCase[*Event]{
 		Name: "CreateEvent",
-		ClientRequest: &babytest.Request{
+		Test: babytest.RequestTest[*Event]{
 			Method: http.MethodPost,
 			Body:   `{"Name": "Party", "Password": "secret"}`,
 		},
