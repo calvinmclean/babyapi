@@ -331,7 +331,7 @@ func MakeRequest[T any](req *http.Request, client *http.Client, expectedStatusCo
 			return nil, fmt.Errorf("error decoding error response %q: %w", result.Body, err)
 		}
 		httpErr.HTTPStatusCode = resp.StatusCode
-		return result, httpErr
+		return nil, httpErr
 	}
 
 	if result.ContentType == "application/json" {

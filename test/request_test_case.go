@@ -67,7 +67,7 @@ func (tt RequestTest[T]) Run(t *testing.T, client *babyapi.Client[T], getRespons
 		parentIDs = tt.ParentIDsFunc(getResponse)
 	}
 
-	// TODO: Can't use GetAll because it doesn't return *babyapi.Response[T]
+	// TODO: Can't use GetAll/List because it doesn't return *babyapi.Response[T]
 	switch tt.Method {
 	case http.MethodPost:
 		return client.PostRaw(context.Background(), body, parentIDs...)

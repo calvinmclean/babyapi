@@ -1,6 +1,7 @@
 package babytest
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -64,11 +65,28 @@ func (tt TestCase[T]) Run(t *testing.T, client *babyapi.Client[T]) {
 	})
 }
 
+// RunWithResponse is the same as Run but returns the Response
+func (tt TestCase[T]) RunWithResponse(t *testing.T, client *babyapi.Client[T]) *babyapi.Response[T] {
+	var resp *babyapi.Response[T]
+	t.Run(tt.Name, func(t *testing.T) {
+		if tt.ClientName != "" {
+			t.Errorf("cannot use ClientName field when executing without TableTest")
+			return
+		}
+
+		resp = tt.run(t, client, nil)
+	})
+
+	return resp
+}
+
 func (tt TestCase[T]) run(t *testing.T, client *babyapi.Client[T], getResponse PreviousResponseGetter) *babyapi.Response[T] {
 	r, err := tt.Test.Run(t, client, getResponse)
 
-	tt.assertError(t, err)
-	tt.assertBody(t, r)
+	skipBody := tt.assertError(t, err)
+	if !skipBody {
+		tt.assertBody(t, r)
+	}
 
 	if tt.Assert != nil {
 		tt.Assert(r)
@@ -77,10 +95,11 @@ func (tt TestCase[T]) run(t *testing.T, client *babyapi.Client[T], getResponse P
 	return r
 }
 
-func (tt TestCase[T]) assertError(t *testing.T, err error) {
+// assertError returns true when the err is a *babyapi.ErrResponse since we compare the body here and want to skip assertBody
+func (tt TestCase[T]) assertError(t *testing.T, err error) bool {
 	if tt.ExpectedResponse.Error == "" {
 		require.NoError(t, err)
-		return
+		return false
 	}
 
 	require.Error(t, err)
@@ -89,7 +108,16 @@ func (tt TestCase[T]) assertError(t *testing.T, err error) {
 	var errResp *babyapi.ErrResponse
 	if errors.As(err, &errResp) {
 		require.Equal(t, tt.ExpectedResponse.Status, errResp.HTTPStatusCode)
+
+		// Compare JSON response to expected Body
+		data, jsonErr := json.Marshal(errResp)
+		require.NoError(t, jsonErr)
+		require.Equal(t, tt.ExpectedResponse.Body, string(data))
+
+		return true
 	}
+
+	return false
 }
 
 func (tt TestCase[T]) assertBody(t *testing.T, r *babyapi.Response[T]) {
