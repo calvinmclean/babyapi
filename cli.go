@@ -102,6 +102,8 @@ func (a *API[T]) CreateClientMap(parent *Client[*AnyResource]) map[string]*Clien
 			childClient = NewSubClient[*AnyResource, *AnyResource](parent, base)
 		}
 
+		childClient.SetCustomResponseCodeMap(child.getCustomResponseCodeMap())
+
 		childMap := child.CreateClientMap(childClient)
 		for n, c := range childMap {
 			clientMap[n] = c
