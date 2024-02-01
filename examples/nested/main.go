@@ -60,7 +60,14 @@ type MusicVideo struct {
 	Title string `json:"title"`
 }
 
-func main() {
+type API struct {
+	Artists     *babyapi.API[*Artist]
+	Albums      *babyapi.API[*Album]
+	MusicVideos *babyapi.API[*MusicVideo]
+	Songs       *babyapi.API[*Song]
+}
+
+func createAPI() API {
 	artistAPI := babyapi.NewAPI[*Artist]("Artists", "/artists", func() *Artist { return &Artist{} })
 	albumAPI := babyapi.NewAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} })
 	musicVideoAPI := babyapi.NewAPI[*MusicVideo]("MusicVideos", "/music_videos", func() *MusicVideo { return &MusicVideo{} })
@@ -74,5 +81,10 @@ func main() {
 	artistAPI.AddNestedAPI(musicVideoAPI)
 	albumAPI.AddNestedAPI(songAPI)
 
-	artistAPI.RunCLI()
+	return API{artistAPI, albumAPI, musicVideoAPI, songAPI}
+}
+
+func main() {
+	api := createAPI()
+	api.Artists.RunCLI()
 }

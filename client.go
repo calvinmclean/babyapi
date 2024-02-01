@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"path"
 	"strings"
 )
@@ -52,7 +51,7 @@ var DefaultRequestEditor RequestEditor = func(r *http.Request) error {
 
 // Client is used to interact with the provided Resource's API
 type Client[T Resource] struct {
-	addr                string
+	Address             string
 	base                string
 	client              *http.Client
 	requestEditor       RequestEditor
@@ -74,7 +73,7 @@ func NewClient[T Resource](addr, base string) *Client[T] {
 
 // NewSubClient creates a Client as a child of an existing Client. This is useful for accessing nested API resources
 func NewSubClient[T, R Resource](parent *Client[T], path string) *Client[R] {
-	newClient := NewClient[R](parent.addr, path)
+	newClient := NewClient[R](parent.Address, path)
 
 	newClient.parentPaths = make([]string, len(parent.parentPaths))
 	copy(newClient.parentPaths, parent.parentPaths)
@@ -126,13 +125,13 @@ func (c *Client[T]) Get(ctx context.Context, id string, parentIDs ...string) (*R
 }
 
 // GetAll gets all resources from the API
-func (c *Client[T]) GetAll(ctx context.Context, query url.Values, parentIDs ...string) (*Response[*ResourceList[T]], error) {
+func (c *Client[T]) GetAll(ctx context.Context, rawQuery string, parentIDs ...string) (*Response[*ResourceList[T]], error) {
 	req, err := c.NewRequestWithParentIDs(ctx, http.MethodGet, http.NoBody, "", parentIDs...)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	req.URL.RawQuery = query.Encode()
+	req.URL.RawQuery = rawQuery
 
 	result, err := MakeRequest[*ResourceList[T]](req, c.client, http.StatusOK, c.requestEditor)
 	if err != nil {
@@ -269,7 +268,7 @@ func (c *Client[T]) URL(id string, parentIDs ...string) (string, error) {
 		return "", fmt.Errorf("expected %d parentIDs", len(c.parentPaths))
 	}
 
-	path := c.addr
+	path := c.Address
 	for i, parentPath := range c.parentPaths {
 		path += fmt.Sprintf("/%s/%s", parentPath, parentIDs[i])
 	}
@@ -331,7 +330,7 @@ func MakeRequest[T any](req *http.Request, client *http.Client, expectedStatusCo
 			return nil, fmt.Errorf("error decoding error response %q: %w", result.Body, err)
 		}
 		httpErr.HTTPStatusCode = resp.StatusCode
-		return result, httpErr
+		return nil, httpErr
 	}
 
 	if result.ContentType == "application/json" {

@@ -28,57 +28,13 @@ func TestRequest[T babyapi.Resource](t *testing.T, api *babyapi.API[T], r *http.
 	return w
 }
 
-type mockParent struct {
-	name string
-}
-
-func (p *mockParent) Router() chi.Router {
-	return chi.NewRouter()
-}
-
-func (p *mockParent) Route(chi.Router) {
-}
-
-func (p *mockParent) Parent() babyapi.RelatedAPI {
-	return p
-}
-
-func (p *mockParent) Base() string {
-	return ""
-}
-
-func (p *mockParent) Name() string {
-	return p.name
-}
-
-func (p *mockParent) GetIDParam(r *http.Request) string {
-	return babyapi.GetIDParam(r, p.name)
-}
-
-func (p *mockParent) setParent(relatedAPI) {}
-func (p *mockParent) isRoot() bool         { return false }
-
-func (p *mockParent) CreateClientMap(*babyapi.Client[*babyapi.AnyResource]) map[string]*babyapi.Client[*babyapi.AnyResource] {
-	return nil
-}
-
-type relatedAPI interface {
-	babyapi.RelatedAPI
-
-	setParent(relatedAPI)
-	isRoot() bool
-}
-
-// Test is meant to be used in external tests of nested APIs
+// TestWithParentRoute allows testing a child API independently with a pre-configured parent resource in the context to
+// mock a middleware
 func TestWithParentRoute[T, P babyapi.Resource](t *testing.T, api *babyapi.API[T], parent P, parentName, parentBasePath string, r *http.Request) *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
 
-	relAPI, ok := any(api).(relatedAPI)
-	if !ok {
-		panic(fmt.Sprintf("incompatible type for child API: %T", api))
-	}
-
-	relAPI.setParent(&mockParent{parentName})
+	parentAPI := babyapi.NewAPI[P](parentName, parentBasePath, func() P { return parent })
+	parentAPI.AddNestedAPI(api)
 
 	router := chi.NewRouter()
 	api.DefaultMiddleware(router)
@@ -89,4 +45,17 @@ func TestWithParentRoute[T, P babyapi.Resource](t *testing.T, api *babyapi.API[T
 	router.ServeHTTP(w, r.WithContext(context.WithValue(context.Background(), babyapi.ContextKey(parentName), parent)))
 
 	return w
+}
+
+// NewTestAnyClient runs the API using TestServe and returns a Client with the correct base URL. It uses AnyClient for an
+// AnyResource so it is compatible with table-driven tests
+func NewTestAnyClient[T babyapi.Resource](t *testing.T, api *babyapi.API[T]) (*babyapi.Client[*babyapi.AnyResource], func()) {
+	serverURL, stop := TestServe[T](t, api)
+	return api.AnyClient(serverURL), stop
+}
+
+// NewTestClient runs the API using TestServe and returns a Client with the correct base URL
+func NewTestClient[T babyapi.Resource](t *testing.T, api *babyapi.API[T]) (*babyapi.Client[T], func()) {
+	serverURL, stop := TestServe[T](t, api)
+	return api.Client(serverURL), stop
 }
