@@ -17,7 +17,7 @@ type CommandLineTest[T babyapi.Resource] struct {
 
 var _ Test[*babyapi.AnyResource] = CommandLineTest[*babyapi.AnyResource]{}
 
-func (tt CommandLineTest[T]) Run(t *testing.T, client *babyapi.Client[T], getResponse PreviousResponseGetter) (*babyapi.Response[T], error) {
+func (tt CommandLineTest[T]) Run(t *testing.T, client *babyapi.Client[T], getResponse PreviousResponseGetter) (*Response[T], error) {
 	args := tt.Args
 	if tt.ArgsFunc != nil {
 		args = tt.ArgsFunc(getResponse)
@@ -32,11 +32,9 @@ func (tt CommandLineTest[T]) Run(t *testing.T, client *babyapi.Client[T], getRes
 
 	switch v := out.(type) {
 	case *babyapi.Response[T]:
-		return v, err
+		return &Response[T]{Response: v}, err
 	case *babyapi.Response[*babyapi.ResourceList[T]]:
-		// TODO: Can't use GetAll/List because it doesn't return *babyapi.Response[T]
-		t.Errorf("testing is currently not compatible with 'list' command")
-		return nil, err
+		return &Response[T]{GetAllResponse: v}, err
 	case nil:
 		return nil, err
 	default:

@@ -97,7 +97,7 @@ func (a *API[T]) CreateClientMap(parent *Client[*AnyResource]) map[string]*Clien
 
 		if a.rootAPI && a.parent == nil {
 			// If the current API is a root API and has no parent, then this client has no need for parent IDs
-			childClient = NewClient[*AnyResource](parent.addr, base)
+			childClient = NewClient[*AnyResource](parent.Address, base)
 		} else {
 			childClient = NewSubClient[*AnyResource, *AnyResource](parent, base)
 		}
@@ -186,7 +186,7 @@ func (c *Client[T]) runDeleteCommand(args []string) (PrintableResponse, error) {
 }
 
 func (c *Client[T]) runListCommand(args []string) (PrintableResponse, error) {
-	items, err := c.GetAll(context.Background(), nil, args[0:]...)
+	items, err := c.GetAll(context.Background(), "", args[0:]...)
 	if err != nil {
 		return nil, fmt.Errorf("error running GetAll: %w", err)
 	}

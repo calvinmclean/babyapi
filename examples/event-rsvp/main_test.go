@@ -42,11 +42,11 @@ func TestAPI(t *testing.T) {
 		},
 		{
 			Name: "GetEventForbidden",
-			Test: babytest.RequestFuncTest[*babyapi.AnyResource](func(getResponse babytest.PreviousResponseGetter, url string) *http.Request {
+			Test: babytest.RequestFuncTest[*babyapi.AnyResource](func(getResponse babytest.PreviousResponseGetter, address string) *http.Request {
 				id := getResponse("CreateEvent").Data.GetID()
-				url = fmt.Sprintf("%s/%s", url, id)
+				address = fmt.Sprintf("%s/events/%s", address, id)
 
-				r, err := http.NewRequest(http.MethodGet, url, http.NoBody)
+				r, err := http.NewRequest(http.MethodGet, address, http.NoBody)
 				require.NoError(t, err)
 				return r
 			}),
@@ -72,8 +72,23 @@ func TestAPI(t *testing.T) {
 		},
 		{
 			Name: "GetAllEventsForbidden",
-			Test: babytest.RequestFuncTest[*babyapi.AnyResource](func(getResponse babytest.PreviousResponseGetter, url string) *http.Request {
-				r, err := http.NewRequest(http.MethodGet, url, http.NoBody)
+			Test: babytest.RequestTest[*babyapi.AnyResource]{
+				Method:   babytest.MethodGetAll,
+				RawQuery: "password=secret",
+				IDFunc: func(getResponse babytest.PreviousResponseGetter) string {
+					return getResponse("CreateEvent").Data.GetID()
+				},
+			},
+			ExpectedResponse: babytest.ExpectedResponse{
+				Status: http.StatusForbidden,
+				Body:   `{"status":"Forbidden"}`,
+				Error:  "error getting all resources: unexpected response with text: Forbidden",
+			},
+		},
+		{
+			Name: "GetAllEventsForbiddenUsingRequestFuncTest",
+			Test: babytest.RequestFuncTest[*babyapi.AnyResource](func(getResponse babytest.PreviousResponseGetter, address string) *http.Request {
+				r, err := http.NewRequest(http.MethodGet, address+"/events", http.NoBody)
 				require.NoError(t, err)
 				return r
 			}),
@@ -144,7 +159,7 @@ func TestAPI(t *testing.T) {
 			},
 			ClientName: "Invite",
 			ExpectedResponse: babytest.ExpectedResponse{
-				Status:     http.StatusOK,
+				Status:     http.StatusCreated,
 				BodyRegexp: `{"id":"[0-9a-v]{20}","Name":"Firstname Lastname","Contact":"","EventID":"[0-9a-v]{20}","RSVP":null}`,
 			},
 		},
@@ -163,6 +178,45 @@ func TestAPI(t *testing.T) {
 			ExpectedResponse: babytest.ExpectedResponse{
 				Status:     http.StatusOK,
 				BodyRegexp: `{"id":"[0-9a-v]{20}","Name":"Firstname Lastname","Contact":"","EventID":"[0-9a-v]{20}","RSVP":null}`,
+			},
+		},
+		{
+			Name: "ListInvites",
+			Test: babytest.RequestTest[*babyapi.AnyResource]{
+				Method:   babytest.MethodGetAll,
+				RawQuery: "password=secret",
+				ParentIDsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
+					return []string{getResponse("CreateEvent").Data.GetID()}
+				},
+				IDFunc: func(getResponse babytest.PreviousResponseGetter) string {
+					return getResponse("CreateInvite").Data.GetID()
+				},
+			},
+			ClientName: "Invite",
+			ExpectedResponse: babytest.ExpectedResponse{
+				Status:     http.StatusOK,
+				BodyRegexp: `{"items":\[{"id":"[0-9a-v]{20}","Name":"Firstname Lastname","Contact":"","EventID":"[0-9a-v]{20}","RSVP":null}]`,
+			},
+		},
+		{
+			Name: "ListInviteUsingRequestFuncTest",
+			Test: babytest.RequestFuncTest[*babyapi.AnyResource](func(getResponse babytest.PreviousResponseGetter, address string) *http.Request {
+				id := getResponse("CreateEvent").Data.GetID()
+				address = fmt.Sprintf("%s/events/%s/invites", address, id)
+
+				r, err := http.NewRequest(babytest.MethodGetAll, address, http.NoBody)
+				require.NoError(t, err)
+
+				q := r.URL.Query()
+				q.Add("password", "secret")
+				r.URL.RawQuery = q.Encode()
+
+				return r
+			}),
+			ClientName: "Invite",
+			ExpectedResponse: babytest.ExpectedResponse{
+				Status:     http.StatusOK,
+				BodyRegexp: `{"items":\[{"id":"[0-9a-v]{20}","Name":"Firstname Lastname","Contact":"","EventID":"[0-9a-v]{20}","RSVP":null}]`,
 			},
 		},
 		{
@@ -198,7 +252,7 @@ func TestAPI(t *testing.T) {
 			},
 			ClientName: "Invite",
 			ExpectedResponse: babytest.ExpectedResponse{
-				Status: http.StatusOK,
+				Status: http.StatusNoContent,
 				NoBody: true,
 			},
 		},
@@ -239,7 +293,7 @@ func TestIndividualTest(t *testing.T) {
 			Status:     http.StatusCreated,
 			BodyRegexp: `{"id":"[0-9a-v]{20}","Name":"Party","Contact":"","Date":"","Location":"","Details":""}`,
 		},
-		Assert: func(r *babyapi.Response[*Event]) {
+		Assert: func(r *babytest.Response[*Event]) {
 			require.Equal(t, "Party", r.Data.Name)
 		},
 	}.Run(t, client)
@@ -254,7 +308,7 @@ func TestIndividualTest(t *testing.T) {
 			Status:     http.StatusCreated,
 			BodyRegexp: `{"id":"[0-9a-v]{20}","Name":"Party","Contact":"","Date":"","Location":"","Details":""}`,
 		},
-		Assert: func(r *babyapi.Response[*Event]) {
+		Assert: func(r *babytest.Response[*Event]) {
 			require.Equal(t, "Party", r.Data.Name)
 		},
 	}.RunWithResponse(t, client)
@@ -378,7 +432,7 @@ func TestCLI(t *testing.T) {
 			},
 			ClientName: "Invite",
 			ExpectedResponse: babytest.ExpectedResponse{
-				Status:     http.StatusOK,
+				Status:     http.StatusCreated,
 				BodyRegexp: `{"id":"[0-9a-v]{20}","Name":"Firstname Lastname","Contact":"","EventID":"[0-9a-v]{20}","RSVP":null}`,
 			},
 		},
@@ -398,6 +452,23 @@ func TestCLI(t *testing.T) {
 			ExpectedResponse: babytest.ExpectedResponse{
 				Status:     http.StatusOK,
 				BodyRegexp: `{"id":"[0-9a-v]{20}","Name":"Firstname Lastname","Contact":"","EventID":"[0-9a-v]{20}","RSVP":null}`,
+			},
+		},
+		{
+			Name: "ListInvites",
+			Test: babytest.CommandLineTest[*babyapi.AnyResource]{
+				RawQuery: "password=secret",
+				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
+					eventID := getResponse("CreateEvent").Data.GetID()
+					return []string{
+						"list", "Invite", eventID,
+					}
+				},
+			},
+			ClientName: "Invite",
+			ExpectedResponse: babytest.ExpectedResponse{
+				Status:     http.StatusOK,
+				BodyRegexp: `{"items":\[{"id":"[0-9a-v]{20}","Name":"Firstname Lastname","Contact":"","EventID":"[0-9a-v]{20}","RSVP":null}]`,
 			},
 		},
 		{
@@ -433,7 +504,7 @@ func TestCLI(t *testing.T) {
 			},
 			ClientName: "Invite",
 			ExpectedResponse: babytest.ExpectedResponse{
-				Status: http.StatusOK,
+				Status: http.StatusNoContent,
 				NoBody: true,
 			},
 		},

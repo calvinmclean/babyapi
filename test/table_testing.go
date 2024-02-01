@@ -7,7 +7,7 @@ import (
 )
 
 // PreviousResponseGetter is used to get the output of previous tests in a TableTest
-type PreviousResponseGetter func(testName string) *babyapi.Response[*babyapi.AnyResource]
+type PreviousResponseGetter func(testName string) *Response[*babyapi.AnyResource]
 
 // RunTableTest will start the provided API and execute all provided tests in-order. This allows the usage of a
 // PreviousResponseGetter in each test to access data from previous tests. The API's ClientMap is used to execute
@@ -16,7 +16,7 @@ func RunTableTest[T babyapi.Resource](t *testing.T, api *babyapi.API[T], tests [
 	client, stop := NewTestAnyClient[T](t, api)
 	defer stop()
 
-	results := map[string]*babyapi.Response[*babyapi.AnyResource]{}
+	results := map[string]*Response[*babyapi.AnyResource]{}
 
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
@@ -31,7 +31,7 @@ func RunTableTest[T babyapi.Resource](t *testing.T, api *babyapi.API[T], tests [
 				}
 			}
 
-			results[tt.Name] = tt.run(t, testClient, func(testName string) *babyapi.Response[*babyapi.AnyResource] {
+			results[tt.Name] = tt.run(t, testClient, func(testName string) *Response[*babyapi.AnyResource] {
 				return results[testName]
 			})
 		})

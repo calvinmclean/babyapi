@@ -2,11 +2,11 @@ package babytest
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"testing"
 
 	"github.com/calvinmclean/babyapi"
-	"github.com/stretchr/testify/require"
 )
 
 // RequestTest contains the necessary details to make a test request to the API. The Func fields allow dynamically
@@ -39,7 +39,7 @@ type RequestTest[T babyapi.Resource] struct {
 
 var _ Test[*babyapi.AnyResource] = RequestTest[*babyapi.AnyResource]{}
 
-func (tt RequestTest[T]) Run(t *testing.T, client *babyapi.Client[T], getResponse PreviousResponseGetter) (*babyapi.Response[T], error) {
+func (tt RequestTest[T]) Run(t *testing.T, client *babyapi.Client[T], getResponse PreviousResponseGetter) (*Response[T], error) {
 	id := tt.ID
 	if tt.IDFunc != nil {
 		id = tt.IDFunc(getResponse)
@@ -67,33 +67,53 @@ func (tt RequestTest[T]) Run(t *testing.T, client *babyapi.Client[T], getRespons
 		parentIDs = tt.ParentIDsFunc(getResponse)
 	}
 
-	// TODO: Can't use GetAll/List because it doesn't return *babyapi.Response[T]
+	var r any
+	var err error
 	switch tt.Method {
+	case MethodGetAll:
+		r, err = client.GetAll(context.Background(), rawQuery, parentIDs...)
+		fmt.Println(r)
 	case http.MethodPost:
-		return client.PostRaw(context.Background(), body, parentIDs...)
+		r, err = client.PostRaw(context.Background(), body, parentIDs...)
 	case http.MethodGet:
-		return client.Get(context.Background(), id, parentIDs...)
+		r, err = client.Get(context.Background(), id, parentIDs...)
 	case http.MethodPut:
-		return client.PutRaw(context.Background(), id, body, parentIDs...)
+		r, err = client.PutRaw(context.Background(), id, body, parentIDs...)
 	case http.MethodPatch:
-		return client.PatchRaw(context.Background(), id, body, parentIDs...)
+		r, err = client.PatchRaw(context.Background(), id, body, parentIDs...)
 	case http.MethodDelete:
-		return client.Delete(context.Background(), id, parentIDs...)
+		r, err = client.Delete(context.Background(), id, parentIDs...)
 	}
 
-	return nil, nil
+	switch v := r.(type) {
+	case *babyapi.Response[T]:
+		return &Response[T]{Response: v}, err
+	case *babyapi.Response[*babyapi.ResourceList[T]]:
+		return &Response[T]{GetAllResponse: v}, err
+	}
+
+	return nil, err
 }
 
-// RequestFuncTest is used to create an *http.Request from the provided URL and create a response for assertions
-type RequestFuncTest[T babyapi.Resource] func(getResponse PreviousResponseGetter, url string) *http.Request
+// RequestFuncTest is used to create an *http.Request from the provided address and create a response for assertions
+type RequestFuncTest[T babyapi.Resource] func(getResponse PreviousResponseGetter, address string) *http.Request
 
 var _ Test[*babyapi.AnyResource] = RequestFuncTest[*babyapi.AnyResource](func(getResponse PreviousResponseGetter, url string) *http.Request {
 	return nil
 })
 
-func (tt RequestFuncTest[T]) Run(t *testing.T, client *babyapi.Client[T], getResponse PreviousResponseGetter) (*babyapi.Response[T], error) {
-	url, err := client.URL("")
-	require.NoError(t, err)
+func (tt RequestFuncTest[T]) Run(t *testing.T, client *babyapi.Client[T], getResponse PreviousResponseGetter) (*Response[T], error) {
+	r := tt(getResponse, client.Address)
 
-	return client.MakeRequest(tt(getResponse, url), 0)
+	if r.Method == MethodGetAll {
+		r.Method = http.MethodGet
+		resp, err := babyapi.MakeRequest[*babyapi.ResourceList[T]](r, http.DefaultClient, http.StatusOK, func(r *http.Request) error {
+			return nil
+		})
+		return &Response[T]{GetAllResponse: resp}, err
+	}
+
+	resp, err := client.MakeRequest(r, 0)
+
+	return &Response[T]{Response: resp}, err
 }

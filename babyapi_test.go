@@ -7,7 +7,6 @@ import (
 	"html/template"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -114,23 +113,19 @@ func TestBabyAPI(t *testing.T) {
 
 	t.Run("GetAll", func(t *testing.T) {
 		t.Run("Successful", func(t *testing.T) {
-			albums, err := client.GetAll(context.Background(), nil)
+			albums, err := client.GetAll(context.Background(), "")
 			require.NoError(t, err)
 			require.ElementsMatch(t, []*Album{album1}, albums.Data.Items)
 		})
 
 		t.Run("SuccessfulWithFilter", func(t *testing.T) {
-			albums, err := client.GetAll(context.Background(), url.Values{
-				"title": []string{"Album1"},
-			})
+			albums, err := client.GetAll(context.Background(), "title=Album1")
 			require.NoError(t, err)
 			require.ElementsMatch(t, []*Album{album1}, albums.Data.Items)
 		})
 
 		t.Run("SuccessfulWithFilterShowingNoResults", func(t *testing.T) {
-			albums, err := client.GetAll(context.Background(), url.Values{
-				"title": []string{"Album2"},
-			})
+			albums, err := client.GetAll(context.Background(), "title=Album2")
 			require.NoError(t, err)
 			require.Len(t, albums.Data.Items, 0)
 		})
@@ -375,7 +370,7 @@ func TestNestedAPI(t *testing.T) {
 
 	t.Run("GetAllAlbums", func(t *testing.T) {
 		t.Run("Successful", func(t *testing.T) {
-			albums, err := albumClient.GetAll(context.Background(), nil, artist1.GetID())
+			albums, err := albumClient.GetAll(context.Background(), "", artist1.GetID())
 			require.NoError(t, err)
 			require.ElementsMatch(t, []*Album{album1}, albums.Data.Items)
 		})
@@ -383,7 +378,7 @@ func TestNestedAPI(t *testing.T) {
 
 	t.Run("GetAllSongs", func(t *testing.T) {
 		t.Run("Successful", func(t *testing.T) {
-			songs, err := songClient.GetAll(context.Background(), nil, artist1.GetID(), album1.GetID())
+			songs, err := songClient.GetAll(context.Background(), "", artist1.GetID(), album1.GetID())
 			require.NoError(t, err)
 			require.ElementsMatch(t, []*SongResponse{song1Response}, songs.Data.Items)
 		})
