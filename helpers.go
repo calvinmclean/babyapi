@@ -175,57 +175,6 @@ func (a *API[T]) GetRequestedResource(r *http.Request) (T, *ErrResponse) {
 	return resource, nil
 }
 
-// ServerSentEvent is a simple struct that represents an event used in HTTP event stream
-type ServerSentEvent struct {
-	Event string
-	Data  string
-}
-
-// Write will write the ServerSentEvent to the HTTP response stream and flush. It removes all newlines
-// in the event data
-func (sse *ServerSentEvent) Write(w http.ResponseWriter) {
-	fmt.Fprintf(w, "event: %s\ndata: %s\n\n", sse.Event, strings.ReplaceAll(sse.Data, "\n", ""))
-	if f, ok := w.(http.Flusher); ok {
-		f.Flush()
-	}
-}
-
-// AddServerSentEventHandler is a shortcut for HandleServerSentEvents that automatically creates and returns
-// the events channel and adds a custom handler for GET requests matching the provided pattern
-func (a *API[T]) AddServerSentEventHandler(pattern string) chan *ServerSentEvent {
-	events := make(chan *ServerSentEvent)
-
-	a.AddCustomRoute(chi.Route{
-		Pattern: pattern,
-		Handlers: map[string]http.Handler{
-			http.MethodGet: a.HandleServerSentEvents(events),
-		},
-	})
-
-	return events
-}
-
-// HandleServerSentEvents is a handler function that will listen on the provided channel and write events
-// to the HTTP response
-func (a *API[T]) HandleServerSentEvents(events <-chan *ServerSentEvent) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-cache")
-		w.Header().Set("Connection", "keep-alive")
-		w.Header().Set("Content-Type", "text/event-stream")
-
-		for {
-			select {
-			case e := <-events:
-				e.Write(w)
-			case <-r.Context().Done():
-				return
-			case <-a.Done():
-				return
-			}
-		}
-	}
-}
-
 func Handler(do func(http.ResponseWriter, *http.Request) render.Renderer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		response := do(w, r)

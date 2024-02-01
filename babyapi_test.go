@@ -728,14 +728,22 @@ func TestServerSentEvents(t *testing.T) {
 	})
 
 	t.Run("GetServerSentEventsEndpoint", func(t *testing.T) {
+		quitTest := make(chan bool)
 		go func() {
-			events <- &babyapi.ServerSentEvent{
-				Event: "event",
-				Data:  "hello",
+			for {
+				select {
+				case <-quitTest:
+					return
+				default:
+					events <- &babyapi.ServerSentEvent{
+						Event: "event",
+						Data:  "hello",
+					}
+				}
 			}
 		}()
-
 		response, err := http.Get(address + "/items/events")
+		quitTest <- true
 		require.NoError(t, err)
 		defer response.Body.Close()
 
