@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
@@ -175,6 +176,53 @@ func (a *API[T]) GetRequestedResource(r *http.Request) (T, *ErrResponse) {
 	return resource, nil
 }
 
+type BroadcastChannel[T any] struct {
+	listeners []chan T
+	lock      sync.RWMutex
+}
+
+func (bc *BroadcastChannel[T]) GetListener() chan T {
+	bc.lock.Lock()
+	defer bc.lock.Unlock()
+	newChan := make(chan T)
+	bc.listeners = append(bc.listeners, newChan)
+	return newChan
+}
+
+func (bc *BroadcastChannel[T]) RemoveListener(removeChan chan T) {
+	bc.lock.Lock()
+	defer bc.lock.Unlock()
+	for i, listener := range bc.listeners {
+		if listener == removeChan {
+			bc.listeners[i] = bc.listeners[len(bc.listeners)-1]
+			bc.listeners = bc.listeners[:len(bc.listeners)-1]
+			close(listener)
+			return
+		}
+	}
+}
+
+func (bc *BroadcastChannel[T]) SendToAll(input T) {
+	bc.lock.RLock()
+	defer bc.lock.RUnlock()
+	for _, listener := range bc.listeners {
+		listener <- input
+	}
+}
+
+func (bc *BroadcastChannel[T]) runInputChannel(inputChan chan T) {
+	for input := range inputChan {
+		bc.SendToAll(input)
+	}
+}
+
+// GetInputChannel returns a channel acting as an input to the broadcast channel, closing the channel will stop the worker goroutine
+func (bc *BroadcastChannel[T]) GetInputChannel() chan T {
+	newInputChan := make(chan T)
+	go bc.runInputChannel(newInputChan)
+	return newInputChan
+}
+
 // ServerSentEvent is a simple struct that represents an event used in HTTP event stream
 type ServerSentEvent struct {
 	Event string
@@ -193,22 +241,24 @@ func (sse *ServerSentEvent) Write(w http.ResponseWriter) {
 // AddServerSentEventHandler is a shortcut for HandleServerSentEvents that automatically creates and returns
 // the events channel and adds a custom handler for GET requests matching the provided pattern
 func (a *API[T]) AddServerSentEventHandler(pattern string) chan *ServerSentEvent {
-	events := make(chan *ServerSentEvent)
+	eventsBroadcastChannel := BroadcastChannel[*ServerSentEvent]{}
 
 	a.AddCustomRoute(chi.Route{
 		Pattern: pattern,
 		Handlers: map[string]http.Handler{
-			http.MethodGet: a.HandleServerSentEvents(events),
+			http.MethodGet: a.HandleServerSentEvents(&eventsBroadcastChannel),
 		},
 	})
 
-	return events
+	return eventsBroadcastChannel.GetInputChannel()
 }
 
 // HandleServerSentEvents is a handler function that will listen on the provided channel and write events
 // to the HTTP response
-func (a *API[T]) HandleServerSentEvents(events <-chan *ServerSentEvent) http.HandlerFunc {
+func (a *API[T]) HandleServerSentEvents(EventsBroadcastChannel *BroadcastChannel[*ServerSentEvent]) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		events := EventsBroadcastChannel.GetListener()
+		defer EventsBroadcastChannel.RemoveListener(events)
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Connection", "keep-alive")
 		w.Header().Set("Content-Type", "text/event-stream")

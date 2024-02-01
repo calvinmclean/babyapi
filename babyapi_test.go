@@ -733,14 +733,17 @@ func TestServerSentEvents(t *testing.T) {
 	})
 
 	t.Run("GetServerSentEventsEndpoint", func(t *testing.T) {
+		testActive := true
 		go func() {
-			events <- &babyapi.ServerSentEvent{
-				Event: "event",
-				Data:  "hello",
+			for testActive {
+				events <- &babyapi.ServerSentEvent{
+					Event: "event",
+					Data:  "hello",
+				}
 			}
 		}()
-
 		response, err := http.Get(address + "/items/events")
+		testActive = false
 		require.NoError(t, err)
 		defer response.Body.Close()
 
