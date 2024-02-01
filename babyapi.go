@@ -258,8 +258,12 @@ func (a *API[T]) AddIDMiddleware(m func(http.Handler) http.Handler) *API[T] {
 }
 
 // Serve will serve the API on the given port
-func (a *API[T]) Serve(port string) {
-	a.server = &http.Server{Addr: port, Handler: a.Router()}
+func (a *API[T]) Serve(address string) {
+	if address == "" {
+		address = ":8080"
+	}
+
+	a.server = &http.Server{Addr: address, Handler: a.Router()}
 
 	var serverStopCtx context.CancelFunc
 	a.serverCtx, serverStopCtx = context.WithCancel(context.Background())
@@ -287,7 +291,7 @@ func (a *API[T]) Serve(port string) {
 		serverStopCtx()
 	}()
 
-	slog.Info("starting server", "port", port, "api", a.name)
+	slog.Info("starting server", "address", address, "api", a.name)
 	err := a.server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
 		slog.Error("error starting the server", "error", err)
