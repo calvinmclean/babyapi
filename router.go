@@ -281,9 +281,7 @@ func (a *API[T]) defaultDelete() http.HandlerFunc {
 			return httpErr
 		}
 
-		render.Status(r, a.responseCodes[http.MethodDelete])
-
-		render.NoContent(w, r)
+		w.WriteHeader(a.responseCodes[http.MethodDelete])
 		return nil
 	})
 }

@@ -23,6 +23,7 @@ type relatedAPI interface {
 	RelatedAPI
 
 	setParent(relatedAPI)
+	getCustomResponseCodeMap() map[string]int
 	isRoot() bool
 }
 
@@ -51,6 +52,10 @@ func (a *API[T]) AddNestedAPI(childAPI RelatedAPI) *API[T] {
 
 func (a *API[T]) setParent(parent relatedAPI) {
 	a.parent = parent
+}
+
+func (a *API[T]) getCustomResponseCodeMap() map[string]int {
+	return a.responseCodes
 }
 
 func (a *API[T]) isRoot() bool {

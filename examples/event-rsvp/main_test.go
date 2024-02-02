@@ -252,7 +252,7 @@ func TestAPI(t *testing.T) {
 			},
 			ClientName: "Invite",
 			ExpectedResponse: babytest.ExpectedResponse{
-				Status: http.StatusNoContent,
+				Status: http.StatusOK,
 				NoBody: true,
 			},
 		},
@@ -504,7 +504,7 @@ func TestCLI(t *testing.T) {
 			},
 			ClientName: "Invite",
 			ExpectedResponse: babytest.ExpectedResponse{
-				Status: http.StatusNoContent,
+				Status: http.StatusOK,
 				NoBody: true,
 			},
 		},
