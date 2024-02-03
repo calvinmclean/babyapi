@@ -1,5 +1,0 @@
-.dockerignore
-devcontainer.json
-docker-compose.yml
-Dockerfile
-README.md
