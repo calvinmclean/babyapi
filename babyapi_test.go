@@ -774,6 +774,7 @@ func TestAPIModifiers(t *testing.T) {
 	beforeDelete := 0
 	afterDelete := 0
 	onCreateOrUpdate := 0
+	afterCreateOrUpdate := 0
 
 	api := babyapi.NewAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} }).
 		SetCustomResponseCode(http.MethodPut, http.StatusTeapot).
@@ -785,6 +786,10 @@ func TestAPIModifiers(t *testing.T) {
 		}).
 		SetOnCreateOrUpdate(func(r *http.Request, a *Album) *babyapi.ErrResponse {
 			onCreateOrUpdate++
+			return nil
+		}).
+		SetAfterCreateOrUpdate(func(r *http.Request, a *Album) *babyapi.ErrResponse {
+			afterCreateOrUpdate++
 			return nil
 		}).
 		SetBeforeDelete(func(r *http.Request) *babyapi.ErrResponse {
@@ -848,6 +853,7 @@ func TestAPIModifiers(t *testing.T) {
 		require.Equal(t, 1, beforeDelete)
 		require.Equal(t, 1, afterDelete)
 		require.Equal(t, 1, onCreateOrUpdate)
+		require.Equal(t, 1, afterCreateOrUpdate)
 	})
 }
 
