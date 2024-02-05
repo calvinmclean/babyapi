@@ -774,6 +774,7 @@ func TestAPIModifiers(t *testing.T) {
 	beforeDelete := 0
 	afterDelete := 0
 	onCreateOrUpdate := 0
+	afterCreateOrUpdate := 0
 
 	api := babyapi.NewAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} }).
 		SetCustomResponseCode(http.MethodPut, http.StatusTeapot).
@@ -785,6 +786,10 @@ func TestAPIModifiers(t *testing.T) {
 		}).
 		SetOnCreateOrUpdate(func(r *http.Request, a *Album) *babyapi.ErrResponse {
 			onCreateOrUpdate++
+			return nil
+		}).
+		SetAfterCreateOrUpdate(func(r *http.Request, a *Album) *babyapi.ErrResponse {
+			afterCreateOrUpdate++
 			return nil
 		}).
 		SetBeforeDelete(func(r *http.Request) *babyapi.ErrResponse {
@@ -848,6 +853,127 @@ func TestAPIModifiers(t *testing.T) {
 		require.Equal(t, 1, beforeDelete)
 		require.Equal(t, 1, afterDelete)
 		require.Equal(t, 1, onCreateOrUpdate)
+		require.Equal(t, 1, afterCreateOrUpdate)
+	})
+}
+
+func TestAPIModifierErrors(t *testing.T) {
+	api := babyapi.NewAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} })
+	albumID := "cljcqg5o402e9s28rbp0"
+
+	t.Run("onCreateOrUpdateErrors", func(t *testing.T) {
+		allAlbums, err := api.Storage.GetAll(nil)
+		require.NoError(t, err)
+		beforeCount := len(allAlbums)
+
+		api.SetOnCreateOrUpdate(func(_ *http.Request, _ *Album) *babyapi.ErrResponse {
+			return babyapi.ErrRender(fmt.Errorf("test error"))
+		})
+		body := bytes.NewBufferString(fmt.Sprintf(`{"Title": "NewAlbum", "ID": "%s"}`, albumID))
+		r, err := http.NewRequest(http.MethodPut, "/albums/"+albumID, body)
+		require.NoError(t, err)
+		r.Header.Add("Content-Type", "application/json")
+
+		w := babytest.TestRequest[*Album](t, api, r)
+		require.Equal(t, http.StatusUnprocessableEntity, w.Result().StatusCode)
+
+		allAlbums, err = api.Storage.GetAll(nil)
+		require.NoError(t, err)
+		afterCount := len(allAlbums)
+
+		require.Equal(t, beforeCount, afterCount)
+
+		api.SetOnCreateOrUpdate(func(_ *http.Request, _ *Album) *babyapi.ErrResponse { return nil })
+	})
+
+	t.Run("afterCreateOrUpdateErrors", func(t *testing.T) {
+		allAlbums, err := api.Storage.GetAll(nil)
+		require.NoError(t, err)
+		beforeCount := len(allAlbums)
+
+		api.SetAfterCreateOrUpdate(func(_ *http.Request, _ *Album) *babyapi.ErrResponse {
+			return babyapi.ErrRender(fmt.Errorf("test error"))
+		})
+
+		body := bytes.NewBufferString(fmt.Sprintf(`{"Title": "NewAlbum", "ID": "%s"}`, albumID))
+		r, err := http.NewRequest(http.MethodPut, "/albums/"+albumID, body)
+		require.NoError(t, err)
+		r.Header.Add("Content-Type", "application/json")
+		w := babytest.TestRequest[*Album](t, api, r)
+		require.Equal(t, http.StatusUnprocessableEntity, w.Result().StatusCode)
+
+		allAlbums, err = api.Storage.GetAll(nil)
+		require.NoError(t, err)
+		afterCount := len(allAlbums)
+
+		require.Greater(t, afterCount, beforeCount)
+
+		api.SetAfterCreateOrUpdate(func(_ *http.Request, _ *Album) *babyapi.ErrResponse { return nil })
+	})
+
+	t.Run("beforeDeleteErrors", func(t *testing.T) {
+		body := bytes.NewBufferString(fmt.Sprintf(`{"Title": "NewAlbum", "ID": "%s"}`, albumID))
+		r, err := http.NewRequest(http.MethodPut, "/albums/"+albumID, body)
+		require.NoError(t, err)
+		r.Header.Add("Content-Type", "application/json")
+		babytest.TestRequest[*Album](t, api, r)
+
+		allAlbums, err := api.Storage.GetAll(nil)
+		require.NoError(t, err)
+		beforeCount := len(allAlbums)
+
+		require.Greater(t, beforeCount, 0)
+
+		api.SetBeforeDelete(func(_ *http.Request) *babyapi.ErrResponse {
+			return babyapi.ErrRender(fmt.Errorf("test error"))
+		})
+
+		r, err = http.NewRequest(http.MethodDelete, "/albums/"+albumID, http.NoBody)
+		require.NoError(t, err)
+
+		w := babytest.TestRequest[*Album](t, api, r)
+
+		require.Equal(t, http.StatusUnprocessableEntity, w.Result().StatusCode)
+
+		allAlbums, err = api.Storage.GetAll(nil)
+		require.NoError(t, err)
+		afterCount := len(allAlbums)
+
+		require.Equal(t, afterCount, beforeCount)
+
+		api.SetBeforeDelete(nil)
+	})
+	t.Run("afterDeleteErrors", func(t *testing.T) {
+		body := bytes.NewBufferString(fmt.Sprintf(`{"Title": "NewAlbum", "ID": "%s"}`, albumID))
+		r, err := http.NewRequest(http.MethodPut, "/albums/"+albumID, body)
+		require.NoError(t, err)
+		r.Header.Add("Content-Type", "application/json")
+		babytest.TestRequest[*Album](t, api, r)
+
+		allAlbums, err := api.Storage.GetAll(nil)
+		require.NoError(t, err)
+		beforeCount := len(allAlbums)
+
+		require.Greater(t, beforeCount, 0)
+
+		api.SetAfterDelete(func(_ *http.Request) *babyapi.ErrResponse {
+			return babyapi.ErrRender(fmt.Errorf("test error"))
+		})
+
+		r, err = http.NewRequest(http.MethodDelete, "/albums/"+albumID, http.NoBody)
+		require.NoError(t, err)
+
+		w := babytest.TestRequest[*Album](t, api, r)
+
+		require.Equal(t, http.StatusUnprocessableEntity, w.Result().StatusCode)
+
+		allAlbums, err = api.Storage.GetAll(nil)
+		require.NoError(t, err)
+		afterCount := len(allAlbums)
+
+		require.Less(t, afterCount, beforeCount)
+
+		api.SetAfterDelete(nil)
 	})
 }
 

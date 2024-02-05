@@ -48,7 +48,8 @@ type API[T Resource] struct {
 	beforeDelete beforeAfterFunc
 	afterDelete  beforeAfterFunc
 
-	onCreateOrUpdate func(*http.Request, T) *ErrResponse
+	onCreateOrUpdate    func(*http.Request, T) *ErrResponse
+	afterCreateOrUpdate func(*http.Request, T) *ErrResponse
 
 	parent relatedAPI
 
@@ -97,6 +98,7 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 		func(*http.Request) FilterFunc[T] { return func(T) bool { return true } },
 		defaultBeforeAfter,
 		defaultBeforeAfter,
+		func(*http.Request, T) *ErrResponse { return nil },
 		func(*http.Request, T) *ErrResponse { return nil },
 		nil,
 		defaultResponseCodes(),
@@ -165,6 +167,11 @@ func (a *API[T]) SetGetAllResponseWrapper(getAllResponder func([]T) render.Rende
 // schedules or sending events
 func (a *API[T]) SetOnCreateOrUpdate(onCreateOrUpdate func(*http.Request, T) *ErrResponse) *API[T] {
 	a.onCreateOrUpdate = onCreateOrUpdate
+	return a
+}
+
+func (a *API[T]) SetAfterCreateOrUpdate(afterCreateOrUpdate func(*http.Request, T) *ErrResponse) *API[T] {
+	a.afterCreateOrUpdate = afterCreateOrUpdate
 	return a
 }
 

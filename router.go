@@ -179,6 +179,11 @@ func (a *API[T]) defaultPost() http.HandlerFunc {
 			return *new(T), InternalServerError(err)
 		}
 
+		httpErr = a.afterCreateOrUpdate(r, resource)
+		if httpErr != nil {
+			return *new(T), httpErr
+		}
+
 		render.Status(r, a.responseCodes[http.MethodPost])
 
 		return resource, nil
@@ -203,6 +208,11 @@ func (a *API[T]) defaultPut() http.HandlerFunc {
 		if err != nil {
 			logger.Error("error storing resource", "error", err)
 			return *new(T), InternalServerError(err)
+		}
+
+		httpErr = a.afterCreateOrUpdate(r, resource)
+		if httpErr != nil {
+			return *new(T), httpErr
 		}
 
 		render.Status(r, a.responseCodes[http.MethodPut])
@@ -243,6 +253,11 @@ func (a *API[T]) defaultPatch() http.HandlerFunc {
 		if err != nil {
 			logger.Error("error storing updated resource", "error", err)
 			return *new(T), InternalServerError(err)
+		}
+
+		httpErr = a.afterCreateOrUpdate(r, resource)
+		if httpErr != nil {
+			return *new(T), httpErr
 		}
 
 		render.Status(r, a.responseCodes[http.MethodPatch])
