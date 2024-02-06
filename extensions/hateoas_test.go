@@ -131,9 +131,8 @@ func TestAPIWithExtension(t *testing.T) {
 	childAPI := babyapi.NewAPI[*TestType]("Child", "/child", func() *TestType { return &TestType{} })
 
 	ext := HATEOAS[*TestType]{}
-	_ = ext.Apply(api)
-	// TODO: real extension mechanism will allow control over applying children?
-	_ = ext.Apply(childAPI)
+	api.ApplyExtension(ext)
+	childAPI.ApplyExtension(ext)
 
 	// Add nested API after applying extension to make sure it still works
 	api.AddNestedAPI(childAPI)
