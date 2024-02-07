@@ -323,3 +323,12 @@ type beforeAfterFunc func(*http.Request) *ErrResponse
 func defaultBeforeAfter(*http.Request) *ErrResponse {
 	return nil
 }
+
+// ChildAPIs returns the nested children APIs
+func (a *API[T]) ChildAPIs() map[string]RelatedAPI {
+	children := map[string]RelatedAPI{}
+	for _, child := range a.subAPIs {
+		children[child.Name()] = child
+	}
+	return children
+}

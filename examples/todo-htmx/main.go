@@ -1,16 +1,14 @@
 package main
 
 import (
-	"fmt"
 	"html/template"
 	"net/http"
 	"os"
 
 	"github.com/calvinmclean/babyapi"
-	"github.com/calvinmclean/babyapi/storage"
+	"github.com/calvinmclean/babyapi/extensions"
 
 	"github.com/go-chi/render"
-	"github.com/madflojo/hord/drivers/redis"
 )
 
 const (
@@ -125,7 +123,7 @@ func (at AllTODOs) HTML(*http.Request) string {
 	return babyapi.MustRenderHTML(tmpl, at)
 }
 
-func main() {
+func createAPI() *babyapi.API[*TODO] {
 	api := babyapi.NewAPI[*TODO]("TODOs", "/todos", func() *TODO { return &TODO{} })
 
 	// Use AllTODOs in the GetAll response since it implements HTMLer
@@ -133,8 +131,7 @@ func main() {
 		return AllTODOs(todos)
 	})
 
-	// HTMX requires a 200 response code to do a swap after delete
-	api.SetCustomResponseCode(http.MethodDelete, http.StatusOK)
+	api.ApplyExtension(extensions.HTMX[*TODO]{})
 
 	// Add SSE handler endpoint which will receive events on the returned channel and write them to the front-end
 	todoChan := api.AddServerSentEventHandler("/listen")
@@ -154,32 +151,20 @@ func main() {
 		return nil
 	})
 
-	err := setupStorage(api)
-	if err != nil {
-		panic(err)
-	}
+	// Optionally setup redis storage if environment variables are defined
+	api.ApplyExtension(extensions.KeyValueStorage[*TODO]{
+		KVConnectionConfig: extensions.KVConnectionConfig{
+			RedisHost:     os.Getenv("REDIS_HOST"),
+			RedisPassword: os.Getenv("REDIS_PASS"),
+			Filename:      os.Getenv("STORAGE_FILE"),
+			Optional:      true,
+		},
+	})
 
-	api.RunCLI()
+	return api
 }
 
-// Optionally setup redis storage if environment variables are defined
-func setupStorage(api *babyapi.API[*TODO]) error {
-	host := os.Getenv("REDIS_HOST")
-	password := os.Getenv("REDIS_PASS")
-
-	if password == "" && host == "" {
-		return nil
-	}
-
-	db, err := storage.NewRedisDB(redis.Config{
-		Server:   host + ":6379",
-		Password: password,
-	})
-	if err != nil {
-		return fmt.Errorf("error setting up redis storage: %w", err)
-	}
-
-	api.Storage = storage.NewClient[*TODO](db, "TODO")
-
-	return nil
+func main() {
+	api := createAPI()
+	api.RunCLI()
 }

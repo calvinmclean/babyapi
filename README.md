@@ -101,8 +101,9 @@ The client provides methods for interacting with the base API and `MakeRequest` 
 
 ## Testing
 
-`babyapi` also makes it easy to unit test your APIs with functions that start an HTTP server with routes, execute the provided request, and return the `httptest.ResponseRecorder`.
+The `babytest` package provides some shortcuts and utilities for easily building table tests or simple individual tests. This allows seamlessly creating tests for an API using the convenient `babytest.RequestTest` struct, a function returning an `*http.Request`, or a slice of command-line arguments.
 
+Check out some of the [examples](./examples) for examples of using the `babytest` package.
 
 ## Storage
 
@@ -120,6 +121,14 @@ db, err := storage.NewRedisDB(redis.Config{
 
 api.SetStorage(storage.NewClient[*TODO](db, "TODO"))
 ```
+
+## Extensions
+
+`babyapi` provides an `Extension` interface that can be applied to any API with `api.ApplyExtension()`. Implementations of this interface create custom configurations and modifications that can be applied to multiple APIs. A few extensions are provided by the `babyapi/extensions` package:
+
+  - `HATEOAS`: "Hypertext as the engine of application state" is the [3rd and final level of REST API maturity](https://en.wikipedia.org/wiki/Richardson_Maturity_Model#Level_3:_Hypermedia_controls), making your API fully RESTful
+  - `KVStorage`: provide a few simple configurations to use the `babyapi/storage` package's KV storage client with a local file or Redis
+  - `HTMX`: HTMX expects 200 responses from DELETE requests, so this changes the response code
 
 
 ## Examples

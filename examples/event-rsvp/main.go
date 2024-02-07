@@ -15,12 +15,9 @@ import (
 	"strings"
 
 	"github.com/calvinmclean/babyapi"
-	"github.com/calvinmclean/babyapi/storage"
+	"github.com/calvinmclean/babyapi/extensions"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
-	"github.com/madflojo/hord"
-	"github.com/madflojo/hord/drivers/hashmap"
-	"github.com/madflojo/hord/drivers/redis"
 
 	_ "embed"
 )
@@ -361,7 +358,7 @@ func createAPI() *API {
 		),
 	}
 
-	api.Invites.SetCustomResponseCode(http.MethodDelete, http.StatusOK)
+	api.Invites.ApplyExtension(extensions.HTMX[*Invite]{})
 
 	api.Invites.AddCustomRoute(chi.Route{
 		Pattern: "/bulk",
@@ -408,13 +405,24 @@ func createAPI() *API {
 
 	api.Events.AddIDMiddleware(api.Events.GetRequestedResourceAndDoMiddleware(api.getAllInvitesMiddleware))
 
-	db, err := createDB()
+	filename := os.Getenv("STORAGE_FILE")
+	if filename == "" {
+		filename = "storage.json"
+	}
+
+	dbConfig := extensions.KVConnectionConfig{
+		Filename:      filename,
+		RedisHost:     os.Getenv("REDIS_HOST"),
+		RedisPassword: os.Getenv("REDIS_PASS"),
+	}
+
+	db, err := dbConfig.CreateDB()
 	if err != nil {
 		panic(err)
 	}
 
-	api.Events.Storage = storage.NewClient[*Event](db, "Event")
-	api.Invites.Storage = storage.NewClient[*Invite](db, "Invite")
+	api.Events.ApplyExtension(extensions.KeyValueStorage[*Event]{DB: db})
+	api.Invites.ApplyExtension(extensions.KeyValueStorage[*Invite]{DB: db})
 
 	return api
 }
@@ -448,27 +456,6 @@ func getInvitesFromContext(ctx context.Context) []*Invite {
 	}
 
 	return invites
-}
-
-// Optionally setup redis storage if environment variables are defined
-func createDB() (hord.Database, error) {
-	host := os.Getenv("REDIS_HOST")
-	password := os.Getenv("REDIS_PASS")
-
-	if password == "" && host == "" {
-		filename := os.Getenv("STORAGE_FILE")
-		if filename == "" {
-			filename = "storage.json"
-		}
-		return storage.NewFileDB(hashmap.Config{
-			Filename: filename,
-		})
-	}
-
-	return storage.NewRedisDB(redis.Config{
-		Server:   host + ":6379",
-		Password: password,
-	})
 }
 
 func renderTemplate(r *http.Request, name string, data any) string {
