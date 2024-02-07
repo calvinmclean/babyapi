@@ -123,7 +123,7 @@ func (at AllTODOs) HTML(*http.Request) string {
 	return babyapi.MustRenderHTML(tmpl, at)
 }
 
-func main() {
+func createAPI() *babyapi.API[*TODO] {
 	api := babyapi.NewAPI[*TODO]("TODOs", "/todos", func() *TODO { return &TODO{} })
 
 	// Use AllTODOs in the GetAll response since it implements HTMLer
@@ -156,9 +156,15 @@ func main() {
 		KVConnectionConfig: extensions.KVConnectionConfig{
 			RedisHost:     os.Getenv("REDIS_HOST"),
 			RedisPassword: os.Getenv("REDIS_PASS"),
+			Filename:      os.Getenv("STORAGE_FILE"),
 			Optional:      true,
 		},
 	})
 
+	return api
+}
+
+func main() {
+	api := createAPI()
 	api.RunCLI()
 }
