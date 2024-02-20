@@ -10,7 +10,7 @@ import (
 	"github.com/go-chi/render"
 )
 
-var respondMtx sync.Mutex
+var respondOnce sync.Once
 
 func defaultResponseCodes() map[string]int {
 	return map[string]int{
@@ -30,19 +30,19 @@ type HTMLer interface {
 
 // Create API routes on the given router
 func (a *API[T]) Route(r chi.Router) {
-	respondMtx.Lock()
-	render.Respond = func(w http.ResponseWriter, r *http.Request, v interface{}) {
-		if render.GetAcceptedContentType(r) == render.ContentTypeHTML {
-			htmler, ok := v.(HTMLer)
-			if ok {
-				render.HTML(w, r, htmler.HTML(r))
-				return
+	respondOnce.Do(func() {
+		render.Respond = func(w http.ResponseWriter, r *http.Request, v interface{}) {
+			if render.GetAcceptedContentType(r) == render.ContentTypeHTML {
+				htmler, ok := v.(HTMLer)
+				if ok {
+					render.HTML(w, r, htmler.HTML(r))
+					return
+				}
 			}
-		}
 
-		render.DefaultResponder(w, r, v)
-	}
-	respondMtx.Unlock()
+			render.DefaultResponder(w, r, v)
+		}
+	})
 
 	for _, m := range a.middlewares {
 		r.Use(m)
