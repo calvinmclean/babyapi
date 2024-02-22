@@ -75,6 +75,8 @@ type API[T Resource] struct {
 	Delete http.HandlerFunc
 
 	rootAPI bool
+
+	readOnly bool
 }
 
 // NewAPI initializes an API using the provided name, base URL path, and function to create a new instance of
@@ -109,6 +111,7 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 		nil,
 		nil,
 		nil,
+		false,
 		false,
 	}
 
