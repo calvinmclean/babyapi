@@ -30,9 +30,9 @@ type HTMLer interface {
 
 // Create API routes on the given router
 func (a *API[T]) Route(r chi.Router) {
-	a.readOnly = true
-
 	respondOnce.Do(func() {
+		a.readOnly = true
+
 		render.Respond = func(w http.ResponseWriter, r *http.Request, v interface{}) {
 			if render.GetAcceptedContentType(r) == render.ContentTypeHTML {
 				htmler, ok := v.(HTMLer)

@@ -154,6 +154,8 @@ func (a *API[T]) Name() string {
 
 // SetCustomResponseCode will override the default response codes for the specified HTTP verb
 func (a *API[T]) SetCustomResponseCode(verb string, code int) *API[T] {
+	a.panicIfReadOnly()
+
 	a.responseCodes[verb] = code
 	return a
 }
@@ -161,6 +163,8 @@ func (a *API[T]) SetCustomResponseCode(verb string, code int) *API[T] {
 // SetGetAllResponseWrapper sets a function that can create a custom response for GetAll. This function will receive
 // a slice of Resources from storage and must return a render.Renderer
 func (a *API[T]) SetGetAllResponseWrapper(getAllResponder func([]T) render.Renderer) *API[T] {
+	a.panicIfReadOnly()
+
 	a.getAllResponseWrapper = getAllResponder
 	return a
 }
@@ -169,11 +173,15 @@ func (a *API[T]) SetGetAllResponseWrapper(getAllResponder func([]T) render.Rende
 // This is useful for adding more validations or performing tasks related to resources such as initializing
 // schedules or sending events
 func (a *API[T]) SetOnCreateOrUpdate(onCreateOrUpdate func(*http.Request, T) *ErrResponse) *API[T] {
+	a.panicIfReadOnly()
+
 	a.onCreateOrUpdate = onCreateOrUpdate
 	return a
 }
 
 func (a *API[T]) SetAfterCreateOrUpdate(afterCreateOrUpdate func(*http.Request, T) *ErrResponse) *API[T] {
+	a.panicIfReadOnly()
+
 	a.afterCreateOrUpdate = afterCreateOrUpdate
 	return a
 }
@@ -181,6 +189,8 @@ func (a *API[T]) SetAfterCreateOrUpdate(afterCreateOrUpdate func(*http.Request, 
 // SetBeforeDelete sets a function that is executing before deleting a resource. It is useful for additional
 // validation before completing the delete
 func (a *API[T]) SetBeforeDelete(before func(*http.Request) *ErrResponse) *API[T] {
+	a.panicIfReadOnly()
+
 	if before == nil {
 		before = defaultBeforeAfter
 	}
@@ -192,6 +202,8 @@ func (a *API[T]) SetBeforeDelete(before func(*http.Request) *ErrResponse) *API[T
 // SetAfterDelete sets a function that is executed after deleting a resource. It is useful for additional
 // cleanup or other actions that should be done after deleting
 func (a *API[T]) SetAfterDelete(after func(*http.Request) *ErrResponse) *API[T] {
+	a.panicIfReadOnly()
+
 	if after == nil {
 		after = defaultBeforeAfter
 	}
@@ -203,6 +215,8 @@ func (a *API[T]) SetAfterDelete(after func(*http.Request) *ErrResponse) *API[T] 
 // SetGetAllFilter sets a function that can use the request context to create a filter for GetAll. Use this
 // to introduce query parameters for filtering resources
 func (a *API[T]) SetGetAllFilter(f func(*http.Request) FilterFunc[T]) *API[T] {
+	a.panicIfReadOnly()
+
 	a.getAllFilter = f
 	return a
 }
@@ -210,6 +224,8 @@ func (a *API[T]) SetGetAllFilter(f func(*http.Request) FilterFunc[T]) *API[T] {
 // SetResponseWrapper sets a function that returns a new Renderer before responding with T. This is used to add
 // more data to responses that isn't directly from storage
 func (a *API[T]) SetResponseWrapper(responseWrapper func(T) render.Renderer) *API[T] {
+	a.panicIfReadOnly()
+
 	a.responseWrapper = responseWrapper
 	return a
 }
@@ -229,6 +245,8 @@ func (a *API[T]) AnyClient(addr string) *Client[*AnyResource] {
 // AddCustomRootRoute appends a custom API route to the absolute root path ("/"). It does not work for APIs with
 // parents because it would conflict with the parent's route. Panics if the API is already a child when this is called
 func (a *API[T]) AddCustomRootRoute(route chi.Route) *API[T] {
+	a.panicIfReadOnly()
+
 	if a.parent != nil {
 		panic("cannot be applied to child APIs")
 	}
@@ -238,6 +256,8 @@ func (a *API[T]) AddCustomRootRoute(route chi.Route) *API[T] {
 
 // AddCustomRoute appends a custom API route to the base path: /base/custom-route
 func (a *API[T]) AddCustomRoute(route chi.Route) *API[T] {
+	a.panicIfReadOnly()
+
 	a.customRoutes = append(a.customRoutes, route)
 	return a
 }
@@ -245,6 +265,8 @@ func (a *API[T]) AddCustomRoute(route chi.Route) *API[T] {
 // AddCustomIDRoute appends a custom API route to the base path after the ID URL parameter: /base/{ID}/custom-route.
 // The handler for this route can access the requested resource using GetResourceFromContext
 func (a *API[T]) AddCustomIDRoute(route chi.Route) *API[T] {
+	a.panicIfReadOnly()
+
 	if a.rootAPI {
 		panic("ID routes cannot be used with a root API")
 	}
@@ -254,12 +276,16 @@ func (a *API[T]) AddCustomIDRoute(route chi.Route) *API[T] {
 
 // AddMiddleware adds a middleware which is active only on the paths without resource ID
 func (a *API[T]) AddMiddleware(m func(http.Handler) http.Handler) *API[T] {
+	a.panicIfReadOnly()
+
 	a.middlewares = append(a.middlewares, m)
 	return a
 }
 
 // AddIDMiddleware adds a middleware which is active only on the paths including a resource ID
 func (a *API[T]) AddIDMiddleware(m func(http.Handler) http.Handler) *API[T] {
+	a.panicIfReadOnly()
+
 	if a.rootAPI {
 		panic("ID middleware cannot be used with a root API")
 	}
@@ -334,4 +360,10 @@ func (a *API[T]) ChildAPIs() map[string]RelatedAPI {
 		children[child.Name()] = child
 	}
 	return children
+}
+
+func (a *API[T]) panicIfReadOnly() {
+	if a.readOnly {
+		panic("API cannot be modified after starting")
+	}
 }
