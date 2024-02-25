@@ -1341,3 +1341,15 @@ func TestRootAPICLI(t *testing.T) {
 		})
 	}
 }
+
+func TestReadOnlyPanicAfterStart(t *testing.T) {
+	api := babyapi.NewAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} })
+
+	_ = api.Router()
+
+	require.PanicsWithError(t, "API cannot be modified after starting", func() {
+		api.SetOnCreateOrUpdate(func(_ *http.Request, _ *Album) *babyapi.ErrResponse {
+			return nil
+		})
+	})
+}

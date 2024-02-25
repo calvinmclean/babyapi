@@ -2,6 +2,7 @@ package babyapi
 
 import (
 	"context"
+	"errors"
 	"log"
 	"log/slog"
 	"net/http"
@@ -364,6 +365,6 @@ func (a *API[T]) ChildAPIs() map[string]RelatedAPI {
 
 func (a *API[T]) panicIfReadOnly() {
 	if a.readOnly {
-		panic("API cannot be modified after starting")
+		panic(errors.New("API cannot be modified after starting"))
 	}
 }
