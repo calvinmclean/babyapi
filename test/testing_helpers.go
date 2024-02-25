@@ -9,11 +9,14 @@ import (
 
 	"github.com/calvinmclean/babyapi"
 	"github.com/go-chi/chi/v5"
+	"github.com/stretchr/testify/require"
 )
 
 // Test is meant to be used in external tests to automatically handle setting up routes and using httptest
 func TestServe[T babyapi.Resource](t *testing.T, api *babyapi.API[T]) (string, func()) {
-	server := httptest.NewServer(api.Router())
+	router, err := api.Router()
+	require.NoError(t, err)
+	server := httptest.NewServer(router)
 	return server.URL, server.Close
 }
 
@@ -21,8 +24,11 @@ func TestServe[T babyapi.Resource](t *testing.T, api *babyapi.API[T]) (string, f
 func TestRequest[T babyapi.Resource](t *testing.T, api *babyapi.API[T], r *http.Request) *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
 
+	apiRouter, err := api.Router()
+	require.NoError(t, err)
+
 	router := chi.NewRouter()
-	router.Mount("/", api.Router())
+	router.Mount("/", apiRouter)
 	router.ServeHTTP(w, r)
 
 	return w
@@ -36,10 +42,13 @@ func TestWithParentRoute[T, P babyapi.Resource](t *testing.T, api *babyapi.API[T
 	parentAPI := babyapi.NewAPI[P](parentName, parentBasePath, func() P { return parent })
 	parentAPI.AddNestedAPI(api)
 
+	apiRouter, err := api.Router()
+	require.NoError(t, err)
+
 	router := chi.NewRouter()
 	api.DefaultMiddleware(router)
 	router.Route(fmt.Sprintf("%s/{%s}", parentBasePath, babyapi.IDParamKey(parentName)), func(r chi.Router) {
-		r.Mount("/", api.Router())
+		r.Mount("/", apiRouter)
 	})
 
 	router.ServeHTTP(w, r.WithContext(context.WithValue(context.Background(), babyapi.ContextKey(parentName), parent)))

@@ -55,8 +55,7 @@ func (a *API[T]) RunWithArgs(out io.Writer, args []string, bindAddress string, a
 	}
 
 	if args[0] == "serve" {
-		a.Serve(bindAddress)
-		return nil
+		return a.Serve(bindAddress)
 	}
 
 	return a.runClientCLI(out, args, address, pretty, headers, query)

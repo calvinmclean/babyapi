@@ -10,8 +10,8 @@ import (
 // RelatedAPI declares a subset of methods from the API struct that are required to enable
 // nested/parent-child API relationships
 type RelatedAPI interface {
-	Router() chi.Router
-	Route(chi.Router)
+	Router() (chi.Router, error)
+	Route(chi.Router) error
 	Base() string
 	Name() string
 	GetIDParam(*http.Request) string
@@ -43,7 +43,8 @@ func (a *API[T]) AddNestedAPI(childAPI RelatedAPI) *API[T] {
 
 	relAPI, ok := childAPI.(relatedAPI)
 	if !ok {
-		panic(fmt.Sprintf("incompatible type for child API: %T", childAPI))
+		a.errors = append(a.errors, fmt.Errorf("AddNestedAPI: incompatible type for child API: %T", childAPI))
+		return a
 	}
 
 	a.subAPIs[childAPI.Name()] = relAPI
