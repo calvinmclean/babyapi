@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -77,7 +78,7 @@ type API[T Resource] struct {
 
 	rootAPI bool
 
-	readOnly bool
+	readOnly sync.Mutex
 }
 
 // NewAPI initializes an API using the provided name, base URL path, and function to create a new instance of
@@ -113,7 +114,7 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 		nil,
 		nil,
 		false,
-		false,
+		sync.Mutex{},
 	}
 
 	api.GetAll = api.defaultGetAll()
@@ -364,7 +365,8 @@ func (a *API[T]) ChildAPIs() map[string]RelatedAPI {
 }
 
 func (a *API[T]) panicIfReadOnly() {
-	if a.readOnly {
+	if !a.readOnly.TryLock() {
 		panic(errors.New("API cannot be modified after starting"))
 	}
+	a.readOnly.Unlock()
 }
