@@ -14,9 +14,8 @@ func (a *API[T]) ApplyExtension(e Extension[T]) *API[T] {
 
 	err := e.Apply(a)
 	if err != nil {
-		// TODO: when #32 is implemented, extensions will be added to a list and applied in the function
-		// that finalizes the API and returns an error
-		panic(fmt.Sprintf("error applying extension: %v", err))
+		a.errors = append(a.errors, fmt.Errorf("ApplyExtension: error applying extension: %w", err))
+		return a
 	}
 	return a
 }

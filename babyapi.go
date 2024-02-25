@@ -3,6 +3,7 @@ package babyapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
@@ -79,6 +80,8 @@ type API[T Resource] struct {
 	rootAPI bool
 
 	readOnly sync.Mutex
+
+	errors []error
 }
 
 // NewAPI initializes an API using the provided name, base URL path, and function to create a new instance of
@@ -115,6 +118,7 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 		nil,
 		false,
 		sync.Mutex{},
+		nil,
 	}
 
 	api.GetAll = api.defaultGetAll()
@@ -250,7 +254,8 @@ func (a *API[T]) AddCustomRootRoute(route chi.Route) *API[T] {
 	a.panicIfReadOnly()
 
 	if a.parent != nil {
-		panic("cannot be applied to child APIs")
+		a.errors = append(a.errors, fmt.Errorf("AddCustomRootRoute: cannot be applied to child APIs"))
+		return a
 	}
 	a.rootRoutes = append(a.rootRoutes, route)
 	return a
@@ -270,7 +275,8 @@ func (a *API[T]) AddCustomIDRoute(route chi.Route) *API[T] {
 	a.panicIfReadOnly()
 
 	if a.rootAPI {
-		panic("ID routes cannot be used with a root API")
+		a.errors = append(a.errors, fmt.Errorf("AddCustomIDRoute: ID routes cannot be used with a root API"))
+		return a
 	}
 	a.customIDRoutes = append(a.customIDRoutes, route)
 	return a
@@ -289,19 +295,24 @@ func (a *API[T]) AddIDMiddleware(m func(http.Handler) http.Handler) *API[T] {
 	a.panicIfReadOnly()
 
 	if a.rootAPI {
-		panic("ID middleware cannot be used with a root API")
+		a.errors = append(a.errors, fmt.Errorf("AddIDMiddleware: ID middleware cannot be used with a root API"))
+		return a
 	}
 	a.idMiddlewares = append(a.idMiddlewares, m)
 	return a
 }
 
 // Serve will serve the API on the given port
-func (a *API[T]) Serve(address string) {
+func (a *API[T]) Serve(address string) error {
 	if address == "" {
 		address = ":8080"
 	}
 
-	a.server = &http.Server{Addr: address, Handler: a.Router()}
+	router, err := a.Router()
+	if err != nil {
+		return fmt.Errorf("error creating router: %w", err)
+	}
+	a.server = &http.Server{Addr: address, Handler: router}
 
 	var serverStopCtx context.CancelFunc
 	a.serverCtx, serverStopCtx = context.WithCancel(context.Background())
@@ -330,12 +341,14 @@ func (a *API[T]) Serve(address string) {
 	}()
 
 	slog.Info("starting server", "address", address, "api", a.name)
-	err := a.server.ListenAndServe()
+	err = a.server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
-		slog.Error("error starting the server", "error", err)
+		return fmt.Errorf("error starting the server: %w", err)
 	}
 
 	<-a.serverCtx.Done()
+
+	return nil
 }
 
 // Stop will stop the API

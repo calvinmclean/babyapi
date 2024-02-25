@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/go-chi/chi/v5"
@@ -22,6 +23,24 @@ func defaultResponseCodes() map[string]int {
 	}
 }
 
+// BuilderError is used for combining errors that may occur when constructing a new API
+type BuilderError struct {
+	errors []error
+}
+
+func (e BuilderError) Error() string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("encountered %d errors constructing API:\n", len(e.errors)))
+
+	for _, err := range e.errors {
+		sb.WriteString(fmt.Sprintf("- %v\n", err))
+	}
+
+	return sb.String()
+}
+
+var _ error = BuilderError{}
+
 // HTMLer allows for easily represending reponses as HTML strings when accepted content
 // type is text/html
 type HTMLer interface {
@@ -29,8 +48,12 @@ type HTMLer interface {
 }
 
 // Create API routes on the given router
-func (a *API[T]) Route(r chi.Router) {
+func (a *API[T]) Route(r chi.Router) error {
 	a.readOnly.TryLock()
+
+	if len(a.errors) > 0 {
+		return BuilderError{a.errors}
+	}
 
 	respondOnce.Do(func() {
 		render.Respond = func(w http.ResponseWriter, r *http.Request, v interface{}) {
@@ -54,6 +77,7 @@ func (a *API[T]) Route(r chi.Router) {
 		a.doCustomRoutes(r, a.rootRoutes)
 	}
 
+	var returnErr error
 	r.Route(a.base, func(r chi.Router) {
 		// Only set these middleware for root-level API
 		if a.parent == nil {
@@ -61,7 +85,7 @@ func (a *API[T]) Route(r chi.Router) {
 		}
 
 		if a.rootAPI {
-			a.rootAPIRoutes(r)
+			returnErr = a.rootAPIRoutes(r)
 			return
 		}
 
@@ -79,18 +103,27 @@ func (a *API[T]) Route(r chi.Router) {
 			routeIfNotNil(r.With(a.requestBodyMiddleware).Patch, "/", a.Patch)
 
 			for _, subAPI := range a.subAPIs {
-				subAPI.Route(r)
+				err := subAPI.Route(r)
+				if err != nil {
+					returnErr = fmt.Errorf("error creating routes for %q: %w", subAPI.Name(), err)
+					return
+				}
 			}
 
 			a.doCustomRoutes(r, a.customIDRoutes)
 		})
+		if returnErr != nil {
+			return
+		}
 
 		a.doCustomRoutes(r, a.customRoutes)
 	})
+
+	return returnErr
 }
 
 // rootAPIRoutes creates different routes for a root API that doesn't deal with any resources
-func (a *API[T]) rootAPIRoutes(r chi.Router) {
+func (a *API[T]) rootAPIRoutes(r chi.Router) error {
 	routeIfNotNil(r.Post, "/", a.Post)
 	routeIfNotNil(r.Get, "/", a.Get)
 	routeIfNotNil(r.Delete, "/", a.Delete)
@@ -98,19 +131,23 @@ func (a *API[T]) rootAPIRoutes(r chi.Router) {
 	routeIfNotNil(r.Patch, "/", a.Patch)
 
 	for _, subAPI := range a.subAPIs {
-		subAPI.Route(r)
+		err := subAPI.Route(r)
+		if err != nil {
+			return fmt.Errorf("error creating routes for %q: %w", subAPI.Name(), err)
+		}
 	}
 
 	a.doCustomRoutes(r, a.rootRoutes)
 	a.doCustomRoutes(r, a.customRoutes)
+
+	return nil
 }
 
 // Create a new router with API routes
-func (a *API[T]) Router() chi.Router {
+func (a *API[T]) Router() (chi.Router, error) {
 	r := chi.NewRouter()
-	a.Route(r)
-
-	return r
+	err := a.Route(r)
+	return r, err
 }
 
 func (a *API[T]) doCustomRoutes(r chi.Router, routes []chi.Route) {

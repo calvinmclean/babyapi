@@ -75,7 +75,10 @@ func TestBabyAPI(t *testing.T) {
 
 	album1 := &Album{Title: "Album1"}
 
-	go api.Serve("localhost:8080")
+	go func() {
+		err := api.Serve("localhost:8080")
+		require.NoError(t, err)
+	}()
 	serverURL := "http://localhost:8080"
 
 	waitForAPI(serverURL)
@@ -980,18 +983,23 @@ func TestAPIModifierErrors(t *testing.T) {
 }
 
 func TestRootAPIWithMiddlewareAndCustomHandlers(t *testing.T) {
-	api := babyapi.NewRootAPI("root", "/")
+	t.Run("CustomizationsForIDsCauseError", func(t *testing.T) {
+		api := babyapi.NewRootAPI("root", "/")
+		api.AddCustomIDRoute(chi.Route{})
+		api.AddIDMiddleware(func(h http.Handler) http.Handler {
+			return nil
+		})
 
-	t.Run("CustomizationsForIDsPanics", func(t *testing.T) {
-		require.Panics(t, func() {
-			api.AddCustomIDRoute(chi.Route{})
-		})
-		require.Panics(t, func() {
-			api.AddIDMiddleware(func(h http.Handler) http.Handler {
-				return nil
-			})
-		})
+		err := api.RunWithArgs(os.Stdout, []string{"serve"}, "", "", false, nil, "")
+		require.Error(t, err)
+		require.ErrorAs(t, err, &babyapi.BuilderError{})
+		require.Equal(t, `error creating router: encountered 2 errors constructing API:
+- AddCustomIDRoute: ID routes cannot be used with a root API
+- AddIDMiddleware: ID middleware cannot be used with a root API
+`, err.Error())
 	})
+
+	api := babyapi.NewRootAPI("root", "/")
 
 	api.Get = func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(201)
@@ -1345,7 +1353,8 @@ func TestRootAPICLI(t *testing.T) {
 func TestReadOnlyPanicAfterStart(t *testing.T) {
 	api := babyapi.NewAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} })
 
-	_ = api.Router()
+	_, err := api.Router()
+	require.NoError(t, err)
 
 	require.PanicsWithError(t, "API cannot be modified after starting", func() {
 		api.SetOnCreateOrUpdate(func(_ *http.Request, _ *Album) *babyapi.ErrResponse {
@@ -1353,3 +1362,8 @@ func TestReadOnlyPanicAfterStart(t *testing.T) {
 		})
 	})
 }
+
+// func TestInvalidUseOfModifiersReturnsErrorAtStart(t *testing.T) {
+// 	api := babyapi.NewRootAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} })
+// 	api
+// }
