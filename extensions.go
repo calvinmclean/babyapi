@@ -10,6 +10,8 @@ type Extension[T Resource] interface {
 
 // ApplyExtension adds an Extension to the API and applies it
 func (a *API[T]) ApplyExtension(e Extension[T]) *API[T] {
+	a.panicIfReadOnly()
+
 	err := e.Apply(a)
 	if err != nil {
 		// TODO: when #32 is implemented, extensions will be added to a list and applied in the function

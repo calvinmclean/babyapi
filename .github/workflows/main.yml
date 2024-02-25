@@ -9,8 +9,8 @@ on:
       - main
 
 jobs:
-  golangci:
-    name: lint
+  lint_and_check:
+    name: lint_and_check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -19,6 +19,12 @@ jobs:
         with:
           go-version: "1.21"
           cache: false
+
+      - name: run generate command
+        run: go generate ./...
+
+      - name: fail if generate causes changes
+        run: git diff --exit-code
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
