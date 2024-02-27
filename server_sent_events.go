@@ -9,12 +9,12 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-type BroadcastChannel[T any] struct {
+type broadcastChannel[T any] struct {
 	listeners []chan T
 	lock      sync.RWMutex
 }
 
-func (bc *BroadcastChannel[T]) GetListener() chan T {
+func (bc *broadcastChannel[T]) GetListener() chan T {
 	bc.lock.Lock()
 	defer bc.lock.Unlock()
 	newChan := make(chan T)
@@ -22,7 +22,7 @@ func (bc *BroadcastChannel[T]) GetListener() chan T {
 	return newChan
 }
 
-func (bc *BroadcastChannel[T]) RemoveListener(removeChan chan T) {
+func (bc *broadcastChannel[T]) RemoveListener(removeChan chan T) {
 	bc.lock.Lock()
 	defer bc.lock.Unlock()
 	for i, listener := range bc.listeners {
@@ -35,7 +35,7 @@ func (bc *BroadcastChannel[T]) RemoveListener(removeChan chan T) {
 	}
 }
 
-func (bc *BroadcastChannel[T]) SendToAll(input T) {
+func (bc *broadcastChannel[T]) SendToAll(input T) {
 	bc.lock.RLock()
 	defer bc.lock.RUnlock()
 	for _, listener := range bc.listeners {
@@ -43,14 +43,14 @@ func (bc *BroadcastChannel[T]) SendToAll(input T) {
 	}
 }
 
-func (bc *BroadcastChannel[T]) runInputChannel(inputChan chan T) {
+func (bc *broadcastChannel[T]) runInputChannel(inputChan chan T) {
 	for input := range inputChan {
 		bc.SendToAll(input)
 	}
 }
 
 // GetInputChannel returns a channel acting as an input to the broadcast channel, closing the channel will stop the worker goroutine
-func (bc *BroadcastChannel[T]) GetInputChannel() chan T {
+func (bc *broadcastChannel[T]) GetInputChannel() chan T {
 	newInputChan := make(chan T)
 	go bc.runInputChannel(newInputChan)
 	return newInputChan
@@ -74,7 +74,7 @@ func (sse *ServerSentEvent) Write(w http.ResponseWriter) {
 // AddServerSentEventHandler is a shortcut for HandleServerSentEvents that automatically creates and returns
 // the events channel and adds a custom handler for GET requests matching the provided pattern
 func (a *API[T]) AddServerSentEventHandler(pattern string) chan *ServerSentEvent {
-	eventsBroadcastChannel := BroadcastChannel[*ServerSentEvent]{}
+	eventsBroadcastChannel := broadcastChannel[*ServerSentEvent]{}
 
 	a.AddCustomRoute(chi.Route{
 		Pattern: pattern,
@@ -88,7 +88,7 @@ func (a *API[T]) AddServerSentEventHandler(pattern string) chan *ServerSentEvent
 
 // HandleServerSentEvents is a handler function that will listen on the provided channel and write events
 // to the HTTP response
-func (a *API[T]) HandleServerSentEvents(EventsBroadcastChannel *BroadcastChannel[*ServerSentEvent]) http.HandlerFunc {
+func (a *API[T]) HandleServerSentEvents(EventsBroadcastChannel *broadcastChannel[*ServerSentEvent]) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		events := EventsBroadcastChannel.GetListener()
 		defer EventsBroadcastChannel.RemoveListener(events)
