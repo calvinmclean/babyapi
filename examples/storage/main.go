@@ -25,7 +25,7 @@ func main() {
 		panic(err)
 	}
 
-	api.Storage = storage.NewClient[*User](db, "User")
+	api.SetStorage(storage.NewClient[*User](db, "User"))
 
 	api.RunCLI()
 }

@@ -377,6 +377,13 @@ func (a *API[T]) ChildAPIs() map[string]RelatedAPI {
 	return children
 }
 
+func (a *API[T]) SetStorage(s Storage[T]) *API[T] {
+	a.panicIfReadOnly()
+
+	a.Storage = s
+	return a
+}
+
 func (a *API[T]) panicIfReadOnly() {
 	if !a.readOnly.TryLock() {
 		panic(errors.New("API cannot be modified after starting"))

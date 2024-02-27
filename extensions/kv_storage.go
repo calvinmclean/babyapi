@@ -57,7 +57,7 @@ func (h KeyValueStorage[T]) Apply(api *babyapi.API[T]) error {
 		storageKeyPrefix = api.Name()
 	}
 
-	api.Storage = storage.NewClient[T](db, storageKeyPrefix)
+	api.SetStorage(storage.NewClient[T](db, storageKeyPrefix))
 
 	return nil
 }
