@@ -2,25 +2,20 @@
 // README at: https://github.com/devcontainers/templates/tree/main/src/go
 {
     "name": "babyapi",
-	"image": "mcr.microsoft.com/devcontainers/go:1-1.21-bullseye",
+    "image": "mcr.microsoft.com/devcontainers/go:1-1.21-bullseye",
     "features": {
         "ghcr.io/devcontainers/features/sshd:1": {
             "version": "latest"
-        }
+        },
+        "ghcr.io/devcontainers-contrib/features/go-task:1": {},
+        "ghcr.io/devcontainers-contrib/features/fish-apt-get:1": {}
     },
     "customizations": {
         "vscode": {
             "extensions": [
                 "golang.go",
-                "eamodio.gitlens", // IDE Git information
                 "davidanson.vscode-markdownlint",
                 "ms-azuretools.vscode-docker", // Docker integration and linting
-                "shardulm94.trailing-spaces", // Show trailing spaces
-                "Gruntfuggly.todo-tree", // Highlights TODO comments
-                "bierner.emojisense", // Emoji sense for markdown
-                "vscode-icons-team.vscode-icons", // Better file extension icons
-                "github.vscode-pull-request-github", // Github interaction
-                "redhat.vscode-yaml", // Kubernetes, Drone syntax highlighting
                 "mohsen1.prettify-json" // Prettify JSON data
             ],
             "settings": {
