@@ -541,10 +541,6 @@ func TestCLI(t *testing.T) {
 	api := babyapi.NewAPI("Albums", "/albums", func() *Album { return &Album{} })
 	songAPI := babyapi.NewAPI("Songs", "/songs", func() *Song { return &Song{} })
 	api.AddNestedAPI(songAPI)
-	go func() {
-		err := api.RunWithArgs(os.Stdout, []string{"serve"}, "localhost:8080", "", false, nil, "")
-		require.NoError(t, err)
-	}()
 
 	api.SetGetAllFilter(func(r *http.Request) babyapi.FilterFunc[*Album] {
 		return func(a *Album) bool {
@@ -552,6 +548,11 @@ func TestCLI(t *testing.T) {
 			return title == "" || a.Title == title
 		}
 	})
+
+	go func() {
+		err := api.RunWithArgs(os.Stdout, []string{"serve"}, "localhost:8080", "", false, nil, "")
+		require.NoError(t, err)
+	}()
 
 	address := "http://localhost:8080"
 
