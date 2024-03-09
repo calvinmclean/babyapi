@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"strings"
 	"sync"
-
-	"github.com/go-chi/chi/v5"
 )
 
 type broadcastChannel[T any] struct {
@@ -76,12 +74,7 @@ func (sse *ServerSentEvent) Write(w http.ResponseWriter) {
 func (a *API[T]) AddServerSentEventHandler(pattern string) chan *ServerSentEvent {
 	eventsBroadcastChannel := broadcastChannel[*ServerSentEvent]{}
 
-	a.AddCustomRoute(chi.Route{
-		Pattern: pattern,
-		Handlers: map[string]http.Handler{
-			http.MethodGet: a.HandleServerSentEvents(&eventsBroadcastChannel),
-		},
-	})
+	a.AddCustomRoute(http.MethodGet, pattern, a.HandleServerSentEvents(&eventsBroadcastChannel))
 
 	return eventsBroadcastChannel.GetInputChannel()
 }

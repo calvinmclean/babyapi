@@ -15,7 +15,6 @@ import (
 
 	"github.com/calvinmclean/babyapi"
 	babytest "github.com/calvinmclean/babyapi/test"
-	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"github.com/rs/xid"
 	"github.com/stretchr/testify/require"
@@ -47,24 +46,14 @@ func waitForAPI(address string) {
 
 func TestBabyAPI(t *testing.T) {
 	api := babyapi.NewAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} })
-	api.AddCustomRoute(chi.Route{
-		Pattern: "/teapot",
-		Handlers: map[string]http.Handler{
-			http.MethodGet: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusTeapot)
-			}),
-		},
-	})
+	api.AddCustomRoute(http.MethodGet, "/teapot", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTeapot)
+	}))
 
-	api.AddCustomIDRoute(chi.Route{
-		Pattern: "/teapot",
-		Handlers: map[string]http.Handler{
-			http.MethodGet: api.GetRequestedResourceAndDo(func(r *http.Request, album *Album) (render.Renderer, *babyapi.ErrResponse) {
-				render.Status(r, http.StatusTeapot)
-				return album, nil
-			}),
-		},
-	})
+	api.AddCustomIDRoute(http.MethodGet, "/teapot", api.GetRequestedResourceAndDo(func(r *http.Request, album *Album) (render.Renderer, *babyapi.ErrResponse) {
+		render.Status(r, http.StatusTeapot)
+		return album, nil
+	}))
 
 	api.SetGetAllFilter(func(r *http.Request) babyapi.FilterFunc[*Album] {
 		return func(a *Album) bool {
@@ -985,7 +974,7 @@ func TestAPIModifierErrors(t *testing.T) {
 func TestRootAPIWithMiddlewareAndCustomHandlers(t *testing.T) {
 	t.Run("CustomizationsForIDsCauseError", func(t *testing.T) {
 		api := babyapi.NewRootAPI("root", "/")
-		api.AddCustomIDRoute(chi.Route{})
+		api.AddCustomIDRoute("", "", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 		api.AddIDMiddleware(func(h http.Handler) http.Handler {
 			return nil
 		})
@@ -1017,23 +1006,13 @@ func TestRootAPIWithMiddlewareAndCustomHandlers(t *testing.T) {
 		w.WriteHeader(205)
 	}
 
-	api.AddCustomRoute(chi.Route{
-		Handlers: map[string]http.Handler{
-			http.MethodGet: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(206)
-			}),
-		},
-		Pattern: "/customRoute",
-	})
+	api.AddCustomRoute(http.MethodGet, "/customRoute", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(206)
+	}))
 
-	api.AddCustomRootRoute(chi.Route{
-		Handlers: map[string]http.Handler{
-			http.MethodGet: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(207)
-			}),
-		},
-		Pattern: "/customRootRoute",
-	})
+	api.AddCustomRootRoute(http.MethodGet, "/customRootRoute", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(207)
+	}))
 
 	middlewareHits := 0
 	api.AddMiddleware(func(next http.Handler) http.Handler {
@@ -1360,6 +1339,43 @@ func TestReadOnlyPanicAfterStart(t *testing.T) {
 		api.SetOnCreateOrUpdate(func(_ *http.Request, _ *Album) *babyapi.ErrResponse {
 			return nil
 		})
+	})
+}
+
+func TestAddRouteWorksWithMultipleMethodSamePath(t *testing.T) {
+	api := babyapi.NewAPI("Albums", "/albums", func() *Album { return &Album{} })
+
+	api.AddCustomRoute(http.MethodGet, "/test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	api.AddCustomRoute(http.MethodPost, "/test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	babytest.RunTableTest(t, api, []babytest.TestCase[*babyapi.AnyResource]{
+		{
+			Name: "GetSuccess",
+			Test: babytest.RequestFuncTest[*babyapi.AnyResource](func(getResponse babytest.PreviousResponseGetter, address string) *http.Request {
+				req, err := http.NewRequest(http.MethodGet, address+"/albums/test", http.NoBody)
+				require.NoError(t, err)
+				return req
+			}),
+			ExpectedResponse: babytest.ExpectedResponse{
+				Status: http.StatusOK,
+			},
+		},
+		{
+			Name: "PostSuccess",
+			Test: babytest.RequestFuncTest[*babyapi.AnyResource](func(getResponse babytest.PreviousResponseGetter, address string) *http.Request {
+				req, err := http.NewRequest(http.MethodPost, address+"/albums/test", http.NoBody)
+				require.NoError(t, err)
+				return req
+			}),
+
+			ExpectedResponse: babytest.ExpectedResponse{
+				Status: http.StatusOK,
+			},
+		},
 	})
 }
 
