@@ -347,11 +347,11 @@ func main() {
 
 func createAPI() *API {
 	api := &API{
-		Events: babyapi.NewAPI[*Event](
+		Events: babyapi.NewAPI(
 			"Event", "/events",
 			func() *Event { return &Event{} },
 		),
-		Invites: babyapi.NewAPI[*Invite](
+		Invites: babyapi.NewAPI(
 			"Invite", "/invites",
 			func() *Invite { return &Invite{} },
 		),

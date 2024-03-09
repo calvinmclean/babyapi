@@ -45,7 +45,7 @@ func waitForAPI(address string) {
 }
 
 func TestBabyAPI(t *testing.T) {
-	api := babyapi.NewAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} })
+	api := babyapi.NewAPI("Albums", "/albums", func() *Album { return &Album{} })
 	api.AddCustomRoute(http.MethodGet, "/teapot", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusTeapot)
 	}))
@@ -262,10 +262,10 @@ type Artist struct {
 }
 
 func TestNestedAPI(t *testing.T) {
-	artistAPI := babyapi.NewAPI[*Artist]("Artists", "/artists", func() *Artist { return &Artist{} })
-	albumAPI := babyapi.NewAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} })
-	musicVideoAPI := babyapi.NewAPI[*MusicVideo]("MusicVideos", "/music_videos", func() *MusicVideo { return &MusicVideo{} })
-	songAPI := babyapi.NewAPI[*Song]("Songs", "/songs", func() *Song { return &Song{} })
+	artistAPI := babyapi.NewAPI("Artists", "/artists", func() *Artist { return &Artist{} })
+	albumAPI := babyapi.NewAPI("Albums", "/albums", func() *Album { return &Album{} })
+	musicVideoAPI := babyapi.NewAPI("MusicVideos", "/music_videos", func() *MusicVideo { return &MusicVideo{} })
+	songAPI := babyapi.NewAPI("Songs", "/songs", func() *Song { return &Song{} })
 
 	songAPI.SetResponseWrapper(func(s *Song) render.Renderer {
 		return &SongResponse{Song: s, api: songAPI}
@@ -538,8 +538,8 @@ func TestCLI(t *testing.T) {
 		},
 	}
 
-	api := babyapi.NewAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} })
-	songAPI := babyapi.NewAPI[*Song]("Songs", "/songs", func() *Song { return &Song{} })
+	api := babyapi.NewAPI("Albums", "/albums", func() *Album { return &Album{} })
+	songAPI := babyapi.NewAPI("Songs", "/songs", func() *Song { return &Song{} })
 	api.AddNestedAPI(songAPI)
 	go func() {
 		err := api.RunWithArgs(os.Stdout, []string{"serve"}, "localhost:8080", "", false, nil, "")
@@ -642,7 +642,7 @@ func (d *ListItem) HTML(*http.Request) string {
 }
 
 func TestHTML(t *testing.T) {
-	api := babyapi.NewAPI[*ListItem]("Items", "/items", func() *ListItem { return &ListItem{} })
+	api := babyapi.NewAPI("Items", "/items", func() *ListItem { return &ListItem{} })
 
 	api.SetGetAllResponseWrapper(func(d []*ListItem) render.Renderer {
 		return &UnorderedList{d}
@@ -699,7 +699,7 @@ func TestHTML(t *testing.T) {
 }
 
 func TestServerSentEvents(t *testing.T) {
-	api := babyapi.NewAPI[*ListItem]("Items", "/items", func() *ListItem { return &ListItem{} })
+	api := babyapi.NewAPI("Items", "/items", func() *ListItem { return &ListItem{} })
 
 	api.SetGetAllResponseWrapper(func(d []*ListItem) render.Renderer {
 		return &UnorderedList{d}
@@ -768,7 +768,7 @@ func TestAPIModifiers(t *testing.T) {
 	onCreateOrUpdate := 0
 	afterCreateOrUpdate := 0
 
-	api := babyapi.NewAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} }).
+	api := babyapi.NewAPI("Albums", "/albums", func() *Album { return &Album{} }).
 		SetCustomResponseCode(http.MethodPut, http.StatusTeapot).
 		AddMiddleware(func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -851,7 +851,7 @@ func TestAPIModifiers(t *testing.T) {
 
 func TestAPIModifierErrors(t *testing.T) {
 	t.Run("OnCreateOrUpdateErrors", func(t *testing.T) {
-		api := babyapi.NewAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} })
+		api := babyapi.NewAPI("Albums", "/albums", func() *Album { return &Album{} })
 		albumID := "cljcqg5o402e9s28rbp0"
 
 		api.SetOnCreateOrUpdate(func(_ *http.Request, _ *Album) *babyapi.ErrResponse {
@@ -873,7 +873,7 @@ func TestAPIModifierErrors(t *testing.T) {
 	})
 
 	t.Run("AfterCreateOrUpdateErrors", func(t *testing.T) {
-		api := babyapi.NewAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} })
+		api := babyapi.NewAPI("Albums", "/albums", func() *Album { return &Album{} })
 		albumID := "cljcqg5o402e9s28rbp0"
 
 		api.SetAfterCreateOrUpdate(func(_ *http.Request, _ *Album) *babyapi.ErrResponse {
@@ -898,7 +898,7 @@ func TestAPIModifierErrors(t *testing.T) {
 	})
 
 	t.Run("BeforeDeleteErrors", func(t *testing.T) {
-		api := babyapi.NewAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} })
+		api := babyapi.NewAPI("Albums", "/albums", func() *Album { return &Album{} })
 		albumID := "cljcqg5o402e9s28rbp0"
 
 		api.SetBeforeDelete(func(_ *http.Request) *babyapi.ErrResponse {
@@ -934,7 +934,7 @@ func TestAPIModifierErrors(t *testing.T) {
 	})
 
 	t.Run("AfterDeleteErrors", func(t *testing.T) {
-		api := babyapi.NewAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} })
+		api := babyapi.NewAPI("Albums", "/albums", func() *Album { return &Album{} })
 		albumID := "cljcqg5o402e9s28rbp0"
 
 		api.SetAfterDelete(func(_ *http.Request) *babyapi.ErrResponse {
@@ -1051,14 +1051,14 @@ func TestRootAPIWithMiddlewareAndCustomHandlers(t *testing.T) {
 }
 
 func TestRootAPIAsChildOfResourceAPI(t *testing.T) {
-	musicVideoAPI := babyapi.NewAPI[*MusicVideo]("MusicVideos", "/music_videos", func() *MusicVideo { return &MusicVideo{} })
-	songAPI := babyapi.NewAPI[*Song]("Songs", "/songs", func() *Song { return &Song{} })
+	musicVideoAPI := babyapi.NewAPI("MusicVideos", "/music_videos", func() *MusicVideo { return &MusicVideo{} })
+	songAPI := babyapi.NewAPI("Songs", "/songs", func() *Song { return &Song{} })
 	rootAPI := babyapi.
 		NewRootAPI("root", "/").
 		AddNestedAPI(musicVideoAPI).
 		AddNestedAPI(songAPI)
 
-	artistAPI := babyapi.NewAPI[*Artist]("Artists", "/artists", func() *Artist { return &Artist{} })
+	artistAPI := babyapi.NewAPI("Artists", "/artists", func() *Artist { return &Artist{} })
 	artistAPI.AddNestedAPI(rootAPI)
 
 	go func() {
@@ -1249,8 +1249,8 @@ func TestRootAPICLI(t *testing.T) {
 	for _, base := range basePaths {
 		t.Run("BasePath"+base, func(t *testing.T) {
 
-			musicVideoAPI := babyapi.NewAPI[*MusicVideo]("MusicVideos", "/music_videos", func() *MusicVideo { return &MusicVideo{} })
-			songAPI := babyapi.NewAPI[*Song]("Songs", "/songs", func() *Song { return &Song{} })
+			musicVideoAPI := babyapi.NewAPI("MusicVideos", "/music_videos", func() *MusicVideo { return &MusicVideo{} })
+			songAPI := babyapi.NewAPI("Songs", "/songs", func() *Song { return &Song{} })
 			rootAPI := babyapi.
 				NewRootAPI("root", base).
 				AddNestedAPI(musicVideoAPI).
@@ -1330,7 +1330,7 @@ func TestRootAPICLI(t *testing.T) {
 }
 
 func TestReadOnlyPanicAfterStart(t *testing.T) {
-	api := babyapi.NewAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} })
+	api := babyapi.NewAPI("Albums", "/albums", func() *Album { return &Album{} })
 
 	_, err := api.Router()
 	require.NoError(t, err)

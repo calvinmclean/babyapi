@@ -1,4 +1,5 @@
 # Baby API
+
 [![GitHub go.mod Go version (subdirectory of monorepo)](https://img.shields.io/github/go-mod/go-version/calvinmclean/babyapi?filename=go.mod)](https://github.com/calvinmclean/babyapi/blob/main/go.mod)
 ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/calvinmclean/babyapi/main.yml?branch=main)
 [![License](https://img.shields.io/github/license/calvinmclean/babyapi)](https://github.com/calvinmclean/babyapi/blob/main/LICENSE)
@@ -10,23 +11,26 @@ A Go CRUD API framework so simple a baby could use it.
 `babyapi` is a super simple framework that automatically creates an HTTP API for create, read, update, and delete operations on a struct. Simply extend the `babyapi.DefaultResource` type to get started.
 
 Implement custom request/response handling by implemented `Renderer` and `Binder` from [`go-chi/render`](https://github.com/go-chi/render). Use provided extension functions to add additional API functionality:
-  - `OnCreateOrUpdate`: additional handling for create/update requests
-  - `Storage`: set a different storage backend implementing the `babyapi.Storage` interface
-  - `AddCustomRoute`: add more routes on the base API 
-  - `Patch`: add custom logic for handling `PATCH` requests
-  - And many more! (see [examples](https://github.com/calvinmclean/babyapi/tree/main/examples) and [docs](https://pkg.go.dev/github.com/calvinmclean/babyapi))
-  - Override any of the default handlers and use `babyapi.Handler` shortcut to easily render errors and responses
 
+- `OnCreateOrUpdate`: additional handling for create/update requests
+- `Storage`: set a different storage backend implementing the `babyapi.Storage` interface
+- `AddCustomRoute`: add more routes on the base API
+- `Patch`: add custom logic for handling `PATCH` requests
+- And many more! (see [examples](https://github.com/calvinmclean/babyapi/tree/main/examples) and [docs](https://pkg.go.dev/github.com/calvinmclean/babyapi))
+- Override any of the default handlers and use `babyapi.Handler` shortcut to easily render errors and responses
 
 ## Getting Started
 
 1. Create a new Go module:
+
     ```shell
     mkdir babyapi-example
     cd babyapi-example
     go mod init babyapi-example
     ```
+
 2. Write `main.go` to create a `TODO` struct and initialize `babyapi.API`:
+
     ```go
     package main
 
@@ -41,19 +45,23 @@ Implement custom request/response handling by implemented `Renderer` and `Binder
     }
 
     func main() {
-        api := babyapi.NewAPI[*TODO](
+        api := babyapi.NewAPI(
             "TODOs", "/todos",
             func() *TODO { return &TODO{} },
         )
         api.RunCLI()
     }
     ```
+
 3. Run!
+
     ```shell
     go mod tidy
     go run main.go serve
     ```
+
 4. Use the built-in CLI to interact with the API:
+
     ```shell
     # Create a new TODO
     go run main.go post TODOs '{"title": "use babyapi!"}'
@@ -66,7 +74,6 @@ Implement custom request/response handling by implemented `Renderer` and `Binder
     ```
 
 <img alt="Simple Example" src="examples/simple/simple.gif" width="600" />
-
 
 ## Client
 
@@ -95,9 +102,8 @@ incompleteTODOs, err := client.GetAll(context.Background(), url.Values{
 // Delete a TODO item
 err := client.Delete(context.Background(), todo.GetID())
 ```
- 
-The client provides methods for interacting with the base API and `MakeRequest` and `MakeRequestWithResponse` to interact with custom routes. You can replace the underlying `http.Client` and set a request editor function that can be used to set authorization headers for a client.
 
+The client provides methods for interacting with the base API and `MakeRequest` and `MakeRequestWithResponse` to interact with custom routes. You can replace the underlying `http.Client` and set a request editor function that can be used to set authorization headers for a client.
 
 ## Testing
 
@@ -126,10 +132,9 @@ api.SetStorage(storage.NewClient[*TODO](db, "TODO"))
 
 `babyapi` provides an `Extension` interface that can be applied to any API with `api.ApplyExtension()`. Implementations of this interface create custom configurations and modifications that can be applied to multiple APIs. A few extensions are provided by the `babyapi/extensions` package:
 
-  - `HATEOAS`: "Hypertext as the engine of application state" is the [3rd and final level of REST API maturity](https://en.wikipedia.org/wiki/Richardson_Maturity_Model#Level_3:_Hypermedia_controls), making your API fully RESTful
-  - `KVStorage`: provide a few simple configurations to use the `babyapi/storage` package's KV storage client with a local file or Redis
-  - `HTMX`: HTMX expects 200 responses from DELETE requests, so this changes the response code
-
+- `HATEOAS`: "Hypertext as the engine of application state" is the [3rd and final level of REST API maturity](https://en.wikipedia.org/wiki/Richardson_Maturity_Model#Level_3:_Hypermedia_controls), making your API fully RESTful
+- `KVStorage`: provide a few simple configurations to use the `babyapi/storage` package's KV storage client with a local file or Redis
+- `HTMX`: HTMX expects 200 responses from DELETE requests, so this changes the response code
 
 ## Examples
 
@@ -143,7 +148,6 @@ api.SetStorage(storage.NewClient[*TODO](db, "TODO"))
 | [Multiple APIs](./examples/multiple-apis/)      | This example shows how multiple top-level (or any level) sibling APIs can be served, and have CLI functionality, under one root API                                                                                             | <ul><li>Use `NewRootAPI` to create a root API</li><li>Add multiple children to create siblings</li>                                                                                                                                                                                                                                                                               |
 
 Also see a full example of an application implementing a REST API using `babyapi` in my [`automated-garden` project](https://github.com/calvinmclean/automated-garden/tree/main/garden-app).
-
 
 ## Contributing
 

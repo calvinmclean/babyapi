@@ -13,7 +13,7 @@ type User struct {
 }
 
 func main() {
-	api := babyapi.NewAPI[*User](
+	api := babyapi.NewAPI(
 		"Users", "/users",
 		func() *User { return &User{} },
 	)

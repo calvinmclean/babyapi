@@ -11,7 +11,7 @@ type TODO struct {
 }
 
 func main() {
-	api := babyapi.NewAPI[*TODO](
+	api := babyapi.NewAPI(
 		"TODOs", "/todos",
 		func() *TODO { return &TODO{} },
 	)
