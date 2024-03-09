@@ -124,7 +124,7 @@ func (at AllTODOs) HTML(*http.Request) string {
 }
 
 func createAPI() *babyapi.API[*TODO] {
-	api := babyapi.NewAPI[*TODO]("TODOs", "/todos", func() *TODO { return &TODO{} })
+	api := babyapi.NewAPI("TODOs", "/todos", func() *TODO { return &TODO{} })
 
 	// Use AllTODOs in the GetAll response since it implements HTMLer
 	api.SetGetAllResponseWrapper(func(todos []*TODO) render.Renderer {

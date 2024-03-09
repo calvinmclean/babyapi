@@ -53,7 +53,6 @@ func TestAPI(t *testing.T) {
 			ExpectedResponse: babytest.ExpectedResponse{
 				Status: http.StatusForbidden,
 				Body:   `{"status":"Forbidden"}`,
-				Error:  "unexpected response with text: Forbidden",
 			},
 		},
 		{
@@ -95,7 +94,6 @@ func TestAPI(t *testing.T) {
 			ExpectedResponse: babytest.ExpectedResponse{
 				Status: http.StatusForbidden,
 				Body:   `{"status":"Forbidden"}`,
-				Error:  "unexpected response with text: Forbidden",
 			},
 		},
 		{

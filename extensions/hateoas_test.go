@@ -127,8 +127,8 @@ func TestHATEOASResponseRenderAndMarshal(t *testing.T) {
 }
 
 func TestAPIWithExtension(t *testing.T) {
-	api := babyapi.NewAPI[*TestType]("Test", "/item", func() *TestType { return &TestType{} })
-	childAPI := babyapi.NewAPI[*TestType]("Child", "/child", func() *TestType { return &TestType{} })
+	api := babyapi.NewAPI("Test", "/item", func() *TestType { return &TestType{} })
+	childAPI := babyapi.NewAPI("Child", "/child", func() *TestType { return &TestType{} })
 
 	ext := HATEOAS[*TestType]{}
 	api.ApplyExtension(ext)

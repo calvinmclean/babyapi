@@ -16,7 +16,6 @@ import (
 
 	"github.com/calvinmclean/babyapi"
 	"github.com/calvinmclean/babyapi/extensions"
-	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 
 	_ "embed"
@@ -348,11 +347,11 @@ func main() {
 
 func createAPI() *API {
 	api := &API{
-		Events: babyapi.NewAPI[*Event](
+		Events: babyapi.NewAPI(
 			"Event", "/events",
 			func() *Event { return &Event{} },
 		),
-		Invites: babyapi.NewAPI[*Invite](
+		Invites: babyapi.NewAPI(
 			"Invite", "/invites",
 			func() *Invite { return &Invite{} },
 		),
@@ -360,35 +359,15 @@ func createAPI() *API {
 
 	api.Invites.ApplyExtension(extensions.HTMX[*Invite]{})
 
-	api.Invites.AddCustomRoute(chi.Route{
-		Pattern: "/bulk",
-		Handlers: map[string]http.Handler{
-			http.MethodPost: api.Events.GetRequestedResourceAndDo(api.addBulkInvites),
-		},
-	})
+	api.Invites.AddCustomRoute(http.MethodPost, "/bulk", api.Events.GetRequestedResourceAndDo(api.addBulkInvites))
 
-	api.Invites.AddCustomRoute(chi.Route{
-		Pattern: "/export",
-		Handlers: map[string]http.Handler{
-			http.MethodGet: babyapi.Handler(api.export),
-		},
-	})
+	api.Invites.AddCustomRoute(http.MethodGet, "/export", babyapi.Handler(api.export))
 
-	api.Invites.AddCustomIDRoute(chi.Route{
-		Pattern: "/rsvp",
-		Handlers: map[string]http.Handler{
-			http.MethodPut: api.Invites.GetRequestedResourceAndDo(api.rsvp),
-		},
-	})
+	api.Invites.AddCustomIDRoute(http.MethodPut, "/rsvp", api.Invites.GetRequestedResourceAndDo(api.rsvp))
 
-	api.Events.AddCustomRootRoute(chi.Route{
-		Pattern: "/",
-		Handlers: map[string]http.Handler{
-			http.MethodGet: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				http.Redirect(w, r, api.Events.Base(), http.StatusSeeOther)
-			}),
-		},
-	})
+	api.Events.AddCustomRootRoute(http.MethodGet, "/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, api.Events.Base(), http.StatusSeeOther)
+	}))
 
 	api.Events.AddNestedAPI(api.Invites)
 

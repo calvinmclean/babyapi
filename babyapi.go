@@ -250,35 +250,50 @@ func (a *API[T]) AnyClient(addr string) *Client[*AnyResource] {
 
 // AddCustomRootRoute appends a custom API route to the absolute root path ("/"). It does not work for APIs with
 // parents because it would conflict with the parent's route. Panics if the API is already a child when this is called
-func (a *API[T]) AddCustomRootRoute(route chi.Route) *API[T] {
+func (a *API[T]) AddCustomRootRoute(method, pattern string, handler http.Handler) *API[T] {
 	a.panicIfReadOnly()
 
 	if a.parent != nil {
 		a.errors = append(a.errors, fmt.Errorf("AddCustomRootRoute: cannot be applied to child APIs"))
 		return a
 	}
-	a.rootRoutes = append(a.rootRoutes, route)
+	a.rootRoutes = append(a.rootRoutes, chi.Route{
+		Pattern: pattern,
+		Handlers: map[string]http.Handler{
+			method: handler,
+		},
+	})
 	return a
 }
 
 // AddCustomRoute appends a custom API route to the base path: /base/custom-route
-func (a *API[T]) AddCustomRoute(route chi.Route) *API[T] {
+func (a *API[T]) AddCustomRoute(method, pattern string, handler http.Handler) *API[T] {
 	a.panicIfReadOnly()
 
-	a.customRoutes = append(a.customRoutes, route)
+	a.customRoutes = append(a.customRoutes, chi.Route{
+		Pattern: pattern,
+		Handlers: map[string]http.Handler{
+			method: handler,
+		},
+	})
 	return a
 }
 
 // AddCustomIDRoute appends a custom API route to the base path after the ID URL parameter: /base/{ID}/custom-route.
 // The handler for this route can access the requested resource using GetResourceFromContext
-func (a *API[T]) AddCustomIDRoute(route chi.Route) *API[T] {
+func (a *API[T]) AddCustomIDRoute(method, pattern string, handler http.Handler) *API[T] {
 	a.panicIfReadOnly()
 
 	if a.rootAPI {
 		a.errors = append(a.errors, fmt.Errorf("AddCustomIDRoute: ID routes cannot be used with a root API"))
 		return a
 	}
-	a.customIDRoutes = append(a.customIDRoutes, route)
+	a.customIDRoutes = append(a.customIDRoutes, chi.Route{
+		Pattern: pattern,
+		Handlers: map[string]http.Handler{
+			method: handler,
+		},
+	})
 	return a
 }
 

@@ -22,7 +22,7 @@ type GOAL struct {
 
 func main() {
 	babyapi.NewRootAPI("root", "/").
-		AddNestedAPI(babyapi.NewAPI[*TODO]("TODOs", "/todos", func() *TODO { return &TODO{} })).
-		AddNestedAPI(babyapi.NewAPI[*GOAL]("GOALs", "/goals", func() *GOAL { return &GOAL{} })).
+		AddNestedAPI(babyapi.NewAPI("TODOs", "/todos", func() *TODO { return &TODO{} })).
+		AddNestedAPI(babyapi.NewAPI("GOALs", "/goals", func() *GOAL { return &GOAL{} })).
 		RunCLI()
 }

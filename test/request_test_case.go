@@ -107,7 +107,7 @@ func (tt RequestFuncTest[T]) Run(t *testing.T, client *babyapi.Client[T], getRes
 
 	if r.Method == MethodGetAll {
 		r.Method = http.MethodGet
-		resp, err := babyapi.MakeRequest[*babyapi.ResourceList[T]](r, http.DefaultClient, http.StatusOK, func(r *http.Request) error {
+		resp, err := babyapi.MakeRequest[*babyapi.ResourceList[T]](r, http.DefaultClient, 0, func(r *http.Request) error {
 			return nil
 		})
 		return &Response[T]{GetAllResponse: resp}, err

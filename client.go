@@ -286,9 +286,6 @@ func (c *Client[T]) URL(id string, parentIDs ...string) (string, error) {
 // It returns a babyapi.Response which contains the http.Response after extracting the body to Body string and
 // JSON decoding the resource type into Data if the response is JSON
 func (c *Client[T]) MakeRequest(req *http.Request, expectedStatusCode int) (*Response[T], error) {
-	if expectedStatusCode == 0 {
-		expectedStatusCode = c.customResponseCodes[req.Method]
-	}
 	return MakeRequest[T](req, c.client, expectedStatusCode, c.requestEditor)
 }
 
@@ -319,7 +316,7 @@ func MakeRequest[T any](req *http.Request, client *http.Client, expectedStatusCo
 		result.Body = string(body)
 	}
 
-	if resp.StatusCode != expectedStatusCode {
+	if resp.StatusCode != expectedStatusCode && expectedStatusCode != 0 {
 		if result.Body == "" {
 			return nil, fmt.Errorf("unexpected status and no body: %d", resp.StatusCode)
 		}
