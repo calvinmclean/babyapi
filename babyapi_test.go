@@ -1380,6 +1380,27 @@ func TestAddRouteWorksWithMultipleMethodSamePath(t *testing.T) {
 	})
 }
 
+func TestWithContextShutdown(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	api := babyapi.NewAPI("Albums", "/albums", func() *Album { return &Album{} }).WithContext(ctx)
+
+	go func() {
+		err := api.Serve(":8080")
+		require.NoError(t, err)
+	}()
+
+	// Stop the API via context after 1s
+	time.AfterFunc(1*time.Second, cancel)
+
+	timeout := time.After(2 * time.Second)
+	select {
+	case <-api.Done():
+		require.True(t, true)
+	case <-timeout:
+		require.Fail(t, "API failed to stop after context is cancelled")
+	}
+}
+
 // func TestInvalidUseOfModifiersReturnsErrorAtStart(t *testing.T) {
 // 	api := babyapi.NewRootAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} })
 // 	api

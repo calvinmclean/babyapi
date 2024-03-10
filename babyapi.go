@@ -27,8 +27,9 @@ type API[T Resource] struct {
 	// Storage is the interface used by the API server to read/write resources
 	Storage[T]
 
-	server *http.Server
-	quit   chan struct{}
+	server  *http.Server
+	quit    chan struct{}
+	context context.Context
 
 	// instance is currently required for PUT because render.Bind() requires a non-nil input for T. Since
 	// I need to have pointer receivers on Bind and Render implementations, `new(T)` creates a nil instance
@@ -92,6 +93,7 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 		MapStorage[T]{},
 		nil,
 		make(chan struct{}, 1),
+		context.Background(),
 		instance,
 		nil,
 		nil,
@@ -329,7 +331,12 @@ func (a *API[T]) Serve(address string) error {
 	go func() {
 		defer wg.Done()
 
-		<-a.Done()
+		// Wait for shutdown signal from internal or from externally-controlled context
+		select {
+		case <-a.Done():
+		case <-a.context.Done():
+		}
+
 		close(a.quit)
 
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -388,6 +395,14 @@ func (a *API[T]) SetStorage(s Storage[T]) *API[T] {
 	a.panicIfReadOnly()
 
 	a.Storage = s
+	return a
+}
+
+// WithContext adds a context to the API so that it will automatically shutdown when the context is closed
+func (a *API[T]) WithContext(ctx context.Context) *API[T] {
+	a.panicIfReadOnly()
+
+	a.context = ctx
 	return a
 }
 
