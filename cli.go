@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"golang.org/x/exp/maps"
 )
@@ -42,6 +44,13 @@ func (a *API[T]) RunCLI() {
 	flag.Parse()
 
 	args := flag.Args()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-quit
+		a.Stop()
+	}()
 
 	err := a.RunWithArgs(os.Stdout, args, bindAddress, address, pretty, headers, query)
 	if err != nil {
