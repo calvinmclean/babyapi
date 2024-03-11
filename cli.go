@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"golang.org/x/exp/maps"
 )
@@ -27,6 +29,8 @@ func (ssf *stringSliceFlag) Set(value string) error {
 	return nil
 }
 
+// RunCLI is an alternative entrypoint to running the API beyond just Serve. It allows running a server or client based on the provided
+// CLI arguments. Use this in your main() function
 func (a *API[T]) RunCLI() {
 	var bindAddress string
 	var address string
@@ -43,12 +47,21 @@ func (a *API[T]) RunCLI() {
 
 	args := flag.Args()
 
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-quit
+		a.Stop()
+	}()
+
 	err := a.RunWithArgs(os.Stdout, args, bindAddress, address, pretty, headers, query)
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 	}
 }
 
+// RunWithArgs is an alternative to RunCLI that allows more control over the inputs. This is mostly useful for testing since any outcomes
+// could be better achieved by using appropriate methods for server or client in most normal situations
 func (a *API[T]) RunWithArgs(out io.Writer, args []string, bindAddress string, address string, pretty bool, headers []string, query string) error {
 	if len(args) < 1 {
 		return fmt.Errorf("at least one argument required")

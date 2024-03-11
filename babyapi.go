@@ -7,10 +7,7 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
-	"os"
-	"os/signal"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -30,8 +27,9 @@ type API[T Resource] struct {
 	// Storage is the interface used by the API server to read/write resources
 	Storage[T]
 
-	server *http.Server
-	quit   chan os.Signal
+	server  *http.Server
+	quit    chan struct{}
+	context context.Context
 
 	// instance is currently required for PUT because render.Bind() requires a non-nil input for T. Since
 	// I need to have pointer receivers on Bind and Render implementations, `new(T)` creates a nil instance
@@ -57,7 +55,6 @@ type API[T Resource] struct {
 	parent relatedAPI
 
 	responseCodes map[string]int
-	serverCtx     context.Context
 
 	// GetAll is the handler for /base and returns an array of resources
 	GetAll http.HandlerFunc
@@ -95,7 +92,8 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 		nil,
 		MapStorage[T]{},
 		nil,
-		make(chan os.Signal, 1),
+		make(chan struct{}, 1),
+		context.Background(),
 		instance,
 		nil,
 		nil,
@@ -109,7 +107,6 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 		func(*http.Request, T) *ErrResponse { return nil },
 		nil,
 		defaultResponseCodes(),
-		nil,
 		nil,
 		nil,
 		nil,
@@ -329,16 +326,20 @@ func (a *API[T]) Serve(address string) error {
 	}
 	a.server = &http.Server{Addr: address, Handler: router}
 
-	var serverStopCtx context.CancelFunc
-	a.serverCtx, serverStopCtx = context.WithCancel(context.Background())
-
-	signal.Notify(a.quit, os.Interrupt, syscall.SIGTERM)
-
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
-		<-a.quit
+		defer wg.Done()
+
+		// Wait for shutdown signal from internal or from externally-controlled context
+		select {
+		case <-a.Done():
+		case <-a.context.Done():
+		}
+
 		close(a.quit)
 
-		shutdownCtx, cancel := context.WithTimeout(a.serverCtx, 10*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
 		go func() {
@@ -352,7 +353,6 @@ func (a *API[T]) Serve(address string) error {
 		if err != nil {
 			log.Fatal(err)
 		}
-		serverStopCtx()
 	}()
 
 	slog.Info("starting server", "address", address, "api", a.name)
@@ -361,19 +361,18 @@ func (a *API[T]) Serve(address string) error {
 		return fmt.Errorf("error starting the server: %w", err)
 	}
 
-	<-a.serverCtx.Done()
+	wg.Wait()
 
 	return nil
 }
 
 // Stop will stop the API
 func (a *API[T]) Stop() {
-	a.quit <- os.Interrupt
-	<-a.serverCtx.Done()
+	a.quit <- struct{}{}
 }
 
 // Done returns a channel that's closed when the API stops, similar to context.Done()
-func (a *API[T]) Done() <-chan os.Signal {
+func (a *API[T]) Done() <-chan struct{} {
 	return a.quit
 }
 
@@ -396,6 +395,14 @@ func (a *API[T]) SetStorage(s Storage[T]) *API[T] {
 	a.panicIfReadOnly()
 
 	a.Storage = s
+	return a
+}
+
+// WithContext adds a context to the API so that it will automatically shutdown when the context is closed
+func (a *API[T]) WithContext(ctx context.Context) *API[T] {
+	a.panicIfReadOnly()
+
+	a.context = ctx
 	return a
 }
 
