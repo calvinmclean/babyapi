@@ -1249,7 +1249,6 @@ func TestRootAPICLI(t *testing.T) {
 
 	for _, base := range basePaths {
 		t.Run("BasePath"+base, func(t *testing.T) {
-
 			musicVideoAPI := babyapi.NewAPI("MusicVideos", "/music_videos", func() *MusicVideo { return &MusicVideo{} })
 			songAPI := babyapi.NewAPI("Songs", "/songs", func() *Song { return &Song{} })
 			rootAPI := babyapi.
@@ -1261,6 +1260,7 @@ func TestRootAPICLI(t *testing.T) {
 				err := rootAPI.RunWithArgs(os.Stdout, []string{"serve"}, "localhost:8080", "", false, nil, "")
 				require.NoError(t, err)
 			}()
+			defer rootAPI.Stop()
 
 			songAPI.SetGetAllFilter(func(r *http.Request) babyapi.FilterFunc[*Song] {
 				return func(s *Song) bool {
@@ -1324,8 +1324,6 @@ func TestRootAPICLI(t *testing.T) {
 					}
 				})
 			}
-
-			rootAPI.Stop()
 		})
 	}
 }

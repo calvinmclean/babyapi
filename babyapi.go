@@ -27,9 +27,14 @@ type API[T Resource] struct {
 	// Storage is the interface used by the API server to read/write resources
 	Storage[T]
 
-	server  *http.Server
-	quit    chan struct{}
+	// context is set by WithContext to allow external goroutines to control API shutdown
 	context context.Context
+
+	// quit is used for the Stop() method to send a shutdown signal to the server
+	quit chan struct{}
+
+	// shutdown is used so the Stop() method can block until the API is fully shutdown
+	shutdown chan struct{}
 
 	// instance is currently required for PUT because render.Bind() requires a non-nil input for T. Since
 	// I need to have pointer receivers on Bind and Render implementations, `new(T)` creates a nil instance
@@ -91,9 +96,9 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 		nil,
 		nil,
 		MapStorage[T]{},
-		nil,
-		make(chan struct{}, 1),
 		context.Background(),
+		make(chan struct{}, 1),
+		make(chan struct{}, 1),
 		instance,
 		nil,
 		nil,
@@ -324,7 +329,7 @@ func (a *API[T]) Serve(address string) error {
 	if err != nil {
 		return fmt.Errorf("error creating router: %w", err)
 	}
-	a.server = &http.Server{Addr: address, Handler: router}
+	server := &http.Server{Addr: address, Handler: router}
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -340,7 +345,10 @@ func (a *API[T]) Serve(address string) error {
 		close(a.quit)
 
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
+		defer func() {
+			cancel()
+			close(a.shutdown)
+		}()
 
 		go func() {
 			<-shutdownCtx.Done()
@@ -349,14 +357,14 @@ func (a *API[T]) Serve(address string) error {
 			}
 		}()
 
-		err := a.server.Shutdown(shutdownCtx)
+		err := server.Shutdown(shutdownCtx)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}()
 
 	slog.Info("starting server", "address", address, "api", a.name)
-	err = a.server.ListenAndServe()
+	err = server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("error starting the server: %w", err)
 	}
@@ -369,6 +377,7 @@ func (a *API[T]) Serve(address string) error {
 // Stop will stop the API
 func (a *API[T]) Stop() {
 	a.quit <- struct{}{}
+	<-a.shutdown
 }
 
 // Done returns a channel that's closed when the API stops, similar to context.Done()
