@@ -2,7 +2,6 @@ package babyapi
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,41 +11,61 @@ import (
 	"strings"
 	"syscall"
 
-	"golang.org/x/exp/maps"
+	"github.com/spf13/cobra"
 )
 
-// stringSliceFlag is a custom flag type to handle multiple occurrences of the same string flag
-type stringSliceFlag []string
-
-// String is the string representation of the flag's value
-func (ssf *stringSliceFlag) String() string {
-	return fmt.Sprintf("%v", *ssf)
-}
-
-// Set appends the value to the slice
-func (ssf *stringSliceFlag) Set(value string) error {
-	*ssf = append(*ssf, value)
-	return nil
-}
+var (
+	bindAddress string
+	address     string
+	pretty      bool
+	headers     []string
+	query       string
+)
 
 // RunCLI is an alternative entrypoint to running the API beyond just Serve. It allows running a server or client based on the provided
 // CLI arguments. Use this in your main() function
 func (a *API[T]) RunCLI() {
-	var bindAddress string
-	var address string
-	var pretty bool
-	var headers stringSliceFlag
-	var query string
-	flag.StringVar(&bindAddress, "bindAddress", "", "Address and port to bind to for example :8080 for port only, localhost:8080 or 172.0.0.1:8080")
-	flag.StringVar(&address, "address", "http://localhost:8080", "server address for client")
-	flag.BoolVar(&pretty, "pretty", true, "pretty print JSON if enabled")
-	flag.Var(&headers, "H", "add headers to request")
-	flag.StringVar(&query, "q", "", "add query parameters to request")
+	err := a.Command().Execute()
+	if err != nil {
+		fmt.Printf("error: %v\n", err)
+	}
+}
 
-	flag.Parse()
+func (a *API[T]) Command() *cobra.Command {
+	rootCmd := &cobra.Command{
+		Use:   a.name,
+		Short: "automatic CLI for babyapi server",
+		RunE:  a.serveCmd,
+	}
+	serveCmd := &cobra.Command{
+		Use:   "serve",
+		Short: "run the API server",
+		RunE:  a.serveCmd,
+	}
+	clientCmd := &cobra.Command{
+		Use:   "client",
+		Short: "HTTP client for interacting with API Resources",
+	}
 
-	args := flag.Args()
+	// TODO: Change to address since now flags are separate from client
+	serveCmd.Flags().StringVar(&bindAddress, "bindAddress", "", "Address and port to bind to for example :8080 for port only, localhost:8080 or 172.0.0.1:8080")
 
+	clientCmd.PersistentFlags().StringVar(&address, "address", "http://localhost:8080", "server address for client")
+	clientCmd.PersistentFlags().BoolVar(&pretty, "pretty", true, "pretty print JSON if enabled")
+	clientCmd.PersistentFlags().StringSliceVar(&headers, "headers", []string{}, "add headers to request")
+	clientCmd.PersistentFlags().StringVarP(&query, "query", "q", "", "add query parameters to request")
+
+	for name, client := range a.CreateClientMap(a.AnyClient(address)) {
+		clientCmd.AddCommand(client.Command(name))
+	}
+
+	rootCmd.AddCommand(serveCmd)
+	rootCmd.AddCommand(clientCmd)
+
+	return rootCmd
+}
+
+func (a *API[T]) serveCmd(_ *cobra.Command, _ []string) error {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	go func() {
@@ -54,45 +73,7 @@ func (a *API[T]) RunCLI() {
 		a.Stop()
 	}()
 
-	err := a.RunWithArgs(os.Stdout, args, bindAddress, address, pretty, headers, query)
-	if err != nil {
-		fmt.Printf("error: %v\n", err)
-	}
-}
-
-// RunWithArgs is an alternative to RunCLI that allows more control over the inputs. This is mostly useful for testing since any outcomes
-// could be better achieved by using appropriate methods for server or client in most normal situations
-func (a *API[T]) RunWithArgs(out io.Writer, args []string, bindAddress string, address string, pretty bool, headers []string, query string) error {
-	if len(args) < 1 {
-		return fmt.Errorf("at least one argument required")
-	}
-
-	if args[0] == "serve" {
-		return a.Serve(bindAddress)
-	}
-
-	return a.runClientCLI(out, args, address, pretty, headers, query)
-}
-
-func (a *API[T]) runClientCLI(out io.Writer, args []string, address string, pretty bool, headers []string, query string) error {
-	if len(args) < 2 {
-		return fmt.Errorf("at least two arguments required")
-	}
-
-	clientMap := a.CreateClientMap(a.AnyClient(address))
-
-	targetAPI := args[1]
-	client, ok := clientMap[targetAPI]
-	if !ok {
-		return fmt.Errorf("invalid API %q. valid options are: %v", targetAPI, maps.Keys[map[string]*Client[*AnyResource]](clientMap))
-	}
-
-	result, err := client.RunFromCLI(args, headers, query)
-	if err != nil {
-		return fmt.Errorf("error running client from CLI: %w", err)
-	}
-
-	return result.Fprint(out, pretty)
+	return a.Serve(bindAddress)
 }
 
 // CreateClientMap returns a map of API names to the corresponding Client for that child API. This makes it easy to use
@@ -130,10 +111,71 @@ type PrintableResponse interface {
 	Fprint(out io.Writer, pretty bool) error
 }
 
-// RunFromCLI executes the client with arguments from the CLI
-func (c *Client[T]) RunFromCLI(args []string, headers []string, query string) (PrintableResponse, error) {
+func (c *Client[T]) Command(name string) *cobra.Command {
+	clientCmd := &cobra.Command{
+		Use:   name,
+		Short: fmt.Sprintf("client for interacting with %s resources", name),
+	}
+
+	runE := func(cmd *cobra.Command, args []string) error {
+		c.Address = address
+
+		result, err := c.RunFromCLI(append([]string{cmd.Name()}, args...), headers, query)
+		if err != nil {
+			return fmt.Errorf("error running client from CLI: %w", err)
+		}
+
+		return result.Fprint(cmd.OutOrStdout(), pretty)
+	}
+
+	getCmd := &cobra.Command{
+		Use:   "get",
+		Short: "make a GET request to get a resource by ID",
+		RunE:  runE,
+	}
+	listCmd := &cobra.Command{
+		Use:   "list",
+		Short: "make a GET request to list resources",
+		RunE:  runE,
+	}
+	deleteCmd := &cobra.Command{
+		Use:   "delete",
+		Short: "make a DELETE request to delete a resource by ID",
+		RunE:  runE,
+	}
+	postCmd := &cobra.Command{
+		Use:   "post",
+		Short: "make a POST request to create a new resource",
+		RunE:  runE,
+	}
+	putCmd := &cobra.Command{
+		Use:   "put",
+		Short: "make a PUT request to create or modify a resource by ID",
+		RunE:  runE,
+	}
+	patchCmd := &cobra.Command{
+		Use:   "patch",
+		Short: "make a PATCH request to modify a resource by ID",
+		RunE:  runE,
+	}
+
+	clientCmd.AddCommand(getCmd)
+	clientCmd.AddCommand(listCmd)
+	clientCmd.AddCommand(deleteCmd)
+	clientCmd.AddCommand(postCmd)
+	clientCmd.AddCommand(putCmd)
+	clientCmd.AddCommand(patchCmd)
+
+	return clientCmd
+}
+
+func (c *Client[T]) RunFromCLI(args, requestHeaders []string, rawQuery string) (PrintableResponse, error) {
+	if len(args) < 1 {
+		return nil, fmt.Errorf("at least one argument required")
+	}
+
 	reqEditor := func(r *http.Request) error {
-		for _, header := range headers {
+		for _, header := range requestHeaders {
 			headerSplit := strings.SplitN(header, ":", 2)
 			if len(headerSplit) != 2 {
 				return fmt.Errorf("invalid header provided: %q", header)
@@ -144,7 +186,7 @@ func (c *Client[T]) RunFromCLI(args []string, headers []string, query string) (P
 			r.Header.Add(header, val)
 		}
 
-		params, err := url.ParseQuery(query)
+		params, err := url.ParseQuery(rawQuery)
 		if err != nil {
 			return fmt.Errorf("error parsing query string: %w", err)
 		}
@@ -158,17 +200,17 @@ func (c *Client[T]) RunFromCLI(args []string, headers []string, query string) (P
 
 	switch args[0] {
 	case "get":
-		return c.runGetCommand(args[2:])
+		return c.runGetCommand(args[1:])
 	case "list":
-		return c.runListCommand(args[2:])
+		return c.runListCommand(args[1:])
 	case "post":
-		return c.runPostCommand(args[2:])
+		return c.runPostCommand(args[1:])
 	case "put":
-		return c.runPutCommand(args[2:])
+		return c.runPutCommand(args[1:])
 	case "patch":
-		return c.runPatchCommand(args[2:])
+		return c.runPatchCommand(args[1:])
 	case "delete":
-		return c.runDeleteCommand(args[2:])
+		return c.runDeleteCommand(args[1:])
 	default:
 		return nil, fmt.Errorf("missing http verb argument")
 	}

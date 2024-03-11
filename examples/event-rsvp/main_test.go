@@ -322,7 +322,7 @@ func TestCLI(t *testing.T) {
 		{
 			Name: "ErrorCreatingEventWithoutPassword",
 			Test: babytest.CommandLineTest[*babyapi.AnyResource]{
-				Args: []string{"post", "Event", `{"Name": "Party"}`},
+				Args: []string{"post", `{"Name": "Party"}`},
 			},
 			ExpectedResponse: babytest.ExpectedResponse{
 				Status: http.StatusBadRequest,
@@ -333,7 +333,7 @@ func TestCLI(t *testing.T) {
 		{
 			Name: "CreateEvent",
 			Test: babytest.CommandLineTest[*babyapi.AnyResource]{
-				Args: []string{"post", "Event", `{"Name": "Party", "Password": "secret"}`},
+				Args: []string{"post", `{"Name": "Party", "Password": "secret"}`},
 			},
 			ExpectedResponse: babytest.ExpectedResponse{
 				Status:     http.StatusCreated,
@@ -344,7 +344,7 @@ func TestCLI(t *testing.T) {
 			Name: "GetEventForbidden",
 			Test: babytest.CommandLineTest[*babyapi.AnyResource]{
 				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
-					return []string{"get", "Event", getResponse("CreateEvent").Data.GetID()}
+					return []string{"get", getResponse("CreateEvent").Data.GetID()}
 				},
 			},
 			ExpectedResponse: babytest.ExpectedResponse{
@@ -357,7 +357,7 @@ func TestCLI(t *testing.T) {
 			Name: "GetEvent",
 			Test: babytest.CommandLineTest[*babyapi.AnyResource]{
 				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
-					return []string{"get", "Event", getResponse("CreateEvent").Data.GetID()}
+					return []string{"get", getResponse("CreateEvent").Data.GetID()}
 				},
 				RawQuery: "password=secret",
 			},
@@ -370,7 +370,7 @@ func TestCLI(t *testing.T) {
 			Name: "GetEventWithInvalidInvite",
 			Test: babytest.CommandLineTest[*babyapi.AnyResource]{
 				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
-					return []string{"get", "Event", getResponse("CreateEvent").Data.GetID()}
+					return []string{"get", getResponse("CreateEvent").Data.GetID()}
 				},
 				RawQuery: "invite=DoesNotExist",
 			},
@@ -386,7 +386,7 @@ func TestCLI(t *testing.T) {
 				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
 					eventID := getResponse("CreateEvent").Data.GetID()
 					return []string{
-						"put", "Event",
+						"put",
 						eventID, fmt.Sprintf(`{"id": "%s", "name": "New Name"}`, eventID),
 					}
 				},
@@ -404,7 +404,7 @@ func TestCLI(t *testing.T) {
 				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
 					eventID := getResponse("CreateEvent").Data.GetID()
 					return []string{
-						"post", "Invite",
+						"post",
 						`{"Name": "Name"}`, eventID,
 					}
 				},
@@ -423,7 +423,7 @@ func TestCLI(t *testing.T) {
 				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
 					eventID := getResponse("CreateEvent").Data.GetID()
 					return []string{
-						"post", "Invite",
+						"post",
 						`{"Name": "Firstname Lastname"}`, eventID,
 					}
 				},
@@ -441,7 +441,7 @@ func TestCLI(t *testing.T) {
 				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
 					eventID := getResponse("CreateEvent").Data.GetID()
 					return []string{
-						"get", "Invite",
+						"get",
 						getResponse("CreateInvite").Data.GetID(), eventID,
 					}
 				},
@@ -459,7 +459,7 @@ func TestCLI(t *testing.T) {
 				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
 					eventID := getResponse("CreateEvent").Data.GetID()
 					return []string{
-						"list", "Invite", eventID,
+						"list", eventID,
 					}
 				},
 			},
@@ -475,7 +475,7 @@ func TestCLI(t *testing.T) {
 				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
 					eventID := getResponse("CreateEvent").Data.GetID()
 					return []string{
-						"get", "Invite",
+						"get",
 						getResponse("CreateInvite").Data.GetID(), eventID,
 					}
 				},
@@ -495,7 +495,7 @@ func TestCLI(t *testing.T) {
 				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
 					eventID := getResponse("CreateEvent").Data.GetID()
 					return []string{
-						"delete", "Invite",
+						"delete",
 						getResponse("CreateInvite").Data.GetID(), eventID,
 					}
 				},
@@ -512,7 +512,7 @@ func TestCLI(t *testing.T) {
 				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
 					eventID := getResponse("CreateEvent").Data.GetID()
 					return []string{
-						"patch", "Event",
+						"patch",
 						eventID, `{"Name": "NEW"}`,
 					}
 				},
