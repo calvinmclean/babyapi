@@ -61,6 +61,9 @@ type Client[T Resource] struct {
 
 // NewClient initializes a Client for interacting with the Resource API
 func NewClient[T Resource](addr, base string) *Client[T] {
+	if !strings.HasPrefix(addr, "http") {
+		addr = fmt.Sprintf("http://%s", addr)
+	}
 	return &Client[T]{
 		addr,
 		strings.TrimLeft(base, "/"),

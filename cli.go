@@ -48,6 +48,10 @@ func (a *API[T]) Command() *cobra.Command {
 			if address == "" {
 				address = "http://localhost:8080"
 			}
+
+			if !strings.HasPrefix(address, "http") {
+				address = fmt.Sprintf("http://%s", address)
+			}
 		},
 	}
 
