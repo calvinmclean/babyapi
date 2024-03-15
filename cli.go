@@ -14,12 +14,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	address string
-	pretty  bool
-	headers []string
-	query   string
-)
+func init() {
+	cobra.EnableCaseInsensitive = true
+}
 
 // RunCLI is an alternative entrypoint to running the API beyond just Serve. It allows running a server or client based on the provided
 // CLI arguments. Use this in your main() function
@@ -28,6 +25,13 @@ func (a *API[T]) RunCLI() {
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 	}
+}
+
+type cliArgs struct {
+	address string
+	pretty  bool
+	headers []string
+	query   string
 }
 
 func (a *API[T]) Command() *cobra.Command {
@@ -45,24 +49,20 @@ func (a *API[T]) Command() *cobra.Command {
 		Use:   "client",
 		Short: "HTTP client for interacting with API Resources",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			if address == "" {
-				address = "http://localhost:8080"
-			}
-
-			if !strings.HasPrefix(address, "http") {
-				address = fmt.Sprintf("http://%s", address)
+			if a.cliArgs.address == "" {
+				a.cliArgs.address = "http://localhost:8080"
 			}
 		},
 	}
 
-	rootCmd.PersistentFlags().StringVar(&address, "address", "", "bind address for server or target host address for client")
+	rootCmd.PersistentFlags().StringVar(&a.cliArgs.address, "address", "", "bind address for server or target host address for client")
 
-	clientCmd.PersistentFlags().BoolVar(&pretty, "pretty", true, "pretty print JSON if enabled")
-	clientCmd.PersistentFlags().StringSliceVar(&headers, "headers", []string{}, "add headers to request")
-	clientCmd.PersistentFlags().StringVarP(&query, "query", "q", "", "add query parameters to request")
+	clientCmd.PersistentFlags().BoolVar(&a.cliArgs.pretty, "pretty", true, "pretty print JSON if enabled")
+	clientCmd.PersistentFlags().StringSliceVar(&a.cliArgs.headers, "headers", []string{}, "add headers to request")
+	clientCmd.PersistentFlags().StringVarP(&a.cliArgs.query, "query", "q", "", "add query parameters to request")
 
-	for name, client := range a.CreateClientMap(a.AnyClient(address)) {
-		clientCmd.AddCommand(client.Command(name))
+	for name, client := range a.CreateClientMap(a.AnyClient(a.cliArgs.address)) {
+		clientCmd.AddCommand(client.Command(name, &a.cliArgs))
 	}
 
 	rootCmd.AddCommand(serveCmd)
@@ -79,7 +79,7 @@ func (a *API[T]) serveCmd(_ *cobra.Command, _ []string) error {
 		a.Stop()
 	}()
 
-	return a.Serve(address)
+	return a.Serve(a.cliArgs.address)
 }
 
 // CreateClientMap returns a map of API names to the corresponding Client for that child API. This makes it easy to use
@@ -117,21 +117,21 @@ type PrintableResponse interface {
 	Fprint(out io.Writer, pretty bool) error
 }
 
-func (c *Client[T]) Command(name string) *cobra.Command {
+func (c *Client[T]) Command(name string, input *cliArgs) *cobra.Command {
 	clientCmd := &cobra.Command{
 		Use:   name,
 		Short: fmt.Sprintf("client for interacting with %s resources", name),
 	}
 
 	runE := func(cmd *cobra.Command, args []string) error {
-		c.Address = address
+		c.Address = input.address
 
-		result, err := c.RunFromCLI(append([]string{cmd.Name()}, args...), headers, query)
+		result, err := c.RunFromCLI(append([]string{cmd.Name()}, args...), input.headers, input.query)
 		if err != nil {
 			return fmt.Errorf("error running client from CLI: %w", err)
 		}
 
-		return result.Fprint(cmd.OutOrStdout(), pretty)
+		return result.Fprint(cmd.OutOrStdout(), input.pretty)
 	}
 
 	getCmd := &cobra.Command{

@@ -84,6 +84,8 @@ type API[T Resource] struct {
 	readOnly sync.Mutex
 
 	errors []error
+
+	cliArgs cliArgs
 }
 
 // NewAPI initializes an API using the provided name, base URL path, and function to create a new instance of
@@ -121,6 +123,7 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 		false,
 		sync.Mutex{},
 		nil,
+		cliArgs{},
 	}
 
 	api.GetAll = api.defaultGetAll()
