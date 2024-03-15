@@ -15,11 +15,10 @@ import (
 )
 
 var (
-	bindAddress string
-	address     string
-	pretty      bool
-	headers     []string
-	query       string
+	address string
+	pretty  bool
+	headers []string
+	query   string
 )
 
 // RunCLI is an alternative entrypoint to running the API beyond just Serve. It allows running a server or client based on the provided
@@ -45,12 +44,15 @@ func (a *API[T]) Command() *cobra.Command {
 	clientCmd := &cobra.Command{
 		Use:   "client",
 		Short: "HTTP client for interacting with API Resources",
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			if address == "" {
+				address = "http://localhost:8080"
+			}
+		},
 	}
 
-	// TODO: Change to address since now flags are separate from client
-	serveCmd.Flags().StringVar(&bindAddress, "bindAddress", "", "Address and port to bind to for example :8080 for port only, localhost:8080 or 172.0.0.1:8080")
+	rootCmd.PersistentFlags().StringVar(&address, "address", "", "bind address for server or target host address for client")
 
-	clientCmd.PersistentFlags().StringVar(&address, "address", "http://localhost:8080", "server address for client")
 	clientCmd.PersistentFlags().BoolVar(&pretty, "pretty", true, "pretty print JSON if enabled")
 	clientCmd.PersistentFlags().StringSliceVar(&headers, "headers", []string{}, "add headers to request")
 	clientCmd.PersistentFlags().StringVarP(&query, "query", "q", "", "add query parameters to request")
@@ -73,7 +75,7 @@ func (a *API[T]) serveCmd(_ *cobra.Command, _ []string) error {
 		a.Stop()
 	}()
 
-	return a.Serve(bindAddress)
+	return a.Serve(address)
 }
 
 // CreateClientMap returns a map of API names to the corresponding Client for that child API. This makes it easy to use

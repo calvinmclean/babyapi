@@ -541,7 +541,7 @@ func TestCLI(t *testing.T) {
 	})
 
 	go func() {
-		_, err := runCommand(api.Command(), []string{"serve", "--bindAddress", "localhost:8080"})
+		_, err := runCommand(api.Command(), []string{"serve", "--address", "localhost:8080"})
 		require.NoError(t, err)
 	}()
 
@@ -1048,7 +1048,7 @@ func TestRootAPIAsChildOfResourceAPI(t *testing.T) {
 	artistAPI.AddNestedAPI(rootAPI)
 
 	go func() {
-		_, err := runCommand(artistAPI.Command(), []string{"serve", "--bindAddress", "localhost:8080"})
+		_, err := runCommand(artistAPI.Command(), []string{"serve", "--address", "localhost:8080"})
 		require.NoError(t, err)
 	}()
 
@@ -1222,7 +1222,7 @@ func TestRootAPICLI(t *testing.T) {
 				AddNestedAPI(songAPI)
 
 			go func() {
-				_, err := runCommand(rootAPI.Command(), []string{"serve", "--bindAddress", "localhost:8080"})
+				_, err := runCommand(rootAPI.Command(), []string{"serve", "--address", "localhost:8080"})
 				require.NoError(t, err)
 			}()
 			defer rootAPI.Stop()
