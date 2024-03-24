@@ -13,6 +13,8 @@ type CommandLineTest[T babyapi.Resource] struct {
 	Headers      []string
 	RawQuery     string
 	RawQueryFunc func(getResponse PreviousResponseGetter) string
+	Body         string
+	BodyFunc     func(getResponse PreviousResponseGetter) string
 }
 
 var _ Test[*babyapi.AnyResource] = CommandLineTest[*babyapi.AnyResource]{}
@@ -28,7 +30,12 @@ func (tt CommandLineTest[T]) Run(t *testing.T, client *babyapi.Client[T], getRes
 		rawQuery = tt.RawQueryFunc(getResponse)
 	}
 
-	out, err := client.RunFromCLI(args, tt.Headers, rawQuery)
+	body := tt.Body
+	if tt.BodyFunc != nil {
+		body = tt.BodyFunc(getResponse)
+	}
+
+	out, err := client.RunFromCLI(args, tt.Headers, rawQuery, body)
 
 	switch v := out.(type) {
 	case *babyapi.Response[T]:

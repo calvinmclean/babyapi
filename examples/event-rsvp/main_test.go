@@ -322,7 +322,8 @@ func TestCLI(t *testing.T) {
 		{
 			Name: "ErrorCreatingEventWithoutPassword",
 			Test: babytest.CommandLineTest[*babyapi.AnyResource]{
-				Args: []string{"post", `{"Name": "Party"}`},
+				Body: `{"Name": "Party"}`,
+				Args: []string{"post"},
 			},
 			ExpectedResponse: babytest.ExpectedResponse{
 				Status: http.StatusBadRequest,
@@ -333,7 +334,8 @@ func TestCLI(t *testing.T) {
 		{
 			Name: "CreateEvent",
 			Test: babytest.CommandLineTest[*babyapi.AnyResource]{
-				Args: []string{"post", `{"Name": "Party", "Password": "secret"}`},
+				Body: `{"Name": "Party", "Password": "secret"}`,
+				Args: []string{"post"},
 			},
 			ExpectedResponse: babytest.ExpectedResponse{
 				Status:     http.StatusCreated,
@@ -384,12 +386,12 @@ func TestCLI(t *testing.T) {
 			Name: "PUTNotAllowed",
 			Test: babytest.CommandLineTest[*babyapi.AnyResource]{
 				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
-					eventID := getResponse("CreateEvent").Data.GetID()
-					return []string{
-						"put",
-						eventID, fmt.Sprintf(`{"id": "%s", "name": "New Name"}`, eventID),
-					}
+					return []string{"put", getResponse("CreateEvent").Data.GetID()}
 				},
+				BodyFunc: func(getResponse babytest.PreviousResponseGetter) string {
+					return fmt.Sprintf(`{"id": "%s", "name": "New Name"}`, getResponse("CreateEvent").Data.GetID())
+				},
+
 				RawQuery: "password=secret",
 			},
 			ExpectedResponse: babytest.ExpectedResponse{
@@ -401,12 +403,10 @@ func TestCLI(t *testing.T) {
 		{
 			Name: "CannotCreateInviteWithoutEventPassword",
 			Test: babytest.CommandLineTest[*babyapi.AnyResource]{
+				Body: `{"Name": "Name"}`,
 				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
 					eventID := getResponse("CreateEvent").Data.GetID()
-					return []string{
-						"post",
-						`{"Name": "Name"}`, eventID,
-					}
+					return []string{"post", eventID}
 				},
 			},
 			ClientName: "Invite",
@@ -420,12 +420,10 @@ func TestCLI(t *testing.T) {
 			Name: "CreateInvite",
 			Test: babytest.CommandLineTest[*babyapi.AnyResource]{
 				RawQuery: "password=secret",
+				Body:     `{"Name": "Firstname Lastname"}`,
 				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
 					eventID := getResponse("CreateEvent").Data.GetID()
-					return []string{
-						"post",
-						`{"Name": "Firstname Lastname"}`, eventID,
-					}
+					return []string{"post", eventID}
 				},
 			},
 			ClientName: "Invite",
@@ -509,12 +507,10 @@ func TestCLI(t *testing.T) {
 		{
 			Name: "PatchErrorNotConfigured",
 			Test: babytest.CommandLineTest[*babyapi.AnyResource]{
+				Body: `{"Name": "NEW"}`,
 				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
 					eventID := getResponse("CreateEvent").Data.GetID()
-					return []string{
-						"patch",
-						eventID, `{"Name": "NEW"}`,
-					}
+					return []string{"patch", eventID}
 				},
 				RawQuery: "password=secret",
 			},

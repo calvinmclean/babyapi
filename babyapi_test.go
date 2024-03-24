@@ -409,43 +409,43 @@ func TestCLI(t *testing.T) {
 		},
 		{
 			"Post",
-			[]string{"Albums", "post", `{"title": "OtherNewAlbum"}`},
+			[]string{"Albums", "post", "-d", `{"title": "OtherNewAlbum"}`},
 			`\{"id":"[0-9a-v]{20}","title":"OtherNewAlbum"\}`,
 			false,
 		},
 		{
 			"PostIncorrectParentArgs",
-			[]string{"Albums", "post", `{"title": "OtherNewAlbum"}`, "ExtraID"},
+			[]string{"Albums", "post", "-d", `{"title": "OtherNewAlbum"}`, "ExtraID"},
 			"error running client from CLI: error running Post: error creating request: error creating target URL: expected 0 parentIDs",
 			true,
 		},
 		{
 			"PostMissingArgs",
 			[]string{"Albums", "post"},
-			"error running client from CLI: at least one argument required",
+			`required flag\(s\) "data" not set`,
 			true,
 		},
 		{
 			"PostError",
-			[]string{"Albums", "post", `bad request`},
+			[]string{"Albums", "post", "-d", `bad request`},
 			"error running client from CLI: error running Post: error posting resource: unexpected response with text: Invalid request.",
 			true,
 		},
 		{
 			"Patch",
-			[]string{"Albums", "patch", "cljcqg5o402e9s28rbp0", `{"title":"NewTitle"}`},
+			[]string{"Albums", "patch", "cljcqg5o402e9s28rbp0", "-d", `{"title":"NewTitle"}`},
 			`\{"id":"cljcqg5o402e9s28rbp0","title":"NewTitle"\}`,
 			false,
 		},
 		{
 			"Put",
-			[]string{"Albums", "put", "cljcqg5o402e9s28rbp0", `{"id":"cljcqg5o402e9s28rbp0","title":"NewAlbum"}`},
+			[]string{"Albums", "put", "cljcqg5o402e9s28rbp0", "-d", `{"id":"cljcqg5o402e9s28rbp0","title":"NewAlbum"}`},
 			`\{"id":"cljcqg5o402e9s28rbp0","title":"NewAlbum"\}`,
 			false,
 		},
 		{
 			"PutError",
-			[]string{"Albums", "put", "cljcqg5o402e9s28rbp0", `{"title":"NewAlbum"}`},
+			[]string{"Albums", "put", "cljcqg5o402e9s28rbp0", "-d", `{"title":"NewAlbum"}`},
 			"error running client from CLI: error running Put: error putting resource: unexpected response with text: Invalid request.",
 			true,
 		},
@@ -481,7 +481,7 @@ func TestCLI(t *testing.T) {
 		},
 		{
 			"PostSong",
-			[]string{"Songs", "post", `{"title": "new song"}`, "cljcqg5o402e9s28rbp0"},
+			[]string{"Songs", "post", "-d", `{"title": "new song"}`, "cljcqg5o402e9s28rbp0"},
 			`\{"id":"[0-9a-v]{20}","title":"new song"\}`,
 			false,
 		},
@@ -511,20 +511,20 @@ func TestCLI(t *testing.T) {
 		},
 		{
 			"PatchNotFound",
-			[]string{"Albums", "patch", "cljcqg5o402e9s28rbp0", ""},
+			[]string{"Albums", "patch", "cljcqg5o402e9s28rbp0", "-d", ""},
 			"error running client from CLI: error running Patch: error patching resource: unexpected response with text: Resource not found.",
 			true,
 		},
 		{
 			"PatchMissingArgs",
 			[]string{"Albums", "patch"},
-			"error running client from CLI: at least two arguments required",
+			`required flag\(s\) "data" not set`,
 			true,
 		},
 		{
 			"PutMissingArgs",
 			[]string{"Albums", "put"},
-			"error running client from CLI: at least two arguments required",
+			`required flag\(s\) "data" not set`,
 			true,
 		},
 	}
@@ -1070,7 +1070,7 @@ func TestRootAPIAsChildOfResourceAPI(t *testing.T) {
 	})
 
 	t.Run("CreateSong", func(t *testing.T) {
-		out, err := runCommand(artistAPI.Command(), []string{"client", "--pretty=false", "--address", address, "Songs", "post", `{"title": "new song"}`, artist1.GetID()})
+		out, err := runCommand(artistAPI.Command(), []string{"client", "--pretty=false", "--address", address, "Songs", "post", "-d", `{"title": "new song"}`, artist1.GetID()})
 		require.NoError(t, err)
 		require.Regexp(t, `\{"id":"[0-9a-v]{20}","title":"new song"\}`, strings.TrimSpace(out))
 	})
@@ -1093,43 +1093,43 @@ func TestRootAPICLI(t *testing.T) {
 		},
 		{
 			"Post",
-			[]string{"MusicVideos", "post", `{"title": "OtherNewMusicVideo"}`},
+			[]string{"MusicVideos", "post", "--data", `{"title": "OtherNewMusicVideo"}`},
 			`\{"id":"[0-9a-v]{20}","title":"OtherNewMusicVideo"\}`,
 			false,
 		},
 		{
 			"PostIncorrectParentArgs",
-			[]string{"MusicVideos", "post", `{"title": "OtherNewMusicVideo"}`, "ExtraID"},
+			[]string{"MusicVideos", "post", "--data", `{"title": "OtherNewMusicVideo"}`, "ExtraID"},
 			"error running client from CLI: error running Post: error creating request: error creating target URL: expected 0 parentIDs",
 			true,
 		},
 		{
 			"PostMissingArgs",
 			[]string{"MusicVideos", "post"},
-			"error running client from CLI: at least one argument required",
+			`required flag\(s\) "data" not set`,
 			true,
 		},
 		{
 			"PostError",
-			[]string{"MusicVideos", "post", `bad request`},
+			[]string{"MusicVideos", "post", "--data", `bad request`},
 			"error running client from CLI: error running Post: error posting resource: unexpected response with text: Invalid request.",
 			true,
 		},
 		{
 			"Patch",
-			[]string{"MusicVideos", "patch", "cljcqg5o402e9s28rbp0", `{"title":"NewTitle"}`},
+			[]string{"MusicVideos", "patch", "cljcqg5o402e9s28rbp0", "--data", `{"title":"NewTitle"}`},
 			`\{"id":"cljcqg5o402e9s28rbp0","title":"NewTitle"\}`,
 			false,
 		},
 		{
 			"Put",
-			[]string{"MusicVideos", "put", "cljcqg5o402e9s28rbp0", `{"id":"cljcqg5o402e9s28rbp0","title":"NewMusicVideo"}`},
+			[]string{"MusicVideos", "put", "cljcqg5o402e9s28rbp0", "--data", `{"id":"cljcqg5o402e9s28rbp0","title":"NewMusicVideo"}`},
 			`\{"id":"cljcqg5o402e9s28rbp0","title":"NewMusicVideo"\}`,
 			false,
 		},
 		{
 			"PutError",
-			[]string{"MusicVideos", "put", "cljcqg5o402e9s28rbp0", `{"title":"NewMusicVideo"}`},
+			[]string{"MusicVideos", "put", "cljcqg5o402e9s28rbp0", "--data", `{"title":"NewMusicVideo"}`},
 			"error running client from CLI: error running Put: error putting resource: unexpected response with text: Invalid request.",
 			true,
 		},
@@ -1159,7 +1159,7 @@ func TestRootAPICLI(t *testing.T) {
 		},
 		{
 			"PostSong",
-			[]string{"Songs", "post", `{"title": "new song"}`},
+			[]string{"Songs", "post", "--data", `{"title": "new song"}`},
 			`\{"id":"[0-9a-v]{20}","title":"new song"\}`,
 			false,
 		},
@@ -1189,20 +1189,20 @@ func TestRootAPICLI(t *testing.T) {
 		},
 		{
 			"PatchNotFound",
-			[]string{"MusicVideos", "patch", "cljcqg5o402e9s28rbp0", ""},
+			[]string{"MusicVideos", "patch", "cljcqg5o402e9s28rbp0", "--data", ""},
 			"error running client from CLI: error running Patch: error patching resource: unexpected response with text: Resource not found.",
 			true,
 		},
 		{
 			"PatchMissingArgs",
 			[]string{"MusicVideos", "patch"},
-			"error running client from CLI: at least two arguments required",
+			`required flag\(s\) "data" not set`,
 			true,
 		},
 		{
 			"PutMissingArgs",
 			[]string{"MusicVideos", "put"},
-			"error running client from CLI: at least two arguments required",
+			`required flag\(s\) "data" not set`,
 			true,
 		},
 	}

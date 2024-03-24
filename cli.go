@@ -32,6 +32,7 @@ type cliArgs struct {
 	pretty  bool
 	headers []string
 	query   string
+	body    string
 }
 
 func (a *API[T]) Command() *cobra.Command {
@@ -126,7 +127,7 @@ func (c *Client[T]) Command(name string, input *cliArgs) *cobra.Command {
 	runE := func(cmd *cobra.Command, args []string) error {
 		c.Address = input.address
 
-		result, err := c.RunFromCLI(append([]string{cmd.Name()}, args...), input.headers, input.query)
+		result, err := c.RunFromCLI(append([]string{cmd.Name()}, args...), input.headers, input.query, input.body)
 		if err != nil {
 			return fmt.Errorf("error running client from CLI: %w", err)
 		}
@@ -165,6 +166,14 @@ func (c *Client[T]) Command(name string, input *cliArgs) *cobra.Command {
 		RunE:  runE,
 	}
 
+	postCmd.Flags().StringVarP(&input.body, "data", "d", "", "data for request body")
+	putCmd.Flags().StringVarP(&input.body, "data", "d", "", "data for request body")
+	patchCmd.Flags().StringVarP(&input.body, "data", "d", "", "data for request body")
+
+	_ = postCmd.MarkFlagRequired("data")
+	_ = putCmd.MarkFlagRequired("data")
+	_ = patchCmd.MarkFlagRequired("data")
+
 	clientCmd.AddCommand(getCmd)
 	clientCmd.AddCommand(listCmd)
 	clientCmd.AddCommand(deleteCmd)
@@ -175,7 +184,7 @@ func (c *Client[T]) Command(name string, input *cliArgs) *cobra.Command {
 	return clientCmd
 }
 
-func (c *Client[T]) RunFromCLI(args, requestHeaders []string, rawQuery string) (PrintableResponse, error) {
+func (c *Client[T]) RunFromCLI(args, requestHeaders []string, rawQuery, body string) (PrintableResponse, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("at least one argument required")
 	}
@@ -210,11 +219,11 @@ func (c *Client[T]) RunFromCLI(args, requestHeaders []string, rawQuery string) (
 	case "list":
 		return c.runListCommand(args[1:])
 	case "post":
-		return c.runPostCommand(args[1:])
+		return c.runPostCommand(args[1:], body)
 	case "put":
-		return c.runPutCommand(args[1:])
+		return c.runPutCommand(args[1:], body)
 	case "patch":
-		return c.runPatchCommand(args[1:])
+		return c.runPatchCommand(args[1:], body)
 	case "delete":
 		return c.runDeleteCommand(args[1:])
 	default:
@@ -256,11 +265,8 @@ func (c *Client[T]) runListCommand(args []string) (PrintableResponse, error) {
 	return items, nil
 }
 
-func (c *Client[T]) runPostCommand(args []string) (PrintableResponse, error) {
-	if len(args) < 1 {
-		return nil, fmt.Errorf("at least one argument required")
-	}
-	result, err := c.PostRaw(context.Background(), args[0], args[1:]...)
+func (c *Client[T]) runPostCommand(args []string, body string) (PrintableResponse, error) {
+	result, err := c.PostRaw(context.Background(), body, args...)
 	if err != nil {
 		return nil, fmt.Errorf("error running Post: %w", err)
 	}
@@ -268,11 +274,11 @@ func (c *Client[T]) runPostCommand(args []string) (PrintableResponse, error) {
 	return result, nil
 }
 
-func (c *Client[T]) runPutCommand(args []string) (PrintableResponse, error) {
-	if len(args) < 2 {
-		return nil, fmt.Errorf("at least two arguments required")
+func (c *Client[T]) runPutCommand(args []string, body string) (PrintableResponse, error) {
+	if len(args) < 1 {
+		return nil, fmt.Errorf("at least one argument required")
 	}
-	result, err := c.PutRaw(context.Background(), args[0], args[1], args[2:]...)
+	result, err := c.PutRaw(context.Background(), args[0], body, args[1:]...)
 	if err != nil {
 		return nil, fmt.Errorf("error running Put: %w", err)
 	}
@@ -280,11 +286,11 @@ func (c *Client[T]) runPutCommand(args []string) (PrintableResponse, error) {
 	return result, nil
 }
 
-func (c *Client[T]) runPatchCommand(args []string) (PrintableResponse, error) {
-	if len(args) < 2 {
-		return nil, fmt.Errorf("at least two arguments required")
+func (c *Client[T]) runPatchCommand(args []string, body string) (PrintableResponse, error) {
+	if len(args) < 1 {
+		return nil, fmt.Errorf("at least one argument required")
 	}
-	result, err := c.PatchRaw(context.Background(), args[0], args[1], args[2:]...)
+	result, err := c.PatchRaw(context.Background(), args[0], body, args[1:]...)
 	if err != nil {
 		return nil, fmt.Errorf("error running Patch: %w", err)
 	}
