@@ -32,7 +32,6 @@ type cliArgs struct {
 	pretty  bool
 	headers []string
 	query   string
-	body    string
 }
 
 func (a *API[T]) Command() *cobra.Command {
@@ -101,6 +100,7 @@ func (a *API[T]) CreateClientMap(parent *Client[*AnyResource]) map[string]*Clien
 		} else {
 			childClient = NewSubClient[*AnyResource, *AnyResource](parent, base)
 		}
+		childClient.name = child.Name()
 
 		childClient.SetCustomResponseCodeMap(child.getCustomResponseCodeMap())
 
@@ -124,10 +124,28 @@ func (c *Client[T]) Command(name string, input *cliArgs) *cobra.Command {
 		Short: fmt.Sprintf("client for interacting with %s resources", name),
 	}
 
+	// currently this is not working correctly because the child will override the length of shared parent IDs, so client.URL fails
+	// this is because all subcommands use the same cliArgs struct
+	parentIDs := make([]string, len(c.parents))
+	for i, parent := range c.parents {
+		flagName := fmt.Sprintf("%s-id", strings.ToLower(parent.name))
+
+		clientCmd.PersistentFlags().StringVar(
+			&(parentIDs[i]),
+			flagName,
+			"",
+			fmt.Sprintf("ID for %q parent", parent.name),
+		)
+
+		_ = clientCmd.MarkPersistentFlagRequired(flagName)
+	}
+
+	var body string
+
 	runE := func(cmd *cobra.Command, args []string) error {
 		c.Address = input.address
 
-		result, err := c.RunFromCLI(append([]string{cmd.Name()}, args...), input.headers, input.query, input.body)
+		result, err := c.RunFromCLI(append([]string{cmd.Name()}, args...), parentIDs, input.headers, input.query, body)
 		if err != nil {
 			return fmt.Errorf("error running client from CLI: %w", err)
 		}
@@ -168,9 +186,9 @@ func (c *Client[T]) Command(name string, input *cliArgs) *cobra.Command {
 		RunE:  runE,
 	}
 
-	postCmd.Flags().StringVarP(&input.body, "data", "d", "", "data for request body")
-	putCmd.Flags().StringVarP(&input.body, "data", "d", "", "data for request body")
-	patchCmd.Flags().StringVarP(&input.body, "data", "d", "", "data for request body")
+	postCmd.Flags().StringVarP(&body, "data", "d", "", "data for request body")
+	putCmd.Flags().StringVarP(&body, "data", "d", "", "data for request body")
+	patchCmd.Flags().StringVarP(&body, "data", "d", "", "data for request body")
 
 	_ = postCmd.MarkFlagRequired("data")
 	_ = putCmd.MarkFlagRequired("data")
@@ -186,7 +204,7 @@ func (c *Client[T]) Command(name string, input *cliArgs) *cobra.Command {
 	return clientCmd
 }
 
-func (c *Client[T]) RunFromCLI(args, requestHeaders []string, rawQuery, body string) (PrintableResponse, error) {
+func (c *Client[T]) RunFromCLI(args, parentIDs, requestHeaders []string, rawQuery, body string) (PrintableResponse, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("at least one argument required")
 	}
@@ -217,28 +235,28 @@ func (c *Client[T]) RunFromCLI(args, requestHeaders []string, rawQuery, body str
 
 	switch args[0] {
 	case "get":
-		return c.runGetCommand(args[1:])
+		return c.runGetCommand(parentIDs, args[1:])
 	case "list":
-		return c.runListCommand(args[1:])
+		return c.runListCommand(parentIDs)
 	case "post":
-		return c.runPostCommand(args[1:], body)
+		return c.runPostCommand(parentIDs, body)
 	case "put":
-		return c.runPutCommand(args[1:], body)
+		return c.runPutCommand(parentIDs, body, args[1:])
 	case "patch":
-		return c.runPatchCommand(args[1:], body)
+		return c.runPatchCommand(parentIDs, body, args[1:])
 	case "delete":
-		return c.runDeleteCommand(args[1:])
+		return c.runDeleteCommand(parentIDs, args[1:])
 	default:
 		return nil, fmt.Errorf("missing http verb argument")
 	}
 }
 
-func (c *Client[T]) runGetCommand(args []string) (PrintableResponse, error) {
+func (c *Client[T]) runGetCommand(parentIDs, args []string) (PrintableResponse, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("at least one argument required")
 	}
 
-	result, err := c.Get(context.Background(), args[0], args[1:]...)
+	result, err := c.Get(context.Background(), args[0], parentIDs...)
 	if err != nil {
 		return nil, fmt.Errorf("error running Get: %w", err)
 	}
@@ -246,11 +264,11 @@ func (c *Client[T]) runGetCommand(args []string) (PrintableResponse, error) {
 	return result, nil
 }
 
-func (c *Client[T]) runDeleteCommand(args []string) (PrintableResponse, error) {
+func (c *Client[T]) runDeleteCommand(parentIDs, args []string) (PrintableResponse, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("at least one argument required")
 	}
-	result, err := c.Delete(context.Background(), args[0], args[1:]...)
+	result, err := c.Delete(context.Background(), args[0], parentIDs...)
 	if err != nil {
 		return nil, fmt.Errorf("error running Delete: %w", err)
 	}
@@ -258,8 +276,8 @@ func (c *Client[T]) runDeleteCommand(args []string) (PrintableResponse, error) {
 	return result, nil
 }
 
-func (c *Client[T]) runListCommand(args []string) (PrintableResponse, error) {
-	items, err := c.GetAll(context.Background(), "", args[0:]...)
+func (c *Client[T]) runListCommand(parentIDs []string) (PrintableResponse, error) {
+	items, err := c.GetAll(context.Background(), "", parentIDs...)
 	if err != nil {
 		return nil, fmt.Errorf("error running GetAll: %w", err)
 	}
@@ -267,8 +285,8 @@ func (c *Client[T]) runListCommand(args []string) (PrintableResponse, error) {
 	return items, nil
 }
 
-func (c *Client[T]) runPostCommand(args []string, body string) (PrintableResponse, error) {
-	result, err := c.PostRaw(context.Background(), body, args...)
+func (c *Client[T]) runPostCommand(parentIDs []string, body string) (PrintableResponse, error) {
+	result, err := c.PostRaw(context.Background(), body, parentIDs...)
 	if err != nil {
 		return nil, fmt.Errorf("error running Post: %w", err)
 	}
@@ -276,11 +294,11 @@ func (c *Client[T]) runPostCommand(args []string, body string) (PrintableRespons
 	return result, nil
 }
 
-func (c *Client[T]) runPutCommand(args []string, body string) (PrintableResponse, error) {
+func (c *Client[T]) runPutCommand(parentIDs []string, body string, args []string) (PrintableResponse, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("at least one argument required")
 	}
-	result, err := c.PutRaw(context.Background(), args[0], body, args[1:]...)
+	result, err := c.PutRaw(context.Background(), args[0], body, parentIDs...)
 	if err != nil {
 		return nil, fmt.Errorf("error running Put: %w", err)
 	}
@@ -288,11 +306,11 @@ func (c *Client[T]) runPutCommand(args []string, body string) (PrintableResponse
 	return result, nil
 }
 
-func (c *Client[T]) runPatchCommand(args []string, body string) (PrintableResponse, error) {
+func (c *Client[T]) runPatchCommand(parentIDs []string, body string, args []string) (PrintableResponse, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("at least one argument required")
 	}
-	result, err := c.PatchRaw(context.Background(), args[0], body, args[1:]...)
+	result, err := c.PatchRaw(context.Background(), args[0], body, parentIDs...)
 	if err != nil {
 		return nil, fmt.Errorf("error running Patch: %w", err)
 	}

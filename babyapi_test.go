@@ -3,6 +3,7 @@ package babyapi_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -336,6 +337,32 @@ func TestNestedAPI(t *testing.T) {
 			require.Equal(t, song1Response, s.Data)
 		})
 
+		t.Run("SuccessfulUsingCLI", func(t *testing.T) {
+			out, err := runCommand(artistAPI.Command(), []string{
+				"client", "--pretty=false", "--address", albumClient.Address,
+				"songs", "get", song1Response.GetID(),
+				"--artists-id", artist1.GetID(), "--albums-id", album1.GetID(),
+			})
+			require.NoError(t, err)
+
+			var result *SongResponse
+			err = json.Unmarshal([]byte(out), &result)
+			require.NoError(t, err)
+			require.Equal(t, song1Response, result)
+
+			out, err = runCommand(artistAPI.Command(), []string{
+				"client", "--pretty=false", "--address", albumClient.Address,
+				"songs", "get",
+				"--albums-id", album1.GetID(), "--artists-id", artist1.GetID(),
+				song1Response.GetID(),
+			})
+			require.NoError(t, err)
+
+			err = json.Unmarshal([]byte(out), &result)
+			require.NoError(t, err)
+			require.Equal(t, song1Response, result)
+		})
+
 		t.Run("SuccessfulParsedAsSongResponse", func(t *testing.T) {
 			req, err := songClient.NewRequestWithParentIDs(context.Background(), http.MethodGet, http.NoBody, song1Response.GetID(), artist1.GetID(), album1.GetID())
 			require.NoError(t, err)
@@ -414,12 +441,6 @@ func TestCLI(t *testing.T) {
 			false,
 		},
 		{
-			"PostIncorrectParentArgs",
-			[]string{"Albums", "post", "-d", `{"title": "OtherNewAlbum"}`, "ExtraID"},
-			"error running client from CLI: error running Post: error creating request: error creating target URL: expected 0 parentIDs",
-			true,
-		},
-		{
 			"PostMissingArgs",
 			[]string{"Albums", "post"},
 			`required flag\(s\) "data" not set`,
@@ -463,25 +484,25 @@ func TestCLI(t *testing.T) {
 		},
 		{
 			"GetAllSongs",
-			[]string{"Songs", "list", "cljcqg5o402e9s28rbp0"},
+			[]string{"Songs", "list", "--albums-id", "cljcqg5o402e9s28rbp0"},
 			`\[{"id":"clknc0do4023onrn3bqg","title":"NewSong"}\]`,
 			false,
 		},
 		{
 			"GetSongByID",
-			[]string{"Songs", "get", "clknc0do4023onrn3bqg", "cljcqg5o402e9s28rbp0"},
+			[]string{"Songs", "get", "clknc0do4023onrn3bqg", "--albums-id", "cljcqg5o402e9s28rbp0"},
 			`{"id":"clknc0do4023onrn3bqg","title":"NewSong"}`,
 			false,
 		},
 		{
 			"GetSongByIDMissingParentID",
 			[]string{"Songs", "get", "clknc0do4023onrn3bqg"},
-			"error running client from CLI: error running Get: error creating request: error creating target URL: expected 1 parentIDs",
+			`required flag\(s\) "albums-id" not set`,
 			true,
 		},
 		{
 			"PostSong",
-			[]string{"Songs", "post", "-d", `{"title": "new song"}`, "cljcqg5o402e9s28rbp0"},
+			[]string{"Songs", "post", "-d", `{"title": "new song"}`, "--albums-id", "cljcqg5o402e9s28rbp0"},
 			`\{"id":"[0-9a-v]{20}","title":"new song"\}`,
 			false,
 		},
@@ -1064,13 +1085,13 @@ func TestRootAPIAsChildOfResourceAPI(t *testing.T) {
 	})
 
 	t.Run("TestGetAllSongsEmpty", func(t *testing.T) {
-		out, err := runCommand(artistAPI.Command(), []string{"client", "--pretty=false", "--address", address, "Songs", "list", artist1.GetID()})
+		out, err := runCommand(artistAPI.Command(), []string{"client", "--pretty=false", "--address", address, "Songs", "list", "--artists-id", artist1.GetID()})
 		require.NoError(t, err)
 		require.Regexp(t, `{"items":\[\]}`, strings.TrimSpace(out))
 	})
 
 	t.Run("CreateSong", func(t *testing.T) {
-		out, err := runCommand(artistAPI.Command(), []string{"client", "--pretty=false", "--address", address, "Songs", "post", "-d", `{"title": "new song"}`, artist1.GetID()})
+		out, err := runCommand(artistAPI.Command(), []string{"client", "--pretty=false", "--address", address, "Songs", "post", "-d", `{"title": "new song"}`, "--artists-id", artist1.GetID()})
 		require.NoError(t, err)
 		require.Regexp(t, `\{"id":"[0-9a-v]{20}","title":"new song"\}`, strings.TrimSpace(out))
 	})
@@ -1096,12 +1117,6 @@ func TestRootAPICLI(t *testing.T) {
 			[]string{"MusicVideos", "post", "--data", `{"title": "OtherNewMusicVideo"}`},
 			`\{"id":"[0-9a-v]{20}","title":"OtherNewMusicVideo"\}`,
 			false,
-		},
-		{
-			"PostIncorrectParentArgs",
-			[]string{"MusicVideos", "post", "--data", `{"title": "OtherNewMusicVideo"}`, "ExtraID"},
-			"error running client from CLI: error running Post: error creating request: error creating target URL: expected 0 parentIDs",
-			true,
 		},
 		{
 			"PostMissingArgs",

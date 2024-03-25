@@ -27,7 +27,7 @@ func (tt CommandLineTest[T]) Run(t *testing.T, client *babyapi.Client[T], getRes
 	cmd := tt.Command()
 
 	var cliOut bytes.Buffer
-	cmd.SetOut(&cliOut)
+	cmd.SetOutput(&cliOut)
 	cmd.SetArgs(append([]string{"client", "--address", client.Address}, args...))
 
 	var out any

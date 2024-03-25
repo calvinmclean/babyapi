@@ -409,7 +409,7 @@ func TestCLI(t *testing.T) {
 				Command: api.Events.Command,
 				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
 					eventID := getResponse("CreateEvent").Data.GetID()
-					return []string{"invite", "post", eventID, "-d", `{"Name": "Name"}`}
+					return []string{"invite", "post", "--event-id", eventID, "-d", `{"Name": "Name"}`}
 				},
 			},
 			ClientName: "Invite",
@@ -425,7 +425,7 @@ func TestCLI(t *testing.T) {
 				Command: api.Events.Command,
 				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
 					eventID := getResponse("CreateEvent").Data.GetID()
-					return []string{"invite", "post", eventID, "-d", `{"Name": "Firstname Lastname"}`, "-q", "password=secret"}
+					return []string{"invite", "post", "--event-id", eventID, "-d", `{"Name": "Firstname Lastname"}`, "-q", "password=secret"}
 				},
 			},
 			ClientName: "Invite",
@@ -442,7 +442,7 @@ func TestCLI(t *testing.T) {
 					eventID := getResponse("CreateEvent").Data.GetID()
 					return []string{
 						"invite", "get",
-						getResponse("CreateInvite").Data.GetID(), eventID,
+						getResponse("CreateInvite").Data.GetID(), "--event-id", eventID,
 						"-q", "password=secret",
 					}
 				},
@@ -460,7 +460,7 @@ func TestCLI(t *testing.T) {
 				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
 					eventID := getResponse("CreateEvent").Data.GetID()
 					return []string{
-						"invite", "list", eventID, "-q", "password=secret",
+						"invite", "list", "--event-id", eventID, "-q", "password=secret",
 					}
 				},
 			},
@@ -478,7 +478,7 @@ func TestCLI(t *testing.T) {
 					eventID := getResponse("CreateEvent").Data.GetID()
 					return []string{
 						"invite", "get",
-						getResponse("CreateInvite").Data.GetID(), eventID,
+						getResponse("CreateInvite").Data.GetID(), "--event-id", eventID,
 						"-q", "invite=" + getResponse("CreateInvite").Data.GetID(),
 					}
 				},
@@ -497,7 +497,7 @@ func TestCLI(t *testing.T) {
 					eventID := getResponse("CreateEvent").Data.GetID()
 					return []string{
 						"invite", "delete",
-						getResponse("CreateInvite").Data.GetID(), eventID,
+						getResponse("CreateInvite").Data.GetID(), "--event-id", eventID,
 					}
 				},
 			},
