@@ -53,6 +53,8 @@ type ExpectedResponse struct {
 	Status int
 	// Error is an expected error string to be returned by the client
 	Error string
+	// CLIOutRegexp is the expected CLI output that would normally go to stdout. This is only available for CommandLineTest
+	CLIOutRegexp string
 }
 
 // Response wraps a *babyapi.Response and a *ResourceList response to enable GetAll/List endpoints
@@ -60,6 +62,7 @@ type ExpectedResponse struct {
 type Response[T babyapi.Resource] struct {
 	*babyapi.Response[T]
 	GetAllResponse *babyapi.Response[*babyapi.ResourceList[T]]
+	CLIOut         string
 }
 
 // Run will execute a Test using t.Run to run with the test name. The API is expected to already be running. If your
@@ -92,6 +95,10 @@ func (tt TestCase[T]) RunWithResponse(t *testing.T, client *babyapi.Client[T]) *
 
 func (tt TestCase[T]) run(t *testing.T, client *babyapi.Client[T], getResponse PreviousResponseGetter) *Response[T] {
 	r, err := tt.Test.Run(t, client, getResponse)
+
+	if r != nil && tt.ExpectedResponse.CLIOutRegexp != "" {
+		require.Regexp(t, tt.ExpectedResponse.CLIOutRegexp, r.CLIOut)
+	}
 
 	skipBody := tt.assertError(t, err)
 	if !skipBody {

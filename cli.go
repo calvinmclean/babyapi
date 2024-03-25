@@ -132,6 +132,8 @@ func (c *Client[T]) Command(name string, input *cliArgs) *cobra.Command {
 			return fmt.Errorf("error running client from CLI: %w", err)
 		}
 
+		cmd.SetContext(NewContextWithCLIResult(cmd.Context(), result))
+
 		return result.Fprint(cmd.OutOrStdout(), input.pretty)
 	}
 
