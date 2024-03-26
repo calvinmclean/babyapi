@@ -9,18 +9,18 @@ Set Height 800
 Set WindowBar Colorful
 Set TypingSpeed 100ms
 
-Type `go run main.go post TODOs '{"title": "use babyapi"}'` Sleep 500ms  Enter
+Type `go run main.go client todos post --data '{"title": "use babyapi"}'` Sleep 500ms  Enter
 
 Sleep 2s
 
-Type `go run main.go list TODOs` Sleep 500ms  Enter
+Type `go run main.go client todos list` Sleep 500ms  Enter
 
 Sleep 2s
 
-Type `go run main.go post GOALs '{"title": "contribute to babyapi"}'` Sleep 500ms  Enter
+Type `go run main.go client goals post --data '{"title": "contribute to babyapi"}'` Sleep 500ms  Enter
 
 Sleep 2s
 
-Type `go run main.go list GOALs` Sleep 500ms  Enter
+Type `go run main.go client goals list` Sleep 500ms  Enter
 
 Sleep 5s
