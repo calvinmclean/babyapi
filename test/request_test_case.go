@@ -2,7 +2,6 @@ package babytest
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"testing"
 
@@ -72,7 +71,6 @@ func (tt RequestTest[T]) Run(t *testing.T, client *babyapi.Client[T], getRespons
 	switch tt.Method {
 	case MethodGetAll:
 		r, err = client.GetAll(context.Background(), rawQuery, parentIDs...)
-		fmt.Println(r)
 	case http.MethodPost:
 		r, err = client.PostRaw(context.Background(), body, parentIDs...)
 	case http.MethodGet:

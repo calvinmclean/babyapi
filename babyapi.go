@@ -84,6 +84,8 @@ type API[T Resource] struct {
 	readOnly sync.Mutex
 
 	errors []error
+
+	cliArgs cliArgs
 }
 
 // NewAPI initializes an API using the provided name, base URL path, and function to create a new instance of
@@ -121,6 +123,7 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 		false,
 		sync.Mutex{},
 		nil,
+		cliArgs{},
 	}
 
 	api.GetAll = api.defaultGetAll()
@@ -246,8 +249,10 @@ func (a *API[T]) Client(addr string) *Client[T] {
 
 // AnyClient returns a new Client based on the API's configuration. It is a shortcut for NewClient
 func (a *API[T]) AnyClient(addr string) *Client[*AnyResource] {
-	return NewClient[*AnyResource](addr, makePathWithRoot(a.base, a.parent)).
+	client := NewClient[*AnyResource](addr, makePathWithRoot(a.base, a.parent)).
 		SetCustomResponseCodeMap(a.responseCodes)
+	client.name = a.name
+	return client
 }
 
 // AddCustomRootRoute appends a custom API route to the absolute root path ("/"). It does not work for APIs with

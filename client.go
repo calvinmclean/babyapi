@@ -49,13 +49,19 @@ var DefaultRequestEditor RequestEditor = func(r *http.Request) error {
 	return nil
 }
 
+type clientParent struct {
+	name string
+	path string
+}
+
 // Client is used to interact with the provided Resource's API
 type Client[T Resource] struct {
 	Address             string
 	base                string
+	name                string
 	client              *http.Client
 	requestEditor       RequestEditor
-	parentPaths         []string
+	parents             []clientParent
 	customResponseCodes map[string]int
 }
 
@@ -64,9 +70,10 @@ func NewClient[T Resource](addr, base string) *Client[T] {
 	return &Client[T]{
 		addr,
 		strings.TrimLeft(base, "/"),
+		"",
 		http.DefaultClient,
 		DefaultRequestEditor,
-		[]string{},
+		[]clientParent{},
 		defaultResponseCodes(),
 	}
 }
@@ -75,11 +82,11 @@ func NewClient[T Resource](addr, base string) *Client[T] {
 func NewSubClient[T, R Resource](parent *Client[T], path string) *Client[R] {
 	newClient := NewClient[R](parent.Address, path)
 
-	newClient.parentPaths = make([]string, len(parent.parentPaths))
-	copy(newClient.parentPaths, parent.parentPaths)
+	newClient.parents = make([]clientParent, len(parent.parents))
+	copy(newClient.parents, parent.parents)
 
 	if parent.base != "" {
-		newClient.parentPaths = append(newClient.parentPaths, parent.base)
+		newClient.parents = append(newClient.parents, clientParent{path: parent.base, name: parent.name})
 	}
 	return newClient
 }
@@ -264,13 +271,13 @@ func (c *Client[T]) NewRequestWithParentIDs(ctx context.Context, method string, 
 
 // URL gets the URL based on provided ID and optional parent IDs
 func (c *Client[T]) URL(id string, parentIDs ...string) (string, error) {
-	if len(parentIDs) != len(c.parentPaths) {
-		return "", fmt.Errorf("expected %d parentIDs", len(c.parentPaths))
+	if len(parentIDs) != len(c.parents) {
+		return "", fmt.Errorf("expected %d parentIDs", len(c.parents))
 	}
 
 	path := c.Address
-	for i, parentPath := range c.parentPaths {
-		path += fmt.Sprintf("/%s/%s", parentPath, parentIDs[i])
+	for i, parent := range c.parents {
+		path += fmt.Sprintf("/%s/%s", parent.path, parentIDs[i])
 	}
 
 	path += fmt.Sprintf("/%s", c.base)

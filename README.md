@@ -64,13 +64,13 @@ Implement custom request/response handling by implemented `Renderer` and `Binder
 
     ```shell
     # Create a new TODO
-    go run main.go post TODOs '{"title": "use babyapi!"}'
+    go run main.go client todos post --data '{"title": "use babyapi!"}'
 
     # Get all TODOs
-    go run main.go list TODOs
+    go run main.go client todos list
 
     # Get TODO by ID (use ID from previous responses)
-    go run main.go get TODOs cljvfslo4020kglbctog
+    go run main.go client todos get cljvfslo4020kglbctog
     ```
 
 <img alt="Simple Example" src="examples/simple/simple.gif" width="600" />
