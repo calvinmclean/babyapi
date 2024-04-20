@@ -4,29 +4,34 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"embed"
 	"encoding/base64"
 	"encoding/csv"
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"html/template"
 	"net/http"
 	"os"
 	"strings"
 
 	"github.com/calvinmclean/babyapi"
 	"github.com/calvinmclean/babyapi/extensions"
+	"github.com/calvinmclean/babyapi/html"
 	"github.com/go-chi/render"
-
-	_ "embed"
 )
 
 //go:embed template.html
-var templates []byte
+var templates embed.FS
 
 const (
 	invitesCtxKey  babyapi.ContextKey = "invites"
 	passwordCtxKey babyapi.ContextKey = "password"
+
+	eventPage       html.Template = "eventPage"
+	invitePage      html.Template = "invitePage"
+	rsvpButtons     html.Template = "rsvpButtons"
+	bulkInvites     html.Template = "bulkInvites"
+	createEventPage html.Template = "createEventPage"
 )
 
 type API struct {
@@ -97,7 +102,11 @@ func (api *API) rsvp(r *http.Request, invite *Invite) (render.Renderer, *babyapi
 	if err != nil {
 		return nil, babyapi.InternalServerError(err)
 	}
-	return &rsvpResponse{invite}, nil
+
+	return rsvpButtons.Renderer(struct {
+		*Invite
+		Attending string
+	}{invite, invite.attending()}), nil
 }
 
 // Allow adding bulk invites with a single request
@@ -133,7 +142,7 @@ func (api *API) addBulkInvites(r *http.Request, event *Event) (render.Renderer, 
 		}
 	}
 
-	return &bulkInvitesResponse{nil, invites}, nil
+	return bulkInvites.Renderer(invites), nil
 }
 
 // authenticationMiddleware enforces access to Events and Invites. Admin access to an Event requires a password query parameter.
@@ -252,7 +261,7 @@ func (e *Event) Bind(r *http.Request) error {
 }
 
 func (e *Event) HTML(r *http.Request) string {
-	return renderTemplate(r, "eventPage", struct {
+	return eventPage.Render(r, struct {
 		Password string
 		*Event
 		Invites []*Invite
@@ -289,7 +298,7 @@ func (i *Invite) Bind(r *http.Request) error {
 func (i *Invite) HTML(r *http.Request) string {
 	event, _ := babyapi.GetResourceFromContext[*Event](r.Context(), babyapi.ContextKey("Event"))
 
-	return renderTemplate(r, "invitePage", struct {
+	return invitePage.Render(r, struct {
 		*Invite
 		Attending string
 		Event     *Event
@@ -311,33 +320,6 @@ func (i *Invite) attending() string {
 
 func (i *Invite) link(r *http.Request) string {
 	return fmt.Sprintf("%s/events/%s/invites/%s", r.Host, i.EventID, i.GetID())
-}
-
-// rsvpResponse is a custom response struct that allows implementing a different HTML method for HTMLer
-// This will just render the HTML buttons for an HTMX partial swap
-type rsvpResponse struct {
-	*Invite
-}
-
-func (rsvp *rsvpResponse) HTML(r *http.Request) string {
-	return renderTemplate(
-		r,
-		"rsvpButtons",
-		struct {
-			*Invite
-			Attending string
-		}{rsvp.Invite, rsvp.attending()},
-	)
-}
-
-type bulkInvitesResponse struct {
-	*babyapi.DefaultRenderer
-
-	Invites []*Invite
-}
-
-func (bi *bulkInvitesResponse) HTML(r *http.Request) string {
-	return renderTemplate(r, "bulkInvites", bi)
 }
 
 func main() {
@@ -371,14 +353,13 @@ func createAPI() *API {
 
 	api.Events.AddNestedAPI(api.Invites)
 
-	api.Events.GetAll = func(w http.ResponseWriter, r *http.Request) {
+	api.Events.GetAll = babyapi.Handler(func(_ http.ResponseWriter, r *http.Request) render.Renderer {
 		if render.GetAcceptedContentType(r) != render.ContentTypeHTML {
-			render.Render(w, r, babyapi.ErrForbidden)
-			return
+			return babyapi.ErrForbidden
 		}
 
-		render.HTML(w, r, renderTemplate(r, "createEventPage", map[string]any{}))
-	}
+		return createEventPage.Renderer(map[string]any{})
+	})
 
 	api.Events.AddIDMiddleware(api.Events.GetRequestedResourceAndDoMiddleware(api.authenticationMiddleware))
 
@@ -402,6 +383,18 @@ func createAPI() *API {
 
 	api.Events.ApplyExtension(extensions.KeyValueStorage[*Event]{DB: db})
 	api.Invites.ApplyExtension(extensions.KeyValueStorage[*Invite]{DB: db})
+
+	html.SetFS(templates, "template.html")
+	html.SetFuncs(func(r *http.Request) map[string]any {
+		return map[string]any{
+			"serverURL": func() string {
+				return r.Host
+			},
+			"attending": func(i *Invite) string {
+				return i.attending()
+			},
+		}
+	})
 
 	return api
 }
@@ -435,20 +428,4 @@ func getInvitesFromContext(ctx context.Context) []*Invite {
 	}
 
 	return invites
-}
-
-func renderTemplate(r *http.Request, name string, data any) string {
-	tmpl, err := template.New(name).Funcs(map[string]any{
-		"serverURL": func() string {
-			return r.Host
-		},
-		"attending": func(i *Invite) string {
-			return i.attending()
-		},
-	}).Parse(string(templates))
-	if err != nil {
-		panic(err)
-	}
-
-	return babyapi.MustRenderHTML(tmpl, data)
 }
