@@ -1,18 +1,19 @@
 package main
 
 import (
-	"html/template"
 	"net/http"
 	"os"
 
 	"github.com/calvinmclean/babyapi"
 	"github.com/calvinmclean/babyapi/extensions"
+	"github.com/calvinmclean/babyapi/html"
 
 	"github.com/go-chi/render"
 )
 
 const (
-	allTODOsTemplate = `<!doctype html>
+	allTODOs         html.Template = "allTODOs"
+	allTODOsTemplate               = `<!doctype html>
 <html>
 	<head>
 		<meta charset="UTF-8">
@@ -67,7 +68,8 @@ const (
 	</body>
 </html>`
 
-	todoRowTemplate = `<tr hx-target="this" hx-swap="outerHTML">
+	todoRow         html.Template = "todoRow"
+	todoRowTemplate               = `<tr hx-target="this" hx-swap="outerHTML">
 	<td>{{ .Title }}</td>
 	<td>{{ .Description }}</td>
 	<td>
@@ -106,9 +108,10 @@ type TODO struct {
 	Completed   *bool
 }
 
-func (t *TODO) HTML(*http.Request) string {
-	tmpl := template.Must(template.New("todoRow").Parse(todoRowTemplate))
-	return babyapi.MustRenderHTML(tmpl, t)
+func (t *TODO) HTML(r *http.Request) string {
+	// tmpl := template.Must(template.New("todoRow").Parse(todoRowTemplate))
+	// return babyapi.MustRenderHTML(tmpl, t)
+	return todoRow.Render(r, t)
 }
 
 type AllTODOs []*TODO
@@ -117,10 +120,11 @@ func (at AllTODOs) Render(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (at AllTODOs) HTML(*http.Request) string {
-	tmpl := template.Must(template.New("todoRow").Parse(todoRowTemplate))
-	tmpl = template.Must(tmpl.New("allTODOs").Parse(allTODOsTemplate))
-	return babyapi.MustRenderHTML(tmpl, at)
+func (at AllTODOs) HTML(r *http.Request) string {
+	// tmpl := template.Must(template.New("todoRow").Parse(todoRowTemplate))
+	// tmpl = template.Must(tmpl.New("allTODOs").Parse(allTODOsTemplate))
+	// return babyapi.MustRenderHTML(tmpl, at)
+	return allTODOs.Render(r, at)
 }
 
 func createAPI() *babyapi.API[*TODO] {
@@ -159,6 +163,11 @@ func createAPI() *babyapi.API[*TODO] {
 			Filename:      os.Getenv("STORAGE_FILE"),
 			Optional:      true,
 		},
+	})
+
+	html.SetMap(map[string]string{
+		string(allTODOs): allTODOsTemplate,
+		string(todoRow):  todoRowTemplate,
 	})
 
 	return api
