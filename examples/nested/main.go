@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/calvinmclean/babyapi"
+	"github.com/calvinmclean/babyapi/extensions"
 	"github.com/go-chi/render"
 )
 
@@ -80,6 +81,11 @@ func createAPI() API {
 	artistAPI.AddNestedAPI(albumAPI)
 	artistAPI.AddNestedAPI(musicVideoAPI)
 	albumAPI.AddNestedAPI(songAPI)
+
+	artistAPI.ApplyExtension(extensions.HATEOAS[*Artist]{})
+	albumAPI.ApplyExtension(extensions.HATEOAS[*Album]{})
+	musicVideoAPI.ApplyExtension(extensions.HATEOAS[*MusicVideo]{})
+	songAPI.ApplyExtension(extensions.HATEOAS[*Song]{})
 
 	return API{artistAPI, albumAPI, musicVideoAPI, songAPI}
 }
