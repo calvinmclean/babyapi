@@ -13,7 +13,7 @@ import (
 
 const (
 	allTODOs         html.Template = "allTODOs"
-	allTODOsTemplate               = `<!doctype html>
+	allTODOsTemplate string        = `<!doctype html>
 <html>
 	<head>
 		<meta charset="UTF-8">
@@ -69,7 +69,7 @@ const (
 </html>`
 
 	todoRow         html.Template = "todoRow"
-	todoRowTemplate               = `<tr hx-target="this" hx-swap="outerHTML">
+	todoRowTemplate string        = `<tr hx-target="this" hx-swap="outerHTML">
 	<td>{{ .Title }}</td>
 	<td>{{ .Description }}</td>
 	<td>
@@ -109,30 +109,29 @@ type TODO struct {
 }
 
 func (t *TODO) HTML(r *http.Request) string {
-	// tmpl := template.Must(template.New("todoRow").Parse(todoRowTemplate))
-	// return babyapi.MustRenderHTML(tmpl, t)
 	return todoRow.Render(r, t)
 }
 
-type AllTODOs []*TODO
+type AllTODOs struct {
+	babyapi.ResourceList[*TODO]
+}
 
 func (at AllTODOs) Render(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
 func (at AllTODOs) HTML(r *http.Request) string {
-	// tmpl := template.Must(template.New("todoRow").Parse(todoRowTemplate))
-	// tmpl = template.Must(tmpl.New("allTODOs").Parse(allTODOsTemplate))
-	// return babyapi.MustRenderHTML(tmpl, at)
-	return allTODOs.Render(r, at)
+	return allTODOs.Render(r, at.Items)
 }
 
 func createAPI() *babyapi.API[*TODO] {
 	api := babyapi.NewAPI("TODOs", "/todos", func() *TODO { return &TODO{} })
 
+	api.AddCustomRootRoute(http.MethodGet, "/", http.RedirectHandler("/todos", http.StatusFound))
+
 	// Use AllTODOs in the GetAll response since it implements HTMLer
 	api.SetGetAllResponseWrapper(func(todos []*TODO) render.Renderer {
-		return AllTODOs(todos)
+		return AllTODOs{ResourceList: babyapi.ResourceList[*TODO]{todos}}
 	})
 
 	api.ApplyExtension(extensions.HTMX[*TODO]{})
