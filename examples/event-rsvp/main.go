@@ -339,6 +339,8 @@ func createAPI() *API {
 		),
 	}
 
+	api.Events.AddCustomRootRoute(http.MethodGet, "/", http.RedirectHandler("/events", http.StatusFound))
+
 	api.Invites.ApplyExtension(extensions.HTMX[*Invite]{})
 
 	api.Invites.AddCustomRoute(http.MethodPost, "/bulk", api.Events.GetRequestedResourceAndDo(api.addBulkInvites))
