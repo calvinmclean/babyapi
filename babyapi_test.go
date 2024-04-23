@@ -1377,7 +1377,47 @@ func TestWithContextShutdown(t *testing.T) {
 	}
 }
 
-// func TestInvalidUseOfModifiersReturnsErrorAtStart(t *testing.T) {
-// 	api := babyapi.NewRootAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} })
-// 	api
-// }
+type AllAlbumsWrapper []*Album
+
+func (AllAlbumsWrapper) Render(http.ResponseWriter, *http.Request) error {
+	return nil
+}
+
+func TestGetAllResponseWrapperWithClient(t *testing.T) {
+	api := babyapi.NewAPI("Albums", "/albums", func() *Album { return &Album{} })
+	api.SetGetAllResponseWrapper(func(a []*Album) render.Renderer {
+		return AllAlbumsWrapper(a)
+	})
+
+	client, stop := babytest.NewTestClient(t, api)
+	defer stop()
+
+	t.Run("CreateAlbum", func(t *testing.T) {
+		_, err := client.Post(context.Background(), &Album{Title: "Album"})
+		require.NoError(t, err)
+	})
+
+	t.Run("RegularGetAllRequestErrors", func(t *testing.T) {
+		_, err := client.GetAll(context.Background(), "")
+		require.Error(t, err)
+	})
+
+	t.Run("MakeRequestCanBeUsed", func(t *testing.T) {
+		req, err := client.GetAllRequest(context.Background(), "")
+		require.NoError(t, err)
+
+		resp, err := babyapi.MakeRequest[AllAlbumsWrapper](req, http.DefaultClient, http.StatusOK, nil)
+		require.NoError(t, err)
+		require.Equal(t, "Album", resp.Data[0].Title)
+	})
+
+	t.Run("MakeGenericRequestCanBeUsed", func(t *testing.T) {
+		req, err := client.GetAllRequest(context.Background(), "")
+		require.NoError(t, err)
+
+		var albums AllAlbumsWrapper
+		err = client.MakeGenericRequest(req, &albums)
+		require.NoError(t, err)
+		require.Equal(t, "Album", albums[0].Title)
+	})
+}
