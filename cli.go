@@ -1,6 +1,7 @@
 package babyapi
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -233,87 +234,99 @@ func (c *Client[T]) RunFromCLI(args, parentIDs, requestHeaders []string, rawQuer
 
 	c.SetRequestEditor(reqEditor)
 
+	var req *http.Request
+	var err error
 	switch args[0] {
 	case "get":
-		return c.runGetCommand(parentIDs, args[1:])
+		req, err = c.cliGetRequest(parentIDs, args[1:])
 	case "list":
-		return c.runListCommand(parentIDs)
+		req, err = c.cliGetAllRequest(parentIDs)
 	case "post":
-		return c.runPostCommand(parentIDs, body)
+		req, err = c.cliPostRequest(parentIDs, body)
 	case "put":
-		return c.runPutCommand(parentIDs, body, args[1:])
+		req, err = c.cliPutRequest(parentIDs, body, args[1:])
 	case "patch":
-		return c.runPatchCommand(parentIDs, body, args[1:])
+		req, err = c.cliPatchRequest(parentIDs, body, args[1:])
 	case "delete":
-		return c.runDeleteCommand(parentIDs, args[1:])
+		req, err = c.cliDeleteRequest(parentIDs, args[1:])
 	default:
 		return nil, fmt.Errorf("missing http verb argument")
 	}
+	if err != nil {
+		return nil, fmt.Errorf("error running %q: %w", args[0], err)
+	}
+
+	result, err := MakeRequest[any](req, c.client, 0, reqEditor)
+	if err != nil {
+		return nil, fmt.Errorf("error executing request: %w", err)
+	}
+
+	return result, nil
 }
 
-func (c *Client[T]) runGetCommand(parentIDs, args []string) (PrintableResponse, error) {
+func (c *Client[T]) cliGetRequest(parentIDs, args []string) (*http.Request, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("at least one argument required")
 	}
 
-	result, err := c.Get(context.Background(), args[0], parentIDs...)
+	req, err := c.GetRequest(context.Background(), args[0], parentIDs...)
 	if err != nil {
-		return nil, fmt.Errorf("error running Get: %w", err)
+		return nil, fmt.Errorf("error creating GET request: %w", err)
 	}
 
-	return result, nil
+	return req, nil
 }
 
-func (c *Client[T]) runDeleteCommand(parentIDs, args []string) (PrintableResponse, error) {
+func (c *Client[T]) cliDeleteRequest(parentIDs, args []string) (*http.Request, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("at least one argument required")
 	}
-	result, err := c.Delete(context.Background(), args[0], parentIDs...)
+	req, err := c.DeleteRequest(context.Background(), args[0], parentIDs...)
 	if err != nil {
-		return nil, fmt.Errorf("error running Delete: %w", err)
+		return nil, fmt.Errorf("error created DELETE request: %w", err)
 	}
 
-	return result, nil
+	return req, nil
 }
 
-func (c *Client[T]) runListCommand(parentIDs []string) (PrintableResponse, error) {
-	items, err := c.GetAll(context.Background(), "", parentIDs...)
+func (c *Client[T]) cliGetAllRequest(parentIDs []string) (*http.Request, error) {
+	req, err := c.GetAllRequest(context.Background(), "", parentIDs...)
 	if err != nil {
-		return nil, fmt.Errorf("error running GetAll: %w", err)
+		return nil, fmt.Errorf("error creating GET all request: %w", err)
 	}
 
-	return items, nil
+	return req, nil
 }
 
-func (c *Client[T]) runPostCommand(parentIDs []string, body string) (PrintableResponse, error) {
-	result, err := c.PostRaw(context.Background(), body, parentIDs...)
+func (c *Client[T]) cliPostRequest(parentIDs []string, body string) (*http.Request, error) {
+	req, err := c.PostRequest(context.Background(), bytes.NewBufferString(body), parentIDs...)
 	if err != nil {
-		return nil, fmt.Errorf("error running Post: %w", err)
+		return nil, fmt.Errorf("error creating POST request: %w", err)
 	}
 
-	return result, nil
+	return req, nil
 }
 
-func (c *Client[T]) runPutCommand(parentIDs []string, body string, args []string) (PrintableResponse, error) {
+func (c *Client[T]) cliPutRequest(parentIDs []string, body string, args []string) (*http.Request, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("at least one argument required")
 	}
-	result, err := c.PutRaw(context.Background(), args[0], body, parentIDs...)
+	req, err := c.PutRequest(context.Background(), bytes.NewBufferString(body), args[0], parentIDs...)
 	if err != nil {
-		return nil, fmt.Errorf("error running Put: %w", err)
+		return nil, fmt.Errorf("error creating PUT request: %w", err)
 	}
 
-	return result, nil
+	return req, nil
 }
 
-func (c *Client[T]) runPatchCommand(parentIDs []string, body string, args []string) (PrintableResponse, error) {
+func (c *Client[T]) cliPatchRequest(parentIDs []string, body string, args []string) (*http.Request, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("at least one argument required")
 	}
-	result, err := c.PatchRaw(context.Background(), args[0], body, parentIDs...)
+	req, err := c.PatchRequest(context.Background(), bytes.NewBufferString(body), args[0], parentIDs...)
 	if err != nil {
-		return nil, fmt.Errorf("error running Patch: %w", err)
+		return nil, fmt.Errorf("error creating PATCH request: %w", err)
 	}
 
-	return result, nil
+	return req, nil
 }

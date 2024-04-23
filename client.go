@@ -20,6 +20,44 @@ type Response[T any] struct {
 	Response    *http.Response
 }
 
+func newResponse[T any](resp *http.Response, expectedStatusCode int) (*Response[T], error) {
+	result := &Response[T]{
+		ContentType: resp.Header.Get("Content-Type"),
+		Response:    resp,
+	}
+
+	if resp.Body != nil {
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding error response: %w", err)
+		}
+		result.Body = string(body)
+	}
+
+	if resp.StatusCode != expectedStatusCode && expectedStatusCode != 0 {
+		if result.Body == "" {
+			return nil, fmt.Errorf("unexpected status and no body: %d", resp.StatusCode)
+		}
+
+		var httpErr *ErrResponse
+		err := json.Unmarshal([]byte(result.Body), &httpErr)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding error response %q: %w", result.Body, err)
+		}
+		httpErr.HTTPStatusCode = resp.StatusCode
+		return nil, httpErr
+	}
+
+	if result.ContentType == "application/json" {
+		err := json.Unmarshal([]byte(result.Body), &result.Data)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding response body %q: %w", result.Body, err)
+		}
+	}
+
+	return result, nil
+}
+
 // Fprint writes the Response body to the provided Writer. If the ContentType is JSON, it will JSON encode
 // the body. Setting pretty=true will print indented JSON.
 func (sr *Response[T]) Fprint(out io.Writer, pretty bool) error {
@@ -380,41 +418,7 @@ func MakeRequest[T any](req *http.Request, client *http.Client, expectedStatusCo
 		return nil, err
 	}
 
-	result := &Response[T]{
-		ContentType: resp.Header.Get("Content-Type"),
-		Response:    resp,
-	}
-
-	if resp.Body != nil {
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("error decoding error response: %w", err)
-		}
-		result.Body = string(body)
-	}
-
-	if resp.StatusCode != expectedStatusCode && expectedStatusCode != 0 {
-		if result.Body == "" {
-			return nil, fmt.Errorf("unexpected status and no body: %d", resp.StatusCode)
-		}
-
-		var httpErr *ErrResponse
-		err = json.Unmarshal([]byte(result.Body), &httpErr)
-		if err != nil {
-			return nil, fmt.Errorf("error decoding error response %q: %w", result.Body, err)
-		}
-		httpErr.HTTPStatusCode = resp.StatusCode
-		return nil, httpErr
-	}
-
-	if result.ContentType == "application/json" {
-		err = json.Unmarshal([]byte(result.Body), &result.Data)
-		if err != nil {
-			return nil, fmt.Errorf("error decoding response body %q: %w", result.Body, err)
-		}
-	}
-
-	return result, nil
+	return newResponse[T](resp, expectedStatusCode)
 }
 
 func makeRequest(req *http.Request, client *http.Client, requestEditor RequestEditor) (*http.Response, error) {
