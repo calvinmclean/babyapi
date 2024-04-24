@@ -597,6 +597,12 @@ func TestCLI(t *testing.T) {
 		})
 	})
 
+	t.Run("RunWithoutAddress", func(t *testing.T) {
+		out, err := runCommand(api.Command(), []string{"client", "--pretty=false", "--query", "title=New Album", "Albums", "list"})
+		require.NoError(t, err)
+		require.Equal(t, `{"items":[{"id":"cljcqg5o402e9s28rbp0","title":"New Album"}]}`, strings.TrimSpace(out))
+	})
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			baseArgs := []string{"client", "--pretty=false", "--address", address}
@@ -1428,5 +1434,29 @@ func TestGetAllResponseWrapperWithClient(t *testing.T) {
 		out, err := runCommand(api.Command(), []string{"client", "--pretty=false", "--address", client.Address, "Albums", "list"})
 		require.NoError(t, err)
 		require.Regexp(t, `[{"id":"[0-9a-v]{20}","title":"Album"}]`, strings.TrimSpace(out))
+	})
+}
+
+func TestClient(t *testing.T) {
+	api := babyapi.NewAPI("Albums", "/albums", func() *Album { return &Album{} })
+	api.SetGetAllResponseWrapper(func(a []*Album) render.Renderer {
+		return AllAlbumsWrapper(a)
+	})
+
+	client, stop := babytest.NewTestClient(t, api)
+	defer stop()
+
+	t.Run("CustomResponseCodeSuccess", func(t *testing.T) {
+		client.SetCustomResponseCode(babyapi.MethodGetAll, http.StatusCreated)
+		resp, err := client.GetAll(context.Background(), "")
+		require.NoError(t, err)
+		require.Equal(t, http.StatusCreated, resp.Response.StatusCode)
+	})
+
+	t.Run("SetHTTPClient", func(t *testing.T) {
+		client.SetHTTPClient(http.DefaultClient)
+
+		_, err := client.GetAll(context.Background(), "")
+		require.NoError(t, err)
 	})
 }

@@ -72,7 +72,7 @@ func TestAPI(t *testing.T) {
 		{
 			Name: "GetAllEventsForbidden",
 			Test: babytest.RequestTest[*babyapi.AnyResource]{
-				Method:   babytest.MethodGetAll,
+				Method:   babyapi.MethodGetAll,
 				RawQuery: "password=secret",
 				IDFunc: func(getResponse babytest.PreviousResponseGetter) string {
 					return getResponse("CreateEvent").Data.GetID()
@@ -181,7 +181,7 @@ func TestAPI(t *testing.T) {
 		{
 			Name: "ListInvites",
 			Test: babytest.RequestTest[*babyapi.AnyResource]{
-				Method:   babytest.MethodGetAll,
+				Method:   babyapi.MethodGetAll,
 				RawQuery: "password=secret",
 				ParentIDsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
 					return []string{getResponse("CreateEvent").Data.GetID()}
@@ -202,7 +202,7 @@ func TestAPI(t *testing.T) {
 				id := getResponse("CreateEvent").Data.GetID()
 				address = fmt.Sprintf("%s/events/%s/invites", address, id)
 
-				r, err := http.NewRequest(babytest.MethodGetAll, address, http.NoBody)
+				r, err := http.NewRequest(babyapi.MethodGetAll, address, http.NoBody)
 				require.NoError(t, err)
 
 				q := r.URL.Query()

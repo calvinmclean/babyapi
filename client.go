@@ -181,7 +181,7 @@ func (c *Client[T]) GetAll(ctx context.Context, rawQuery string, parentIDs ...st
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	result, err := MakeRequest[*ResourceList[T]](req, c.client, http.StatusOK, c.requestEditor)
+	result, err := MakeRequest[*ResourceList[T]](req, c.client, c.customResponseCodes[MethodGetAll], c.requestEditor)
 	if err != nil {
 		return nil, fmt.Errorf("error getting all resources: %w", err)
 	}

@@ -11,9 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// MethodGetAll is the same as http.MethodGet, but can be used in a RequestTest to get all resources
-const MethodGetAll = "GetAll"
-
 // TestCase is a single test step that executes the provided ClientRequest or RequestFunc and compares to the
 // ExpectedResponse
 type TestCase[T babyapi.Resource] struct {

@@ -16,6 +16,7 @@ var respondOnce sync.Once
 func defaultResponseCodes() map[string]int {
 	return map[string]int{
 		http.MethodGet:    http.StatusOK,
+		MethodGetAll:      http.StatusOK,
 		http.MethodDelete: http.StatusNoContent,
 		http.MethodPost:   http.StatusCreated,
 		http.MethodPatch:  http.StatusOK,
@@ -196,7 +197,7 @@ func (a *API[T]) defaultGetAll() http.HandlerFunc {
 			resp = &ResourceList[render.Renderer]{Items: items}
 		}
 
-		render.Status(r, a.responseCodes[http.MethodGet])
+		render.Status(r, a.responseCodes[MethodGetAll])
 
 		return resp
 	})
