@@ -479,7 +479,7 @@ func TestCLI(t *testing.T) {
 		{
 			"GetByIDMissingArgs",
 			[]string{"Albums", "get"},
-			`error running client from CLI: error running "get": at least one argument required`,
+			`at least one argument required`,
 			true,
 		},
 		{
@@ -515,7 +515,7 @@ func TestCLI(t *testing.T) {
 		{
 			"DeleteMissingArgs",
 			[]string{"Albums", "delete"},
-			`error running client from CLI: error running "delete": at least one argument required`,
+			`at least one argument required`,
 			true,
 		},
 		{
@@ -609,7 +609,6 @@ func TestCLI(t *testing.T) {
 				}
 			} else {
 				if err == nil {
-					fmt.Println("NOE RR")
 					fmt.Println(out)
 				}
 				require.Error(t, err)
@@ -1161,7 +1160,7 @@ func TestRootAPICLI(t *testing.T) {
 		{
 			"GetByIDMissingArgs",
 			[]string{"MusicVideos", "get"},
-			`error running client from CLI: error running "get": at least one argument required`,
+			`at least one argument required`,
 			true,
 		},
 		{
@@ -1191,7 +1190,7 @@ func TestRootAPICLI(t *testing.T) {
 		{
 			"DeleteMissingArgs",
 			[]string{"MusicVideos", "delete"},
-			`error running client from CLI: error running "delete": at least one argument required`,
+			`at least one argument required`,
 			true,
 		},
 		{

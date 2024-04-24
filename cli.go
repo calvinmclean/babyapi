@@ -120,9 +120,41 @@ type PrintableResponse interface {
 }
 
 func (c *Client[T]) Command(name string, input *cliArgs) *cobra.Command {
+	reqEditor := func(r *http.Request) error {
+		for _, header := range input.headers {
+			headerSplit := strings.SplitN(header, ":", 2)
+			if len(headerSplit) != 2 {
+				return fmt.Errorf("invalid header provided: %q", header)
+			}
+
+			header, val := strings.TrimSpace(headerSplit[0]), strings.TrimSpace(headerSplit[1])
+
+			r.Header.Add(header, val)
+		}
+
+		params, err := url.ParseQuery(input.query)
+		if err != nil {
+			return fmt.Errorf("error parsing query string: %w", err)
+		}
+
+		r.URL.RawQuery = params.Encode()
+
+		return nil
+	}
+
+	var req *http.Request
 	clientCmd := &cobra.Command{
 		Use:   name,
 		Short: fmt.Sprintf("client for interacting with %s resources", name),
+		// This will execute the request created by the subcommand and print the output
+		PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
+			result, err := MakeRequest[any](req, c.client, 0, reqEditor)
+			if err != nil {
+				return fmt.Errorf("error executing request: %w", err)
+			}
+
+			return result.Fprint(cmd.OutOrStdout(), input.pretty)
+		},
 	}
 
 	// currently this is not working correctly because the child will override the length of shared parent IDs, so client.URL fails
@@ -143,48 +175,72 @@ func (c *Client[T]) Command(name string, input *cliArgs) *cobra.Command {
 
 	var body string
 
-	runE := func(cmd *cobra.Command, args []string) error {
-		c.Address = input.address
-
-		result, err := c.RunFromCLI(append([]string{cmd.Name()}, args...), parentIDs, input.headers, input.query, body)
-		if err != nil {
-			return fmt.Errorf("error running client from CLI: %w", err)
-		}
-
-		cmd.SetContext(NewContextWithCLIResult(cmd.Context(), result))
-
-		return result.Fprint(cmd.OutOrStdout(), input.pretty)
-	}
-
+	// Each command's RunE will create the appropriate *http.Request
 	getCmd := &cobra.Command{
 		Use:   "get",
 		Short: "make a GET request to get a resource by ID",
-		RunE:  runE,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c.Address = input.address
+
+			var err error
+			req, err = c.cliGetRequest(parentIDs, args)
+			return err
+		},
 	}
 	listCmd := &cobra.Command{
 		Use:   "list",
 		Short: "make a GET request to list resources",
-		RunE:  runE,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c.Address = input.address
+
+			var err error
+			req, err = c.cliGetAllRequest(parentIDs)
+			return err
+		},
 	}
 	deleteCmd := &cobra.Command{
 		Use:   "delete",
 		Short: "make a DELETE request to delete a resource by ID",
-		RunE:  runE,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c.Address = input.address
+
+			var err error
+			req, err = c.cliDeleteRequest(parentIDs, args)
+			return err
+		},
 	}
 	postCmd := &cobra.Command{
 		Use:   "post",
 		Short: "make a POST request to create a new resource",
-		RunE:  runE,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c.Address = input.address
+
+			var err error
+			req, err = c.cliPostRequest(parentIDs, body)
+			return err
+		},
 	}
 	putCmd := &cobra.Command{
 		Use:   "put",
 		Short: "make a PUT request to create or modify a resource by ID",
-		RunE:  runE,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c.Address = input.address
+
+			var err error
+			req, err = c.cliPutRequest(parentIDs, body, args)
+			return err
+		},
 	}
 	patchCmd := &cobra.Command{
 		Use:   "patch",
 		Short: "make a PATCH request to modify a resource by ID",
-		RunE:  runE,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c.Address = input.address
+
+			var err error
+			req, err = c.cliPatchRequest(parentIDs, body, args)
+			return err
+		},
 	}
 
 	postCmd.Flags().StringVarP(&body, "data", "d", "", "data for request body")
@@ -203,65 +259,6 @@ func (c *Client[T]) Command(name string, input *cliArgs) *cobra.Command {
 	clientCmd.AddCommand(patchCmd)
 
 	return clientCmd
-}
-
-func (c *Client[T]) RunFromCLI(args, parentIDs, requestHeaders []string, rawQuery, body string) (PrintableResponse, error) {
-	if len(args) < 1 {
-		return nil, fmt.Errorf("at least one argument required")
-	}
-
-	reqEditor := func(r *http.Request) error {
-		for _, header := range requestHeaders {
-			headerSplit := strings.SplitN(header, ":", 2)
-			if len(headerSplit) != 2 {
-				return fmt.Errorf("invalid header provided: %q", header)
-			}
-
-			header, val := strings.TrimSpace(headerSplit[0]), strings.TrimSpace(headerSplit[1])
-
-			r.Header.Add(header, val)
-		}
-
-		params, err := url.ParseQuery(rawQuery)
-		if err != nil {
-			return fmt.Errorf("error parsing query string: %w", err)
-		}
-
-		r.URL.RawQuery = params.Encode()
-
-		return nil
-	}
-
-	c.SetRequestEditor(reqEditor)
-
-	var req *http.Request
-	var err error
-	switch args[0] {
-	case "get":
-		req, err = c.cliGetRequest(parentIDs, args[1:])
-	case "list":
-		req, err = c.cliGetAllRequest(parentIDs)
-	case "post":
-		req, err = c.cliPostRequest(parentIDs, body)
-	case "put":
-		req, err = c.cliPutRequest(parentIDs, body, args[1:])
-	case "patch":
-		req, err = c.cliPatchRequest(parentIDs, body, args[1:])
-	case "delete":
-		req, err = c.cliDeleteRequest(parentIDs, args[1:])
-	default:
-		return nil, fmt.Errorf("missing http verb argument")
-	}
-	if err != nil {
-		return nil, fmt.Errorf("error running %q: %w", args[0], err)
-	}
-
-	result, err := MakeRequest[any](req, c.client, 0, reqEditor)
-	if err != nil {
-		return nil, fmt.Errorf("error executing request: %w", err)
-	}
-
-	return result, nil
 }
 
 func (c *Client[T]) cliGetRequest(parentIDs, args []string) (*http.Request, error) {

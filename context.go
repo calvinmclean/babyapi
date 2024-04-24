@@ -14,22 +14,7 @@ type ctxKey int
 const (
 	loggerCtxKey ctxKey = iota
 	requestBodyCtxKey
-	cliResultCtxKey
 )
-
-func GetCLIResultFromContext(ctx context.Context) any {
-	if ctx == nil {
-		return nil
-	}
-	return ctx.Value(cliResultCtxKey)
-}
-
-func NewContextWithCLIResult(ctx context.Context, result any) context.Context {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	return context.WithValue(ctx, cliResultCtxKey, result)
-}
 
 // GetLoggerFromContext returns the structured logger from the context. It expects to use an HTTP
 // request context to get a logger with details from middleware
