@@ -69,7 +69,7 @@ func (tt RequestTest[T]) Run(t *testing.T, client *babyapi.Client[T], getRespons
 	var r any
 	var err error
 	switch tt.Method {
-	case MethodGetAll:
+	case babyapi.MethodGetAll:
 		r, err = client.GetAll(context.Background(), rawQuery, parentIDs...)
 	case http.MethodPost:
 		r, err = client.PostRaw(context.Background(), body, parentIDs...)
@@ -103,7 +103,7 @@ var _ Test[*babyapi.AnyResource] = RequestFuncTest[*babyapi.AnyResource](func(ge
 func (tt RequestFuncTest[T]) Run(t *testing.T, client *babyapi.Client[T], getResponse PreviousResponseGetter) (*Response[T], error) {
 	r := tt(getResponse, client.Address)
 
-	if r.Method == MethodGetAll {
+	if r.Method == babyapi.MethodGetAll {
 		r.Method = http.MethodGet
 		resp, err := babyapi.MakeRequest[*babyapi.ResourceList[T]](r, http.DefaultClient, 0, func(r *http.Request) error {
 			return nil

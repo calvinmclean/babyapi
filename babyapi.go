@@ -14,6 +14,9 @@ import (
 	"github.com/go-chi/render"
 )
 
+// MethodGetAll is the same as http.MethodGet, but can be used when setting custom response codes
+const MethodGetAll = "GetAll"
+
 // API encapsulates all handlers and other pieces of code required to run the CRUID API based on
 // the provided Resource type
 type API[T Resource] struct {
@@ -163,7 +166,8 @@ func (a *API[T]) Name() string {
 	return a.name
 }
 
-// SetCustomResponseCode will override the default response codes for the specified HTTP verb
+// SetCustomResponseCode will override the default response codes for the specified HTTP verb. Use MethodGetAll to set the
+// response code for listing all resources
 func (a *API[T]) SetCustomResponseCode(verb string, code int) *API[T] {
 	a.panicIfReadOnly()
 

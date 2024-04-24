@@ -72,7 +72,7 @@ func TestAPI(t *testing.T) {
 		{
 			Name: "GetAllEventsForbidden",
 			Test: babytest.RequestTest[*babyapi.AnyResource]{
-				Method:   babytest.MethodGetAll,
+				Method:   babyapi.MethodGetAll,
 				RawQuery: "password=secret",
 				IDFunc: func(getResponse babytest.PreviousResponseGetter) string {
 					return getResponse("CreateEvent").Data.GetID()
@@ -181,7 +181,7 @@ func TestAPI(t *testing.T) {
 		{
 			Name: "ListInvites",
 			Test: babytest.RequestTest[*babyapi.AnyResource]{
-				Method:   babytest.MethodGetAll,
+				Method:   babyapi.MethodGetAll,
 				RawQuery: "password=secret",
 				ParentIDsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
 					return []string{getResponse("CreateEvent").Data.GetID()}
@@ -202,7 +202,7 @@ func TestAPI(t *testing.T) {
 				id := getResponse("CreateEvent").Data.GetID()
 				address = fmt.Sprintf("%s/events/%s/invites", address, id)
 
-				r, err := http.NewRequest(babytest.MethodGetAll, address, http.NoBody)
+				r, err := http.NewRequest(babyapi.MethodGetAll, address, http.NoBody)
 				require.NoError(t, err)
 
 				q := r.URL.Query()
@@ -311,216 +311,4 @@ func TestIndividualTest(t *testing.T) {
 		},
 	}.RunWithResponse(t, client)
 	require.NotNil(t, resp)
-}
-
-func TestCLI(t *testing.T) {
-	defer os.RemoveAll("storage.json")
-
-	api := createAPI()
-
-	babytest.RunTableTest(t, api.Events, []babytest.TestCase[*babyapi.AnyResource]{
-		{
-			Name: "ErrorCreatingEventWithoutPassword",
-			Test: babytest.CommandLineTest[*babyapi.AnyResource]{
-				Command: api.Events.Command,
-				Args:    []string{"event", "post", "-d", `{"Name": "Party"}`},
-			},
-			ExpectedResponse: babytest.ExpectedResponse{
-				Status: http.StatusBadRequest,
-				Body:   `{"status":"Invalid request.","error":"missing required 'password' field"}`,
-				Error:  "error running client from CLI: error running Post: error posting resource: unexpected response with text: Invalid request.",
-			},
-		},
-		{
-			Name: "CreateEvent",
-			Test: babytest.CommandLineTest[*babyapi.AnyResource]{
-				Command: api.Events.Command,
-				Args:    []string{"event", "post", "-d", `{"Name": "Party", "Password": "secret"}`},
-			},
-			ExpectedResponse: babytest.ExpectedResponse{
-				Status:       http.StatusCreated,
-				BodyRegexp:   `{"id":"[0-9a-v]{20}","Name":"Party","Contact":"","Date":"","Location":"","Details":""}`,
-				CLIOutRegexp: `{\s+"Contact": "",\s+"Date": "",\s+"Details": "",\s+"Location": "",\s+"Name": "Party",\s+"id": "[0-9a-v]{20}"\s+}\s*`,
-			},
-		},
-		{
-			Name: "GetEventForbidden",
-			Test: babytest.CommandLineTest[*babyapi.AnyResource]{
-				Command: api.Events.Command,
-				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
-					return []string{"event", "get", getResponse("CreateEvent").Data.GetID()}
-				},
-			},
-			ExpectedResponse: babytest.ExpectedResponse{
-				Status: http.StatusForbidden,
-				Body:   `{"status":"Forbidden"}`,
-				Error:  "error running client from CLI: error running Get: error getting resource: unexpected response with text: Forbidden",
-			},
-		},
-		{
-			Name: "GetEvent",
-			Test: babytest.CommandLineTest[*babyapi.AnyResource]{
-				Command: api.Events.Command,
-				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
-					return []string{"event", "get", getResponse("CreateEvent").Data.GetID(), "-q", "password=secret"}
-				},
-			},
-			ExpectedResponse: babytest.ExpectedResponse{
-				Status:     http.StatusOK,
-				BodyRegexp: `{"id":"[0-9a-v]{20}","Name":"Party","Contact":"","Date":"","Location":"","Details":""}`,
-			},
-		},
-		{
-			Name: "GetEventWithInvalidInvite",
-			Test: babytest.CommandLineTest[*babyapi.AnyResource]{
-				Command: api.Events.Command,
-				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
-					return []string{"event", "get", getResponse("CreateEvent").Data.GetID(), "-q", "invite=DoesNotExist"}
-				},
-			},
-			ExpectedResponse: babytest.ExpectedResponse{
-				Status: http.StatusForbidden,
-				Body:   `{"status":"Forbidden"}`,
-				Error:  "error running client from CLI: error running Get: error getting resource: unexpected response with text: Forbidden",
-			},
-		},
-		{
-			Name: "PUTNotAllowed",
-			Test: babytest.CommandLineTest[*babyapi.AnyResource]{
-				Command: api.Events.Command,
-				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
-					return []string{
-						"event", "put",
-						getResponse("CreateEvent").Data.GetID(),
-						"-d", fmt.Sprintf(`{"id": "%s", "name": "New Name"}`, getResponse("CreateEvent").Data.GetID()),
-						"-q", "password=secret",
-					}
-				},
-			},
-			ExpectedResponse: babytest.ExpectedResponse{
-				Status: http.StatusBadRequest,
-				Body:   `{"status":"Invalid request.","error":"PUT not allowed"}`,
-				Error:  "error running client from CLI: error running Put: error putting resource: unexpected response with text: Invalid request.",
-			},
-		},
-		{
-			Name: "CannotCreateInviteWithoutEventPassword",
-			Test: babytest.CommandLineTest[*babyapi.AnyResource]{
-				Command: api.Events.Command,
-				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
-					eventID := getResponse("CreateEvent").Data.GetID()
-					return []string{"invite", "post", "--event-id", eventID, "-d", `{"Name": "Name"}`}
-				},
-			},
-			ClientName: "Invite",
-			ExpectedResponse: babytest.ExpectedResponse{
-				Status: http.StatusForbidden,
-				Body:   `{"status":"Forbidden"}`,
-				Error:  "error running client from CLI: error running Post: error posting resource: unexpected response with text: Forbidden",
-			},
-		},
-		{
-			Name: "CreateInvite",
-			Test: babytest.CommandLineTest[*babyapi.AnyResource]{
-				Command: api.Events.Command,
-				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
-					eventID := getResponse("CreateEvent").Data.GetID()
-					return []string{"invite", "post", "--event-id", eventID, "-d", `{"Name": "Firstname Lastname"}`, "-q", "password=secret"}
-				},
-			},
-			ClientName: "Invite",
-			ExpectedResponse: babytest.ExpectedResponse{
-				Status:     http.StatusCreated,
-				BodyRegexp: `{"id":"[0-9a-v]{20}","Name":"Firstname Lastname","Contact":"","EventID":"[0-9a-v]{20}","RSVP":null}`,
-			},
-		},
-		{
-			Name: "GetInvite",
-			Test: babytest.CommandLineTest[*babyapi.AnyResource]{
-				Command: api.Events.Command,
-				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
-					eventID := getResponse("CreateEvent").Data.GetID()
-					return []string{
-						"invite", "get",
-						getResponse("CreateInvite").Data.GetID(), "--event-id", eventID,
-						"-q", "password=secret",
-					}
-				},
-			},
-			ClientName: "Invite",
-			ExpectedResponse: babytest.ExpectedResponse{
-				Status:     http.StatusOK,
-				BodyRegexp: `{"id":"[0-9a-v]{20}","Name":"Firstname Lastname","Contact":"","EventID":"[0-9a-v]{20}","RSVP":null}`,
-			},
-		},
-		{
-			Name: "ListInvites",
-			Test: babytest.CommandLineTest[*babyapi.AnyResource]{
-				Command: api.Events.Command,
-				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
-					eventID := getResponse("CreateEvent").Data.GetID()
-					return []string{
-						"invite", "list", "--event-id", eventID, "-q", "password=secret",
-					}
-				},
-			},
-			ClientName: "Invite",
-			ExpectedResponse: babytest.ExpectedResponse{
-				Status:     http.StatusOK,
-				BodyRegexp: `{"items":\[{"id":"[0-9a-v]{20}","Name":"Firstname Lastname","Contact":"","EventID":"[0-9a-v]{20}","RSVP":null}]`,
-			},
-		},
-		{
-			Name: "GetEventWithInviteIDAsPassword",
-			Test: babytest.CommandLineTest[*babyapi.AnyResource]{
-				Command: api.Events.Command,
-				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
-					eventID := getResponse("CreateEvent").Data.GetID()
-					return []string{
-						"invite", "get",
-						getResponse("CreateInvite").Data.GetID(), "--event-id", eventID,
-						"-q", "invite=" + getResponse("CreateInvite").Data.GetID(),
-					}
-				},
-			},
-			ClientName: "Invite",
-			ExpectedResponse: babytest.ExpectedResponse{
-				Status:     http.StatusOK,
-				BodyRegexp: `{"id":"[0-9a-v]{20}","Name":"Firstname Lastname","Contact":"","EventID":"[0-9a-v]{20}","RSVP":null}`,
-			},
-		},
-		{
-			Name: "DeleteInvite",
-			Test: babytest.CommandLineTest[*babyapi.AnyResource]{
-				Command: api.Events.Command,
-				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
-					eventID := getResponse("CreateEvent").Data.GetID()
-					return []string{
-						"invite", "delete",
-						getResponse("CreateInvite").Data.GetID(), "--event-id", eventID,
-					}
-				},
-			},
-			ClientName: "Invite",
-			ExpectedResponse: babytest.ExpectedResponse{
-				Status: http.StatusOK,
-				NoBody: true,
-			},
-		},
-		{
-			Name: "PatchErrorNotConfigured",
-			Test: babytest.CommandLineTest[*babyapi.AnyResource]{
-				Command: api.Events.Command,
-				ArgsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
-					eventID := getResponse("CreateEvent").Data.GetID()
-					return []string{"event", "patch", eventID, "-d", `{"Name": "NEW"}`, "-q", "password=secret"}
-				},
-			},
-			ExpectedResponse: babytest.ExpectedResponse{
-				Status: http.StatusMethodNotAllowed,
-				Body:   `{"status":"Method not allowed."}`,
-				Error:  "error running client from CLI: error running Patch: error patching resource: unexpected response with text: Method not allowed.",
-			},
-		},
-	})
 }

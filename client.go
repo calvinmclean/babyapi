@@ -20,6 +20,44 @@ type Response[T any] struct {
 	Response    *http.Response
 }
 
+func newResponse[T any](resp *http.Response, expectedStatusCode int) (*Response[T], error) {
+	result := &Response[T]{
+		ContentType: resp.Header.Get("Content-Type"),
+		Response:    resp,
+	}
+
+	if resp.Body != nil {
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding error response: %w", err)
+		}
+		result.Body = string(body)
+	}
+
+	if resp.StatusCode != expectedStatusCode && expectedStatusCode != 0 {
+		if result.Body == "" {
+			return nil, fmt.Errorf("unexpected status and no body: %d", resp.StatusCode)
+		}
+
+		var httpErr *ErrResponse
+		err := json.Unmarshal([]byte(result.Body), &httpErr)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding error response %q: %w", result.Body, err)
+		}
+		httpErr.HTTPStatusCode = resp.StatusCode
+		return nil, httpErr
+	}
+
+	if result.ContentType == "application/json" {
+		err := json.Unmarshal([]byte(result.Body), &result.Data)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding response body %q: %w", result.Body, err)
+		}
+	}
+
+	return result, nil
+}
+
 // Fprint writes the Response body to the provided Writer. If the ContentType is JSON, it will JSON encode
 // the body. Setting pretty=true will print indented JSON.
 func (sr *Response[T]) Fprint(out io.Writer, pretty bool) error {
@@ -118,7 +156,7 @@ func (c *Client[T]) SetRequestEditor(requestEditor RequestEditor) *Client[T] {
 
 // Get will get a resource by ID
 func (c *Client[T]) Get(ctx context.Context, id string, parentIDs ...string) (*Response[T], error) {
-	req, err := c.NewRequestWithParentIDs(ctx, http.MethodGet, http.NoBody, id, parentIDs...)
+	req, err := c.GetRequest(ctx, id, parentIDs...)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
@@ -131,21 +169,36 @@ func (c *Client[T]) Get(ctx context.Context, id string, parentIDs ...string) (*R
 	return result, nil
 }
 
+// GetRequest creates a request that can be used to get a resource
+func (c *Client[T]) GetRequest(ctx context.Context, id string, parentIDs ...string) (*http.Request, error) {
+	return c.NewRequestWithParentIDs(ctx, http.MethodGet, http.NoBody, id, parentIDs...)
+}
+
 // GetAll gets all resources from the API
 func (c *Client[T]) GetAll(ctx context.Context, rawQuery string, parentIDs ...string) (*Response[*ResourceList[T]], error) {
-	req, err := c.NewRequestWithParentIDs(ctx, http.MethodGet, http.NoBody, "", parentIDs...)
+	req, err := c.GetAllRequest(ctx, rawQuery, parentIDs...)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	req.URL.RawQuery = rawQuery
-
-	result, err := MakeRequest[*ResourceList[T]](req, c.client, http.StatusOK, c.requestEditor)
+	result, err := MakeRequest[*ResourceList[T]](req, c.client, c.customResponseCodes[MethodGetAll], c.requestEditor)
 	if err != nil {
 		return nil, fmt.Errorf("error getting all resources: %w", err)
 	}
 
 	return result, nil
+}
+
+// GetAllRequest creates a request that can be used to get all resources
+func (c *Client[T]) GetAllRequest(ctx context.Context, rawQuery string, parentIDs ...string) (*http.Request, error) {
+	req, err := c.NewRequestWithParentIDs(ctx, http.MethodGet, http.NoBody, "", parentIDs...)
+	if err != nil {
+		return nil, err
+	}
+
+	req.URL.RawQuery = rawQuery
+
+	return req, nil
 }
 
 // Put makes a PUT request to create/modify a resource by ID
@@ -159,18 +212,28 @@ func (c *Client[T]) Put(ctx context.Context, resource T, parentIDs ...string) (*
 	return c.put(ctx, resource.GetID(), &body, parentIDs...)
 }
 
+// PutRequest creates a request that can be used to PUT a resource
+func (c *Client[T]) PutRequest(ctx context.Context, body io.Reader, id string, parentIDs ...string) (*http.Request, error) {
+	req, err := c.NewRequestWithParentIDs(ctx, http.MethodPut, body, id, parentIDs...)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+
+	return req, nil
+}
+
 // PutRaw makes a PUT request to create/modify a resource by ID. It uses the provided string as the request body
 func (c *Client[T]) PutRaw(ctx context.Context, id, body string, parentIDs ...string) (*Response[T], error) {
 	return c.put(ctx, id, bytes.NewBufferString(body), parentIDs...)
 }
 
 func (c *Client[T]) put(ctx context.Context, id string, body io.Reader, parentIDs ...string) (*Response[T], error) {
-	req, err := c.NewRequestWithParentIDs(ctx, http.MethodPut, body, id, parentIDs...)
+	req, err := c.PutRequest(ctx, body, id, parentIDs...)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
-
-	req.Header.Add("Content-Type", "application/json")
 
 	result, err := c.MakeRequest(req, c.customResponseCodes[http.MethodPut])
 	if err != nil {
@@ -191,18 +254,28 @@ func (c *Client[T]) Post(ctx context.Context, resource T, parentIDs ...string) (
 	return c.post(ctx, &body, parentIDs...)
 }
 
+// PostRequest creates a request that can be used to POST a resource
+func (c *Client[T]) PostRequest(ctx context.Context, body io.Reader, parentIDs ...string) (*http.Request, error) {
+	req, err := c.NewRequestWithParentIDs(ctx, http.MethodPost, body, "", parentIDs...)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+
+	return req, nil
+}
+
 // PostRaw makes a POST request using the provided string as the body
 func (c *Client[T]) PostRaw(ctx context.Context, body string, parentIDs ...string) (*Response[T], error) {
 	return c.post(ctx, bytes.NewBufferString(body), parentIDs...)
 }
 
 func (c *Client[T]) post(ctx context.Context, body io.Reader, parentIDs ...string) (*Response[T], error) {
-	req, err := c.NewRequestWithParentIDs(ctx, http.MethodPost, body, "", parentIDs...)
+	req, err := c.PostRequest(ctx, body, parentIDs...)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
-
-	req.Header.Add("Content-Type", "application/json")
 
 	result, err := c.MakeRequest(req, c.customResponseCodes[http.MethodPost])
 	if err != nil {
@@ -223,18 +296,28 @@ func (c *Client[T]) Patch(ctx context.Context, id string, resource T, parentIDs 
 	return c.patch(ctx, id, &body, parentIDs...)
 }
 
+// PatchRequest creates a request that can be used to PATCH a resource
+func (c *Client[T]) PatchRequest(ctx context.Context, body io.Reader, id string, parentIDs ...string) (*http.Request, error) {
+	req, err := c.NewRequestWithParentIDs(ctx, http.MethodPatch, body, id, parentIDs...)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+
+	return req, nil
+}
+
 // PatchRaw makes a PATCH request to modify a resource by ID. It uses the provided string as the request body
 func (c *Client[T]) PatchRaw(ctx context.Context, id, body string, parentIDs ...string) (*Response[T], error) {
 	return c.patch(ctx, id, bytes.NewBufferString(body), parentIDs...)
 }
 
 func (c *Client[T]) patch(ctx context.Context, id string, body io.Reader, parentIDs ...string) (*Response[T], error) {
-	req, err := c.NewRequestWithParentIDs(ctx, http.MethodPatch, body, id, parentIDs...)
+	req, err := c.PatchRequest(ctx, body, id, parentIDs...)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
-
-	req.Header.Add("Content-Type", "application/json")
 
 	resp, err := c.MakeRequest(req, c.customResponseCodes[http.MethodPatch])
 	if err != nil {
@@ -246,7 +329,7 @@ func (c *Client[T]) patch(ctx context.Context, id string, body io.Reader, parent
 
 // Delete makes a DELETE request to delete a resource by ID
 func (c *Client[T]) Delete(ctx context.Context, id string, parentIDs ...string) (*Response[T], error) {
-	req, err := c.NewRequestWithParentIDs(ctx, http.MethodDelete, http.NoBody, id, parentIDs...)
+	req, err := c.DeleteRequest(ctx, id, parentIDs...)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
@@ -257,6 +340,11 @@ func (c *Client[T]) Delete(ctx context.Context, id string, parentIDs ...string) 
 	}
 
 	return resp, nil
+}
+
+// DeleteRequest creates a request that can be used to delete a resource
+func (c *Client[T]) DeleteRequest(ctx context.Context, id string, parentIDs ...string) (*http.Request, error) {
+	return c.NewRequestWithParentIDs(ctx, http.MethodDelete, http.NoBody, id, parentIDs...)
 }
 
 // NewRequestWithParentIDs uses http.NewRequestWithContext to create a new request using the URL created from the provided ID and parent IDs
@@ -296,13 +384,49 @@ func (c *Client[T]) MakeRequest(req *http.Request, expectedStatusCode int) (*Res
 	return MakeRequest[T](req, c.client, expectedStatusCode, c.requestEditor)
 }
 
+// MakeGenericRequest allows making a request without specifying the return type. It accepts a pointer receiver
+// to pass to json.Unmarshal. This allows returning any type using the Client.
+func (c *Client[T]) MakeGenericRequest(req *http.Request, target any) error {
+	resp, err := makeRequest(req, c.client, c.requestEditor)
+	if err != nil {
+		return err
+	}
+
+	if resp.Body == nil {
+		return nil
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("error decoding error response: %w", err)
+	}
+
+	err = json.Unmarshal(body, target)
+	if err != nil {
+		return fmt.Errorf("error decoding response body %q: %w", string(body), err)
+	}
+
+	return nil
+}
+
 // MakeRequest generically sends an HTTP request after calling the request editor and checks the response code
 // It returns a babyapi.Response which contains the http.Response after extracting the body to Body string and
 // JSON decoding the resource type into Data if the response is JSON
 func MakeRequest[T any](req *http.Request, client *http.Client, expectedStatusCode int, requestEditor RequestEditor) (*Response[T], error) {
-	err := requestEditor(req)
+	resp, err := makeRequest(req, client, requestEditor)
 	if err != nil {
-		return nil, fmt.Errorf("error returned from request editor: %w", err)
+		return nil, err
+	}
+
+	return newResponse[T](resp, expectedStatusCode)
+}
+
+func makeRequest(req *http.Request, client *http.Client, requestEditor RequestEditor) (*http.Response, error) {
+	if requestEditor != nil {
+		err := requestEditor(req)
+		if err != nil {
+			return nil, fmt.Errorf("error returned from request editor: %w", err)
+		}
 	}
 
 	resp, err := client.Do(req)
@@ -310,41 +434,7 @@ func MakeRequest[T any](req *http.Request, client *http.Client, expectedStatusCo
 		return nil, fmt.Errorf("error doing request: %w", err)
 	}
 
-	result := &Response[T]{
-		ContentType: resp.Header.Get("Content-Type"),
-		Response:    resp,
-	}
-
-	if resp.Body != nil {
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("error decoding error response: %w", err)
-		}
-		result.Body = string(body)
-	}
-
-	if resp.StatusCode != expectedStatusCode && expectedStatusCode != 0 {
-		if result.Body == "" {
-			return nil, fmt.Errorf("unexpected status and no body: %d", resp.StatusCode)
-		}
-
-		var httpErr *ErrResponse
-		err = json.Unmarshal([]byte(result.Body), &httpErr)
-		if err != nil {
-			return nil, fmt.Errorf("error decoding error response %q: %w", result.Body, err)
-		}
-		httpErr.HTTPStatusCode = resp.StatusCode
-		return nil, httpErr
-	}
-
-	if result.ContentType == "application/json" {
-		err = json.Unmarshal([]byte(result.Body), &result.Data)
-		if err != nil {
-			return nil, fmt.Errorf("error decoding response body %q: %w", result.Body, err)
-		}
-	}
-
-	return result, nil
+	return resp, nil
 }
 
 // makePathWithRoot will create a base API route if the parent is a root path. This is necessary because the parent

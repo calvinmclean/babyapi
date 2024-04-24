@@ -449,8 +449,8 @@ func TestCLI(t *testing.T) {
 		{
 			"PostError",
 			[]string{"Albums", "post", "-d", `bad request`},
-			"error running client from CLI: error running Post: error posting resource: unexpected response with text: Invalid request.",
-			true,
+			`{"error":"invalid character 'b' looking for beginning of value","status":"Invalid request."}`,
+			false,
 		},
 		{
 			"Patch",
@@ -467,8 +467,8 @@ func TestCLI(t *testing.T) {
 		{
 			"PutError",
 			[]string{"Albums", "put", "cljcqg5o402e9s28rbp0", "-d", `{"title":"NewAlbum"}`},
-			"error running client from CLI: error running Put: error putting resource: unexpected response with text: Invalid request.",
-			true,
+			`{"error":"missing required id field","status":"Invalid request."}`,
+			false,
 		},
 		{
 			"GetByID",
@@ -479,7 +479,7 @@ func TestCLI(t *testing.T) {
 		{
 			"GetByIDMissingArgs",
 			[]string{"Albums", "get"},
-			"error running client from CLI: at least one argument required",
+			`at least one argument required`,
 			true,
 		},
 		{
@@ -515,26 +515,26 @@ func TestCLI(t *testing.T) {
 		{
 			"DeleteMissingArgs",
 			[]string{"Albums", "delete"},
-			"error running client from CLI: at least one argument required",
+			`at least one argument required`,
 			true,
 		},
 		{
 			"GetByIDNotFound",
 			[]string{"Albums", "get", "cljcqg5o402e9s28rbp0"},
-			"error running client from CLI: error running Get: error getting resource: unexpected response with text: Resource not found.",
-			true,
+			`{"status":"Resource not found."}`,
+			false,
 		},
 		{
 			"DeleteNotFound",
 			[]string{"Albums", "delete", "cljcqg5o402e9s28rbp0"},
-			"error running client from CLI: error running Delete: error deleting resource: unexpected response with text: Resource not found.",
-			true,
+			`{"status":"Resource not found."}`,
+			false,
 		},
 		{
 			"PatchNotFound",
 			[]string{"Albums", "patch", "cljcqg5o402e9s28rbp0", "-d", ""},
-			"error running client from CLI: error running Patch: error patching resource: unexpected response with text: Resource not found.",
-			true,
+			`{"status":"Resource not found."}`,
+			false,
 		},
 		{
 			"PatchMissingArgs",
@@ -597,6 +597,12 @@ func TestCLI(t *testing.T) {
 		})
 	})
 
+	t.Run("RunWithoutAddress", func(t *testing.T) {
+		out, err := runCommand(api.Command(), []string{"client", "--pretty=false", "--query", "title=New Album", "Albums", "list"})
+		require.NoError(t, err)
+		require.Equal(t, `{"items":[{"id":"cljcqg5o402e9s28rbp0","title":"New Album"}]}`, strings.TrimSpace(out))
+	})
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			baseArgs := []string{"client", "--pretty=false", "--address", address}
@@ -608,6 +614,9 @@ func TestCLI(t *testing.T) {
 					require.Equal(t, tt.expectedRegexp, strings.TrimSpace(out))
 				}
 			} else {
+				if err == nil {
+					fmt.Println(out)
+				}
 				require.Error(t, err)
 				require.Regexp(t, tt.expectedRegexp, err.Error())
 			}
@@ -1127,8 +1136,8 @@ func TestRootAPICLI(t *testing.T) {
 		{
 			"PostError",
 			[]string{"MusicVideos", "post", "--data", `bad request`},
-			"error running client from CLI: error running Post: error posting resource: unexpected response with text: Invalid request.",
-			true,
+			`{"error":"invalid character 'b' looking for beginning of value","status":"Invalid request."}`,
+			false,
 		},
 		{
 			"Patch",
@@ -1145,8 +1154,8 @@ func TestRootAPICLI(t *testing.T) {
 		{
 			"PutError",
 			[]string{"MusicVideos", "put", "cljcqg5o402e9s28rbp0", "--data", `{"title":"NewMusicVideo"}`},
-			"error running client from CLI: error running Put: error putting resource: unexpected response with text: Invalid request.",
-			true,
+			`{"error":"missing required id field","status":"Invalid request."}`,
+			false,
 		},
 		{
 			"GetByID",
@@ -1157,7 +1166,7 @@ func TestRootAPICLI(t *testing.T) {
 		{
 			"GetByIDMissingArgs",
 			[]string{"MusicVideos", "get"},
-			"error running client from CLI: at least one argument required",
+			`at least one argument required`,
 			true,
 		},
 		{
@@ -1187,26 +1196,26 @@ func TestRootAPICLI(t *testing.T) {
 		{
 			"DeleteMissingArgs",
 			[]string{"MusicVideos", "delete"},
-			"error running client from CLI: at least one argument required",
+			`at least one argument required`,
 			true,
 		},
 		{
 			"GetByIDNotFound",
 			[]string{"MusicVideos", "get", "cljcqg5o402e9s28rbp0"},
-			"error running client from CLI: error running Get: error getting resource: unexpected response with text: Resource not found.",
-			true,
+			`{"status":"Resource not found."}`,
+			false,
 		},
 		{
 			"DeleteNotFound",
 			[]string{"MusicVideos", "delete", "cljcqg5o402e9s28rbp0"},
-			"error running client from CLI: error running Delete: error deleting resource: unexpected response with text: Resource not found.",
-			true,
+			`{"status":"Resource not found."}`,
+			false,
 		},
 		{
 			"PatchNotFound",
 			[]string{"MusicVideos", "patch", "cljcqg5o402e9s28rbp0", "--data", ""},
-			"error running client from CLI: error running Patch: error patching resource: unexpected response with text: Resource not found.",
-			true,
+			`{"status":"Resource not found."}`,
+			false,
 		},
 		{
 			"PatchMissingArgs",
@@ -1377,7 +1386,77 @@ func TestWithContextShutdown(t *testing.T) {
 	}
 }
 
-// func TestInvalidUseOfModifiersReturnsErrorAtStart(t *testing.T) {
-// 	api := babyapi.NewRootAPI[*Album]("Albums", "/albums", func() *Album { return &Album{} })
-// 	api
-// }
+type AllAlbumsWrapper []*Album
+
+func (AllAlbumsWrapper) Render(http.ResponseWriter, *http.Request) error {
+	return nil
+}
+
+func TestGetAllResponseWrapperWithClient(t *testing.T) {
+	api := babyapi.NewAPI("Albums", "/albums", func() *Album { return &Album{} })
+	api.SetGetAllResponseWrapper(func(a []*Album) render.Renderer {
+		return AllAlbumsWrapper(a)
+	})
+
+	client, stop := babytest.NewTestClient(t, api)
+	defer stop()
+
+	t.Run("CreateAlbum", func(t *testing.T) {
+		_, err := client.Post(context.Background(), &Album{Title: "Album"})
+		require.NoError(t, err)
+	})
+
+	t.Run("RegularGetAllRequestErrors", func(t *testing.T) {
+		_, err := client.GetAll(context.Background(), "")
+		require.Error(t, err)
+	})
+
+	t.Run("MakeRequestCanBeUsed", func(t *testing.T) {
+		req, err := client.GetAllRequest(context.Background(), "")
+		require.NoError(t, err)
+
+		resp, err := babyapi.MakeRequest[AllAlbumsWrapper](req, http.DefaultClient, http.StatusOK, nil)
+		require.NoError(t, err)
+		require.Equal(t, "Album", resp.Data[0].Title)
+	})
+
+	t.Run("MakeGenericRequestCanBeUsed", func(t *testing.T) {
+		req, err := client.GetAllRequest(context.Background(), "")
+		require.NoError(t, err)
+
+		var albums AllAlbumsWrapper
+		err = client.MakeGenericRequest(req, &albums)
+		require.NoError(t, err)
+		require.Equal(t, "Album", albums[0].Title)
+	})
+
+	t.Run("GetAllCLI", func(t *testing.T) {
+		out, err := runCommand(api.Command(), []string{"client", "--pretty=false", "--address", client.Address, "Albums", "list"})
+		require.NoError(t, err)
+		require.Regexp(t, `[{"id":"[0-9a-v]{20}","title":"Album"}]`, strings.TrimSpace(out))
+	})
+}
+
+func TestClient(t *testing.T) {
+	api := babyapi.NewAPI("Albums", "/albums", func() *Album { return &Album{} })
+	api.SetGetAllResponseWrapper(func(a []*Album) render.Renderer {
+		return AllAlbumsWrapper(a)
+	})
+
+	client, stop := babytest.NewTestClient(t, api)
+	defer stop()
+
+	t.Run("CustomResponseCodeSuccess", func(t *testing.T) {
+		client.SetCustomResponseCode(babyapi.MethodGetAll, http.StatusCreated)
+		resp, err := client.GetAll(context.Background(), "")
+		require.NoError(t, err)
+		require.Equal(t, http.StatusCreated, resp.Response.StatusCode)
+	})
+
+	t.Run("SetHTTPClient", func(t *testing.T) {
+		client.SetHTTPClient(http.DefaultClient)
+
+		_, err := client.GetAll(context.Background(), "")
+		require.NoError(t, err)
+	})
+}
