@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/calvinmclean/babyapi"
-	"github.com/calvinmclean/babyapi/storage"
+	"github.com/calvinmclean/babyapi/storage/kv"
 	"github.com/madflojo/hord"
 	"github.com/madflojo/hord/drivers/hashmap"
 	"github.com/madflojo/hord/drivers/redis"
@@ -57,7 +57,7 @@ func (h KeyValueStorage[T]) Apply(api *babyapi.API[T]) error {
 		storageKeyPrefix = api.Name()
 	}
 
-	api.SetStorage(storage.NewClient[T](db, storageKeyPrefix))
+	api.SetStorage(kv.NewClient[T](db, storageKeyPrefix))
 
 	return nil
 }
@@ -65,12 +65,12 @@ func (h KeyValueStorage[T]) Apply(api *babyapi.API[T]) error {
 func (h KVConnectionConfig) CreateDB() (hord.Database, error) {
 	switch {
 	case h.RedisHost != "" && h.RedisPassword != "":
-		return storage.NewRedisDB(redis.Config{
+		return kv.NewRedisDB(redis.Config{
 			Server:   h.RedisHost + ":6379",
 			Password: h.RedisPassword,
 		})
 	case h.Filename != "":
-		return storage.NewFileDB(hashmap.Config{
+		return kv.NewFileDB(hashmap.Config{
 			Filename: h.Filename,
 		})
 	case h.Optional:
