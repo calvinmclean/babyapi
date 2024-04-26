@@ -46,7 +46,7 @@ func (api *API) export(w http.ResponseWriter, r *http.Request) render.Renderer {
 		return httpErr
 	}
 
-	invites, err := api.Invites.Storage.GetAll(func(i *Invite) bool {
+	invites, err := api.Invites.Storage.GetAll(r.Context(), func(i *Invite) bool {
 		return i.EventID == event.GetID()
 	})
 	if err != nil {
@@ -98,7 +98,7 @@ func (api *API) rsvp(r *http.Request, invite *Invite) (render.Renderer, *babyapi
 	rsvp := r.Form.Get("RSVP") == "true"
 	invite.RSVP = &rsvp
 
-	err := api.Invites.Storage.Set(invite)
+	err := api.Invites.Storage.Set(r.Context(), invite)
 	if err != nil {
 		return nil, babyapi.InternalServerError(err)
 	}
@@ -136,7 +136,7 @@ func (api *API) addBulkInvites(r *http.Request, event *Event) (render.Renderer, 
 		}
 		invites = append(invites, inv)
 
-		err := api.Invites.Storage.Set(inv)
+		err := api.Invites.Storage.Set(r.Context(), inv)
 		if err != nil {
 			return nil, babyapi.InternalServerError(err)
 		}
@@ -162,7 +162,7 @@ func (api *API) authenticationMiddleware(r *http.Request, event *Event) (*http.R
 			return r, nil
 		}
 	case inviteID != "":
-		invite, err := api.Invites.Storage.Get(inviteID)
+		invite, err := api.Invites.Storage.Get(r.Context(), inviteID)
 		if err != nil {
 			if errors.Is(err, babyapi.ErrNotFound) {
 				return r, babyapi.ErrForbidden
@@ -188,7 +188,7 @@ func (api *API) getAllInvitesMiddleware(r *http.Request, event *Event) (*http.Re
 		return r, nil
 	}
 
-	invites, err := api.Invites.Storage.GetAll(func(i *Invite) bool {
+	invites, err := api.Invites.Storage.GetAll(r.Context(), func(i *Invite) bool {
 		return i.EventID == event.GetID()
 	})
 	if err != nil {

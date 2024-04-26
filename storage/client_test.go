@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -25,31 +26,31 @@ func TestClient(t *testing.T) {
 
 	id := babyapi.NewID()
 	t.Run("StoreTODO", func(t *testing.T) {
-		err := c.Set(&TODO{DefaultResource: babyapi.DefaultResource{ID: id}, Title: "TODO 1"})
+		err := c.Set(context.Background(), &TODO{DefaultResource: babyapi.DefaultResource{ID: id}, Title: "TODO 1"})
 		require.NoError(t, err)
 	})
 	t.Run("GetTODO", func(t *testing.T) {
-		todo, err := c.Get(id.String())
+		todo, err := c.Get(context.Background(), id.String())
 		require.NoError(t, err)
 		require.Equal(t, "TODO 1", todo.Title)
 	})
 	t.Run("GetAllTODOs", func(t *testing.T) {
-		todos, err := c.GetAll(func(t *TODO) bool { return true })
+		todos, err := c.GetAll(context.Background(), func(t *TODO) bool { return true })
 		require.NoError(t, err)
 		require.Len(t, todos, 1)
 		require.Equal(t, "TODO 1", todos[0].Title)
 	})
 	t.Run("DeleteTODO", func(t *testing.T) {
-		err := c.Delete(id.String())
+		err := c.Delete(context.Background(), id.String())
 		require.NoError(t, err)
 	})
 	t.Run("GetTODONotFound", func(t *testing.T) {
-		_, err := c.Get(id.String())
+		_, err := c.Get(context.Background(), id.String())
 		require.Error(t, err)
 		require.ErrorIs(t, err, babyapi.ErrNotFound)
 	})
 	t.Run("DeleteTODONotFound", func(t *testing.T) {
-		err := c.Delete(id.String())
+		err := c.Delete(context.Background(), id.String())
 		require.Error(t, err)
 		require.ErrorIs(t, err, babyapi.ErrNotFound)
 	})
@@ -80,29 +81,29 @@ func TestEndDateable(t *testing.T) {
 	id := babyapi.NewID()
 
 	t.Run("StoreTODO", func(t *testing.T) {
-		err := c.Set(&EndDateableTODO{DefaultResource: babyapi.DefaultResource{ID: id}, Title: "TODO 1"})
+		err := c.Set(context.Background(), &EndDateableTODO{DefaultResource: babyapi.DefaultResource{ID: id}, Title: "TODO 1"})
 		require.NoError(t, err)
 	})
 	t.Run("GetTODOIsNotEndDated", func(t *testing.T) {
-		todo, err := c.Get(id.String())
+		todo, err := c.Get(context.Background(), id.String())
 		require.NoError(t, err)
 		require.False(t, todo.EndDated())
 	})
 	t.Run("SoftDeleteTODO", func(t *testing.T) {
-		err := c.Delete(id.String())
+		err := c.Delete(context.Background(), id.String())
 		require.NoError(t, err)
 	})
 	t.Run("GetTODOHasEndDate", func(t *testing.T) {
-		todo, err := c.Get(id.String())
+		todo, err := c.Get(context.Background(), id.String())
 		require.NoError(t, err)
 		require.True(t, todo.EndDated())
 	})
 	t.Run("HardDeleteTODO", func(t *testing.T) {
-		err := c.Delete(id.String())
+		err := c.Delete(context.Background(), id.String())
 		require.NoError(t, err)
 	})
 	t.Run("GetTODONotFound", func(t *testing.T) {
-		_, err := c.Get(id.String())
+		_, err := c.Get(context.Background(), id.String())
 		require.Error(t, err)
 		require.ErrorIs(t, err, babyapi.ErrNotFound)
 	})
