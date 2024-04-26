@@ -349,9 +349,9 @@ func (a *API[T]) Serve(address string) error {
 		select {
 		case <-a.Done():
 		case <-a.context.Done():
+			// if shutdown by context, need to close a.quit for a.Done()
+			close(a.quit)
 		}
-
-		close(a.quit)
 
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer func() {
@@ -385,7 +385,7 @@ func (a *API[T]) Serve(address string) error {
 
 // Stop will stop the API
 func (a *API[T]) Stop() {
-	a.quit <- struct{}{}
+	close(a.quit)
 	<-a.shutdown
 }
 

@@ -74,7 +74,7 @@ func (a *API[T]) Command() *cobra.Command {
 
 func (a *API[T]) serveCmd(_ *cobra.Command, _ []string) error {
 	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 	go func() {
 		<-quit
 		a.Stop()
