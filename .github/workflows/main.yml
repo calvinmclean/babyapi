@@ -63,5 +63,5 @@ jobs:
         run: |
           for dir in examples/*/; do
             echo "Building $dir"
-            go build $dir/*.go
+            cd $dir && go build && cd -
           done
