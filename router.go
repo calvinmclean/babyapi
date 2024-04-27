@@ -179,11 +179,13 @@ func (a *API[T]) defaultGetAll() http.HandlerFunc {
 	return Handler(func(w http.ResponseWriter, r *http.Request) render.Renderer {
 		logger := GetLoggerFromContext(r.Context())
 
-		resources, err := a.Storage.GetAll(a.getAllFilter(r))
+		resources, err := a.Storage.GetAll(r.Context(), r.URL.Query())
 		if err != nil {
 			logger.Error("error getting resources", "error", err)
 			return InternalServerError(err)
 		}
+
+		resources = a.getAllFilter(r).Filter(resources)
 		logger.Debug("responding with resources", "count", len(resources))
 
 		var resp render.Renderer
@@ -213,7 +215,7 @@ func (a *API[T]) defaultPost() http.HandlerFunc {
 		}
 
 		logger.Info("storing resource", "resource", resource)
-		err := a.Storage.Set(resource)
+		err := a.Storage.Set(r.Context(), resource)
 		if err != nil {
 			logger.Error("error storing resource", "error", err)
 			return *new(T), InternalServerError(err)
@@ -244,7 +246,7 @@ func (a *API[T]) defaultPut() http.HandlerFunc {
 		}
 
 		logger.Info("storing resource", "resource", resource)
-		err := a.Storage.Set(resource)
+		err := a.Storage.Set(r.Context(), resource)
 		if err != nil {
 			logger.Error("error storing resource", "error", err)
 			return *new(T), InternalServerError(err)
@@ -289,7 +291,7 @@ func (a *API[T]) defaultPatch() http.HandlerFunc {
 
 		logger.Info("storing updated resource", "resource", resource)
 
-		err := a.Storage.Set(resource)
+		err := a.Storage.Set(r.Context(), resource)
 		if err != nil {
 			logger.Error("error storing updated resource", "error", err)
 			return *new(T), InternalServerError(err)
@@ -319,7 +321,7 @@ func (a *API[T]) defaultDelete() http.HandlerFunc {
 
 		logger.Info("deleting resource", "id", id)
 
-		err := a.Storage.Delete(id)
+		err := a.Storage.Delete(r.Context(), id)
 		if err != nil {
 			logger.Error("error deleting resource", "error", err)
 

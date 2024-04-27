@@ -110,7 +110,7 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 		nil,
 		func(r T) render.Renderer { return r },
 		nil,
-		func(*http.Request) FilterFunc[T] { return func(T) bool { return true } },
+		func(*http.Request) FilterFunc[T] { return nil },
 		defaultBeforeAfter,
 		defaultBeforeAfter,
 		func(*http.Request, T) *ErrResponse { return nil },
@@ -228,7 +228,9 @@ func (a *API[T]) SetAfterDelete(after func(*http.Request) *ErrResponse) *API[T] 
 }
 
 // SetGetAllFilter sets a function that can use the request context to create a filter for GetAll. Use this
-// to introduce query parameters for filtering resources
+// to introduce custom filtering after reading from storage. This should mostly be used with the default storage
+// client options. If you are using a custom SQL or other query-based implementation, it is better to use the url.Values
+// to create custom filtering
 func (a *API[T]) SetGetAllFilter(f func(*http.Request) FilterFunc[T]) *API[T] {
 	a.panicIfReadOnly()
 
@@ -349,9 +351,9 @@ func (a *API[T]) Serve(address string) error {
 		select {
 		case <-a.Done():
 		case <-a.context.Done():
+			// if shutdown by context, need to close a.quit for a.Done()
+			close(a.quit)
 		}
-
-		close(a.quit)
 
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer func() {
@@ -385,7 +387,7 @@ func (a *API[T]) Serve(address string) error {
 
 // Stop will stop the API
 func (a *API[T]) Stop() {
-	a.quit <- struct{}{}
+	close(a.quit)
 	<-a.shutdown
 }
 

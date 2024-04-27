@@ -675,7 +675,7 @@ func TestHTML(t *testing.T) {
 	client := api.Client(address)
 
 	t.Run("CreateItem", func(t *testing.T) {
-		err := api.Storage.Set(item1)
+		err := api.Storage.Set(context.Background(), item1)
 		require.NoError(t, err)
 	})
 
@@ -731,7 +731,7 @@ func TestServerSentEvents(t *testing.T) {
 		Content:         "Item1",
 	}
 	t.Run("CreateItem", func(t *testing.T) {
-		err := api.Storage.Set(item1)
+		err := api.Storage.Set(context.Background(), item1)
 		require.NoError(t, err)
 	})
 
@@ -882,7 +882,7 @@ func TestAPIModifierErrors(t *testing.T) {
 		w := babytest.TestRequest[*Album](t, api, r)
 		require.Equal(t, http.StatusUnprocessableEntity, w.Result().StatusCode)
 
-		allAlbums, err := api.Storage.GetAll(nil)
+		allAlbums, err := api.Storage.GetAll(context.Background(), nil)
 		require.NoError(t, err)
 
 		require.Equal(t, 0, len(allAlbums))
@@ -903,7 +903,7 @@ func TestAPIModifierErrors(t *testing.T) {
 		w := babytest.TestRequest[*Album](t, api, r)
 		require.Equal(t, http.StatusUnprocessableEntity, w.Result().StatusCode)
 
-		allAlbums, err := api.Storage.GetAll(nil)
+		allAlbums, err := api.Storage.GetAll(context.Background(), nil)
 		require.NoError(t, err)
 
 		require.Greater(t, len(allAlbums), 0)
@@ -928,7 +928,7 @@ func TestAPIModifierErrors(t *testing.T) {
 			r.Header.Add("Content-Type", "application/json")
 			babytest.TestRequest[*Album](t, api, r)
 
-			allAlbums, err := api.Storage.GetAll(nil)
+			allAlbums, err := api.Storage.GetAll(context.Background(), nil)
 			require.NoError(t, err)
 
 			require.Greater(t, len(allAlbums), 0)
@@ -942,7 +942,7 @@ func TestAPIModifierErrors(t *testing.T) {
 
 			require.Equal(t, http.StatusUnprocessableEntity, w.Result().StatusCode)
 
-			allAlbums, err := api.Storage.GetAll(nil)
+			allAlbums, err := api.Storage.GetAll(context.Background(), nil)
 			require.NoError(t, err)
 
 			require.Equal(t, len(allAlbums), 1)
@@ -964,7 +964,7 @@ func TestAPIModifierErrors(t *testing.T) {
 			r.Header.Add("Content-Type", "application/json")
 			babytest.TestRequest[*Album](t, api, r)
 
-			allAlbums, err := api.Storage.GetAll(nil)
+			allAlbums, err := api.Storage.GetAll(context.Background(), nil)
 			require.NoError(t, err)
 
 			require.Greater(t, len(allAlbums), 0)
@@ -978,7 +978,7 @@ func TestAPIModifierErrors(t *testing.T) {
 
 			require.Equal(t, http.StatusUnprocessableEntity, w.Result().StatusCode)
 
-			allAlbums, err := api.Storage.GetAll(nil)
+			allAlbums, err := api.Storage.GetAll(context.Background(), nil)
 			require.NoError(t, err)
 			afterCount := len(allAlbums)
 
@@ -1448,7 +1448,7 @@ func TestClient(t *testing.T) {
 
 	t.Run("CustomResponseCodeSuccess", func(t *testing.T) {
 		client.SetCustomResponseCode(babyapi.MethodGetAll, http.StatusCreated)
-		resp, err := client.GetAll(context.Background(), "")
+		resp, err := client.GetAllAny(context.Background(), "")
 		require.NoError(t, err)
 		require.Equal(t, http.StatusCreated, resp.Response.StatusCode)
 	})
@@ -1456,7 +1456,7 @@ func TestClient(t *testing.T) {
 	t.Run("SetHTTPClient", func(t *testing.T) {
 		client.SetHTTPClient(http.DefaultClient)
 
-		_, err := client.GetAll(context.Background(), "")
+		_, err := client.GetAllAny(context.Background(), "")
 		require.NoError(t, err)
 	})
 }

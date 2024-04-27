@@ -163,7 +163,7 @@ func (a *API[T]) GetFromRequest(r *http.Request) (T, *ErrResponse) {
 func (a *API[T]) GetRequestedResource(r *http.Request) (T, *ErrResponse) {
 	id := a.GetIDParam(r)
 
-	resource, err := a.Storage.Get(id)
+	resource, err := a.Storage.Get(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return *new(T), ErrNotFoundResponse

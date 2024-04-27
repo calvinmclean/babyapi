@@ -197,6 +197,24 @@ func TestAPI(t *testing.T) {
 			},
 		},
 		{
+			Name: "ListInvitesForbidden",
+			Test: babytest.RequestTest[*babyapi.AnyResource]{
+				Method: babyapi.MethodGetAll,
+				ParentIDsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
+					return []string{getResponse("CreateEvent").Data.GetID()}
+				},
+				IDFunc: func(getResponse babytest.PreviousResponseGetter) string {
+					return getResponse("CreateInvite").Data.GetID()
+				},
+			},
+			ClientName: "Invite",
+			ExpectedResponse: babytest.ExpectedResponse{
+				Status: http.StatusForbidden,
+				Body:   `{"status":"Forbidden"}`,
+				Error:  "error getting all resources: unexpected response with text: Forbidden",
+			},
+		},
+		{
 			Name: "ListInviteUsingRequestFuncTest",
 			Test: babytest.RequestFuncTest[*babyapi.AnyResource](func(getResponse babytest.PreviousResponseGetter, address string) *http.Request {
 				id := getResponse("CreateEvent").Data.GetID()

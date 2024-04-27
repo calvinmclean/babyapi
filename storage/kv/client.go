@@ -1,9 +1,11 @@
-package storage
+package kv
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -28,7 +30,7 @@ func (c *Client[T]) key(id string) string {
 
 // Delete will delete a resource by the key. If the resource implements EndDateable, it will first soft-delete by
 // setting the EndDate to time.Now()
-func (c *Client[T]) Delete(id string) error {
+func (c *Client[T]) Delete(ctx context.Context, id string) error {
 	key := c.key(id)
 
 	result, err := c.get(key)
@@ -47,12 +49,12 @@ func (c *Client[T]) Delete(id string) error {
 
 	endDateable.SetEndDate(time.Now())
 
-	return c.Set(result)
+	return c.Set(ctx, result)
 }
 
 // Get will use the provided key to read data from the data source. Then, it will Unmarshal
 // into the generic type
-func (c *Client[T]) Get(id string) (T, error) {
+func (c *Client[T]) Get(_ context.Context, id string) (T, error) {
 	return c.get(c.key(id))
 }
 
@@ -80,7 +82,7 @@ func (c *Client[T]) get(key string) (T, error) {
 
 // GetAll will use the provided prefix to read data from the data source. Then, it will use Get
 // to read each element into the correct type
-func (c *Client[T]) GetAll(filter babyapi.FilterFunc[T]) ([]T, error) {
+func (c *Client[T]) GetAll(_ context.Context, _ url.Values) ([]T, error) {
 	keys, err := c.db.Keys()
 	if err != nil {
 		return nil, fmt.Errorf("error getting keys: %w", err)
@@ -97,16 +99,14 @@ func (c *Client[T]) GetAll(filter babyapi.FilterFunc[T]) ([]T, error) {
 			return nil, fmt.Errorf("error getting data: %w", err)
 		}
 
-		if filter == nil || filter(result) {
-			results = append(results, result)
-		}
+		results = append(results, result)
 	}
 
 	return results, nil
 }
 
 // Set marshals the provided item and writes it to the database
-func (c *Client[T]) Set(item T) error {
+func (c *Client[T]) Set(_ context.Context, item T) error {
 	asBytes, err := json.Marshal(item)
 	if err != nil {
 		return fmt.Errorf("error marshalling data: %w", err)

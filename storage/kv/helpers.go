@@ -1,4 +1,4 @@
-package storage
+package kv
 
 import (
 	"fmt"

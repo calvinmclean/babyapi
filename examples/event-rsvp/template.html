@@ -147,7 +147,7 @@
 
 {{/* // This renders multiple invite rows and uses HTMX out of band responses */}}
 {{ define "bulkInvites" }}
-{{ range .Invites }}
+{{ range . }}
 {{ template "inviteRowOOB" . }}
 {{ end }}
 {{ end }}
