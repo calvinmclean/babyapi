@@ -35,7 +35,7 @@ func TestClient(t *testing.T) {
 		require.Equal(t, "TODO 1", todo.Title)
 	})
 	t.Run("GetAllTODOs", func(t *testing.T) {
-		todos, err := c.GetAll(context.Background(), func(t *TODO) bool { return true })
+		todos, err := c.GetAll(context.Background(), nil)
 		require.NoError(t, err)
 		require.Len(t, todos, 1)
 		require.Equal(t, "TODO 1", todos[0].Title)

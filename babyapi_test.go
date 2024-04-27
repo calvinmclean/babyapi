@@ -1448,7 +1448,7 @@ func TestClient(t *testing.T) {
 
 	t.Run("CustomResponseCodeSuccess", func(t *testing.T) {
 		client.SetCustomResponseCode(babyapi.MethodGetAll, http.StatusCreated)
-		resp, err := client.GetAll(context.Background(), "")
+		resp, err := client.GetAllAny(context.Background(), "")
 		require.NoError(t, err)
 		require.Equal(t, http.StatusCreated, resp.Response.StatusCode)
 	})
@@ -1456,7 +1456,7 @@ func TestClient(t *testing.T) {
 	t.Run("SetHTTPClient", func(t *testing.T) {
 		client.SetHTTPClient(http.DefaultClient)
 
-		_, err := client.GetAll(context.Background(), "")
+		_, err := client.GetAllAny(context.Background(), "")
 		require.NoError(t, err)
 	})
 }

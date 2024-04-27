@@ -201,6 +201,21 @@ func (c *Client[T]) GetAllRequest(ctx context.Context, rawQuery string, parentID
 	return req, nil
 }
 
+// GetAllAny allows using GetAll when using a custom response wrapper
+func (c *Client[T]) GetAllAny(ctx context.Context, rawQuery string, parentIDs ...string) (*Response[any], error) {
+	req, err := c.GetAllRequest(ctx, rawQuery, parentIDs...)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	result, err := MakeRequest[any](req, c.client, c.customResponseCodes[MethodGetAll], c.requestEditor)
+	if err != nil {
+		return nil, fmt.Errorf("error getting all resources: %w", err)
+	}
+
+	return result, nil
+}
+
 // Put makes a PUT request to create/modify a resource by ID
 func (c *Client[T]) Put(ctx context.Context, resource T, parentIDs ...string) (*Response[T], error) {
 	var body bytes.Buffer

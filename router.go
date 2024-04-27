@@ -179,11 +179,13 @@ func (a *API[T]) defaultGetAll() http.HandlerFunc {
 	return Handler(func(w http.ResponseWriter, r *http.Request) render.Renderer {
 		logger := GetLoggerFromContext(r.Context())
 
-		resources, err := a.Storage.GetAll(r.Context(), a.getAllFilter(r))
+		resources, err := a.Storage.GetAll(r.Context(), r.URL.Query())
 		if err != nil {
 			logger.Error("error getting resources", "error", err)
 			return InternalServerError(err)
 		}
+
+		resources = a.getAllFilter(r).Filter(resources)
 		logger.Debug("responding with resources", "count", len(resources))
 
 		var resp render.Renderer

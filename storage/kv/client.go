@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -81,7 +82,7 @@ func (c *Client[T]) get(key string) (T, error) {
 
 // GetAll will use the provided prefix to read data from the data source. Then, it will use Get
 // to read each element into the correct type
-func (c *Client[T]) GetAll(_ context.Context, filter babyapi.FilterFunc[T]) ([]T, error) {
+func (c *Client[T]) GetAll(_ context.Context, _ url.Values) ([]T, error) {
 	keys, err := c.db.Keys()
 	if err != nil {
 		return nil, fmt.Errorf("error getting keys: %w", err)
@@ -98,9 +99,7 @@ func (c *Client[T]) GetAll(_ context.Context, filter babyapi.FilterFunc[T]) ([]T
 			return nil, fmt.Errorf("error getting data: %w", err)
 		}
 
-		if filter == nil || filter(result) {
-			results = append(results, result)
-		}
+		results = append(results, result)
 	}
 
 	return results, nil

@@ -39,6 +39,13 @@ type API struct {
 	Invites *babyapi.API[*Invite]
 }
 
+// inviteFilter is used to filter invites that belong to the specified event
+func inviteFilter(eventID string) babyapi.FilterFunc[*Invite] {
+	return func(i *Invite) bool {
+		return i.EventID == eventID
+	}
+}
+
 // Export invites to CSV format for use with external tools
 func (api *API) export(w http.ResponseWriter, r *http.Request) render.Renderer {
 	event, httpErr := api.Events.GetRequestedResource(r)
@@ -46,12 +53,11 @@ func (api *API) export(w http.ResponseWriter, r *http.Request) render.Renderer {
 		return httpErr
 	}
 
-	invites, err := api.Invites.Storage.GetAll(r.Context(), func(i *Invite) bool {
-		return i.EventID == event.GetID()
-	})
+	invites, err := api.Invites.Storage.GetAll(r.Context(), nil)
 	if err != nil {
 		return babyapi.InternalServerError(err)
 	}
+	invites = inviteFilter(event.GetID()).Filter(invites)
 
 	w.Header().Set("Content-Type", "text/csv")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment;filename=event_%s_invites.csv", event.GetID()))
@@ -188,12 +194,11 @@ func (api *API) getAllInvitesMiddleware(r *http.Request, event *Event) (*http.Re
 		return r, nil
 	}
 
-	invites, err := api.Invites.Storage.GetAll(r.Context(), func(i *Invite) bool {
-		return i.EventID == event.GetID()
-	})
+	invites, err := api.Invites.Storage.GetAll(r.Context(), nil)
 	if err != nil {
 		return r, babyapi.InternalServerError(err)
 	}
+	invites = inviteFilter(event.GetID()).Filter(invites)
 
 	ctx := context.WithValue(r.Context(), invitesCtxKey, invites)
 	r = r.WithContext(ctx)
@@ -341,19 +346,19 @@ func createAPI() *API {
 
 	api.Events.AddCustomRootRoute(http.MethodGet, "/", http.RedirectHandler("/events", http.StatusFound))
 
-	api.Invites.ApplyExtension(extensions.HTMX[*Invite]{})
+	api.Invites.ApplyExtension(extensions.HTMX[*Invite]{}).
+		AddCustomRoute(http.MethodPost, "/bulk", api.Events.GetRequestedResourceAndDo(api.addBulkInvites)).
+		AddCustomRoute(http.MethodGet, "/export", babyapi.Handler(api.export)).
+		AddCustomIDRoute(http.MethodPut, "/rsvp", api.Invites.GetRequestedResourceAndDo(api.rsvp)).
+		SetGetAllFilter(func(r *http.Request) babyapi.FilterFunc[*Invite] {
+			return inviteFilter(api.Events.GetIDParam(r))
+		})
 
-	api.Invites.AddCustomRoute(http.MethodPost, "/bulk", api.Events.GetRequestedResourceAndDo(api.addBulkInvites))
-
-	api.Invites.AddCustomRoute(http.MethodGet, "/export", babyapi.Handler(api.export))
-
-	api.Invites.AddCustomIDRoute(http.MethodPut, "/rsvp", api.Invites.GetRequestedResourceAndDo(api.rsvp))
-
-	api.Events.AddCustomRootRoute(http.MethodGet, "/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, api.Events.Base(), http.StatusSeeOther)
-	}))
-
-	api.Events.AddNestedAPI(api.Invites)
+	api.Events.
+		AddCustomRootRoute(http.MethodGet, "/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, api.Events.Base(), http.StatusSeeOther)
+		})).
+		AddNestedAPI(api.Invites)
 
 	api.Events.GetAll = babyapi.Handler(func(_ http.ResponseWriter, r *http.Request) render.Renderer {
 		if render.GetAcceptedContentType(r) != render.ContentTypeHTML {
@@ -363,9 +368,9 @@ func createAPI() *API {
 		return createEventPage.Renderer(map[string]any{})
 	})
 
-	api.Events.AddIDMiddleware(api.Events.GetRequestedResourceAndDoMiddleware(api.authenticationMiddleware))
-
-	api.Events.AddIDMiddleware(api.Events.GetRequestedResourceAndDoMiddleware(api.getAllInvitesMiddleware))
+	api.Events.
+		AddIDMiddleware(api.Events.GetRequestedResourceAndDoMiddleware(api.authenticationMiddleware)).
+		AddIDMiddleware(api.Events.GetRequestedResourceAndDoMiddleware(api.getAllInvitesMiddleware))
 
 	filename := os.Getenv("STORAGE_FILE")
 	if filename == "" {
