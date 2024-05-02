@@ -14,6 +14,11 @@ import (
 )
 
 // Client implements the babyapi.Storage interface for the provided type using hord.Database for the storage backend
+//
+// It allows soft-deleting if your type implements the kv.EndDateable interface. This means Delete will set the end-date
+// to now and update in storage instead of deleting. If something is already end-dated, then it is hard-deleted. Also,
+// the GetAll method will automatically read the 'end_dated' query param to determine if end-dated resources should
+// be filtered out
 type Client[T babyapi.Resource] struct {
 	prefix string
 	db     hord.Database
@@ -82,7 +87,7 @@ func (c *Client[T]) get(key string) (T, error) {
 
 // GetAll will use the provided prefix to read data from the data source. Then, it will use Get
 // to read each element into the correct type
-func (c *Client[T]) GetAll(_ context.Context, _ url.Values) ([]T, error) {
+func (c *Client[T]) GetAll(_ context.Context, query url.Values) ([]T, error) {
 	keys, err := c.db.Keys()
 	if err != nil {
 		return nil, fmt.Errorf("error getting keys: %w", err)
@@ -97,6 +102,12 @@ func (c *Client[T]) GetAll(_ context.Context, _ url.Values) ([]T, error) {
 		result, err := c.get(key)
 		if err != nil {
 			return nil, fmt.Errorf("error getting data: %w", err)
+		}
+
+		getEndDated := query.Get("end_dated") == "true"
+		endDateable, ok := any(result).(EndDateable)
+		if ok && !getEndDated && endDateable.EndDated() {
+			continue
 		}
 
 		results = append(results, result)

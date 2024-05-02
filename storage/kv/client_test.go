@@ -54,6 +54,21 @@ func TestClient(t *testing.T) {
 		require.Error(t, err)
 		require.ErrorIs(t, err, babyapi.ErrNotFound)
 	})
+	t.Run("GetAllTODOsAgainWithEndDatedDefaultFalse", func(t *testing.T) {
+		todos, err := c.GetAll(context.Background(), nil)
+		require.NoError(t, err)
+		require.Empty(t, todos)
+	})
+	t.Run("GetAllTODOsAgainWithEndDatedFalse", func(t *testing.T) {
+		todos, err := c.GetAll(context.Background(), EndDatedQueryParam(false))
+		require.NoError(t, err)
+		require.Empty(t, todos)
+	})
+	t.Run("GetAllTODOsWithEndDatedTrueStillShowsNone", func(t *testing.T) {
+		todos, err := c.GetAll(context.Background(), EndDatedQueryParam(true))
+		require.NoError(t, err)
+		require.Empty(t, todos)
+	})
 }
 
 type EndDateableTODO struct {
@@ -97,6 +112,22 @@ func TestEndDateable(t *testing.T) {
 		todo, err := c.Get(context.Background(), id.String())
 		require.NoError(t, err)
 		require.True(t, todo.EndDated())
+	})
+	t.Run("GetAllTODOsAgainWithEndDatedDefaultFalse", func(t *testing.T) {
+		todos, err := c.GetAll(context.Background(), nil)
+		require.NoError(t, err)
+		require.Empty(t, todos)
+	})
+	t.Run("GetAllTODOsAgainWithEndDatedFalse", func(t *testing.T) {
+		todos, err := c.GetAll(context.Background(), EndDatedQueryParam(false))
+		require.NoError(t, err)
+		require.Empty(t, todos)
+	})
+	t.Run("GetAllTODOsWithEndDatedTrue", func(t *testing.T) {
+		todos, err := c.GetAll(context.Background(), EndDatedQueryParam(true))
+		require.NoError(t, err)
+		require.Len(t, todos, 1)
+		require.Equal(t, "TODO 1", todos[0].Title)
 	})
 	t.Run("HardDeleteTODO", func(t *testing.T) {
 		err := c.Delete(context.Background(), id.String())
