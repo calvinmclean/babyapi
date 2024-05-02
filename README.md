@@ -113,27 +113,31 @@ Check out some of the [examples](./examples) for examples of using the `babytest
 
 ## Storage
 
-You can bring any storage backend to `babyapi` by implementing the `Storage` interface. By default, the API will use the built-in `MapStorage` which just uses an in-memory map.
+You can bring any storage backend to `babyapi` by implementing the `Storage` interface. By default, the API will use the built-in `KVStorage` with the default configuration for in-memory map.
 
-The `babyapi/storage/kv` package provides another generic `Storage` implementation using [`madflojo/hord`](https://github.com/madflojo/hord) to support a variety of key-value store backends. `babyapi/storage/kv` provides helper functions for initializing the `hord` client for Redis or file-based storage.
+This storage implementation leverages [`madflojo/hord`](https://github.com/madflojo/hord) to support a variety of key-value store backends. Currently, the `babyapi/storage/kv` package provides helpers to create file or redis-based storage implementations.
 
 ```go
-db, err := storage.NewFileDB(hashmap.Config{
+db, err := kv.NewFileDB(hashmap.Config{
     Filename: "storage.json",
 })
-db, err := storage.NewRedisDB(redis.Config{
+db, err := kv.NewRedisDB(redis.Config{
     Server: "localhost:6379",
 })
 
-api.SetStorage(storage.NewClient[*TODO](db, "TODO"))
+api.SetStorage(babyapi.NewKVStorage[*TODO](db, "TODO"))
 ```
+
+### EndDateable
+
+The `babyapi.EndDateable` interface can be implemented to enable soft-delete with the `KVStorage`. This will set an end-date instead of permanently deleting a resource. Then, deleting it again will permanently delete. Also, the `GetAll` implementation will filter out end-dated resources unless the `end_dated` query parameter is set to enable getting end-dated resources.
 
 ## Extensions
 
 `babyapi` provides an `Extension` interface that can be applied to any API with `api.ApplyExtension()`. Implementations of this interface create custom configurations and modifications that can be applied to multiple APIs. A few extensions are provided by the `babyapi/extensions` package:
 
 - `HATEOAS`: "Hypertext as the engine of application state" is the [3rd and final level of REST API maturity](https://en.wikipedia.org/wiki/Richardson_Maturity_Model#Level_3:_Hypermedia_controls), making your API fully RESTful
-- `KVStorage`: provide a few simple configurations to use the `babyapi/storage` package's KV storage client with a local file or Redis
+- `KVStorage`: provide a few simple configurations to use the `KVStorage` client with a local file or Redis
 - `HTMX`: HTMX expects 200 responses from DELETE requests, so this changes the response code
 
 ## Examples

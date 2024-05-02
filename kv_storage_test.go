@@ -1,18 +1,18 @@
-package kv
+package babyapi
 
 import (
 	"context"
 	"testing"
 	"time"
 
-	"github.com/calvinmclean/babyapi"
+	"github.com/calvinmclean/babyapi/storage/kv"
 	"github.com/madflojo/hord/drivers/hashmap"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type TODO struct {
-	babyapi.DefaultResource
+	DefaultResource
 
 	Title       string
 	Description string
@@ -20,13 +20,13 @@ type TODO struct {
 }
 
 func TestClient(t *testing.T) {
-	db, err := NewFileDB(hashmap.Config{})
+	db, err := kv.NewFileDB(hashmap.Config{})
 	assert.NoError(t, err)
-	c := NewClient[*TODO](db, "TODO")
+	c := NewKVStorage[*TODO](db, "TODO")
 
-	id := babyapi.NewID()
+	id := NewID()
 	t.Run("StoreTODO", func(t *testing.T) {
-		err := c.Set(context.Background(), &TODO{DefaultResource: babyapi.DefaultResource{ID: id}, Title: "TODO 1"})
+		err := c.Set(context.Background(), &TODO{DefaultResource: DefaultResource{ID: id}, Title: "TODO 1"})
 		require.NoError(t, err)
 	})
 	t.Run("GetTODO", func(t *testing.T) {
@@ -47,12 +47,12 @@ func TestClient(t *testing.T) {
 	t.Run("GetTODONotFound", func(t *testing.T) {
 		_, err := c.Get(context.Background(), id.String())
 		require.Error(t, err)
-		require.ErrorIs(t, err, babyapi.ErrNotFound)
+		require.ErrorIs(t, err, ErrNotFound)
 	})
 	t.Run("DeleteTODONotFound", func(t *testing.T) {
 		err := c.Delete(context.Background(), id.String())
 		require.Error(t, err)
-		require.ErrorIs(t, err, babyapi.ErrNotFound)
+		require.ErrorIs(t, err, ErrNotFound)
 	})
 	t.Run("GetAllTODOsAgainWithEndDatedDefaultFalse", func(t *testing.T) {
 		todos, err := c.GetAll(context.Background(), nil)
@@ -72,7 +72,7 @@ func TestClient(t *testing.T) {
 }
 
 type EndDateableTODO struct {
-	babyapi.DefaultResource
+	DefaultResource
 
 	Title       string
 	Description string
@@ -89,14 +89,14 @@ func (t *EndDateableTODO) SetEndDate(now time.Time) {
 }
 
 func TestEndDateable(t *testing.T) {
-	db, err := NewFileDB(hashmap.Config{})
+	db, err := kv.NewFileDB(hashmap.Config{})
 	assert.NoError(t, err)
-	c := NewClient[*EndDateableTODO](db, "TODO")
+	c := NewKVStorage[*EndDateableTODO](db, "TODO")
 
-	id := babyapi.NewID()
+	id := NewID()
 
 	t.Run("StoreTODO", func(t *testing.T) {
-		err := c.Set(context.Background(), &EndDateableTODO{DefaultResource: babyapi.DefaultResource{ID: id}, Title: "TODO 1"})
+		err := c.Set(context.Background(), &EndDateableTODO{DefaultResource: DefaultResource{ID: id}, Title: "TODO 1"})
 		require.NoError(t, err)
 	})
 	t.Run("GetTODOIsNotEndDated", func(t *testing.T) {
@@ -136,6 +136,6 @@ func TestEndDateable(t *testing.T) {
 	t.Run("GetTODONotFound", func(t *testing.T) {
 		_, err := c.Get(context.Background(), id.String())
 		require.Error(t, err)
-		require.ErrorIs(t, err, babyapi.ErrNotFound)
+		require.ErrorIs(t, err, ErrNotFound)
 	})
 }

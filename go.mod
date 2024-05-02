@@ -9,7 +9,6 @@ require (
 	github.com/rs/xid v1.5.0
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.8.4
-	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa
 	golang.org/x/tools v0.15.0
 )
 
