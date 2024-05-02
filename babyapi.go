@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/calvinmclean/babyapi/storage/kv"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 )
@@ -100,7 +101,7 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 		map[string]relatedAPI{},
 		nil,
 		nil,
-		MapStorage[T]{},
+		NewKVStorage[T](kv.NewDefaultDB(), name),
 		context.Background(),
 		make(chan struct{}, 1),
 		make(chan struct{}, 1),

@@ -25,7 +25,7 @@ func main() {
 		panic(err)
 	}
 
-	api.SetStorage(kv.NewClient[*User](db, "User"))
+	api.SetStorage(babyapi.NewKVStorage[*User](db, "User"))
 
 	api.RunCLI()
 }

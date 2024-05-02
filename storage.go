@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/url"
-
-	"golang.org/x/exp/maps"
 )
 
 var ErrNotFound = errors.New("resource not found")
@@ -39,35 +37,4 @@ type Storage[T Resource] interface {
 	Set(context.Context, T) error
 	// Delete will delete a resource by ID
 	Delete(context.Context, string) error
-}
-
-// MapStorage is the default implementation of the Storage interface that just uses a map
-type MapStorage[T Resource] map[string]T
-
-func (m MapStorage[T]) Get(_ context.Context, id string) (T, error) {
-	resource, ok := m[id]
-	if !ok {
-		return *new(T), ErrNotFound
-	}
-	return resource, nil
-}
-
-// GetAll for MapStorage does not make use of the query parameters, but the API's FilterFunc can filter after
-func (m MapStorage[T]) GetAll(_ context.Context, _ url.Values) ([]T, error) {
-	return maps.Values[map[string]T](m), nil
-}
-
-func (m MapStorage[T]) Set(_ context.Context, resource T) error {
-	m[resource.GetID()] = resource
-	return nil
-}
-
-func (m MapStorage[T]) Delete(_ context.Context, id string) error {
-	_, ok := m[id]
-	if !ok {
-		return ErrNotFound
-	}
-
-	delete(m, id)
-	return nil
 }

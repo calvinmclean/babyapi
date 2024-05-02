@@ -1,4 +1,4 @@
-package kv
+package babyapi
 
 import (
 	"context"
@@ -9,28 +9,32 @@ import (
 	"strings"
 	"time"
 
-	"github.com/calvinmclean/babyapi"
 	"github.com/madflojo/hord"
 )
 
-// Client implements the babyapi.Storage interface for the provided type using hord.Database for the storage backend
-type Client[T babyapi.Resource] struct {
+// KVStorage implements the Storage interface for the provided type using hord.Database for the storage backend
+//
+// It allows soft-deleting if your type implements the kv.EndDateable interface. This means Delete will set the end-date
+// to now and update in storage instead of deleting. If something is already end-dated, then it is hard-deleted. Also,
+// the GetAll method will automatically read the 'end_dated' query param to determine if end-dated resources should
+// be filtered out
+type KVStorage[T Resource] struct {
 	prefix string
 	db     hord.Database
 }
 
-// NewClient creates a new storage client for the specified type. It stores resources with keys prefixed by 'prefix'
-func NewClient[T babyapi.Resource](db hord.Database, prefix string) babyapi.Storage[T] {
-	return &Client[T]{prefix, db}
+// NewKVStorage creates a new storage client for the specified type. It stores resources with keys prefixed by 'prefix'
+func NewKVStorage[T Resource](db hord.Database, prefix string) Storage[T] {
+	return &KVStorage[T]{prefix, db}
 }
 
-func (c *Client[T]) key(id string) string {
+func (c *KVStorage[T]) key(id string) string {
 	return fmt.Sprintf("%s_%s", c.prefix, id)
 }
 
 // Delete will delete a resource by the key. If the resource implements EndDateable, it will first soft-delete by
 // setting the EndDate to time.Now()
-func (c *Client[T]) Delete(ctx context.Context, id string) error {
+func (c *KVStorage[T]) Delete(ctx context.Context, id string) error {
 	key := c.key(id)
 
 	result, err := c.get(key)
@@ -54,11 +58,11 @@ func (c *Client[T]) Delete(ctx context.Context, id string) error {
 
 // Get will use the provided key to read data from the data source. Then, it will Unmarshal
 // into the generic type
-func (c *Client[T]) Get(_ context.Context, id string) (T, error) {
+func (c *KVStorage[T]) Get(_ context.Context, id string) (T, error) {
 	return c.get(c.key(id))
 }
 
-func (c *Client[T]) get(key string) (T, error) {
+func (c *KVStorage[T]) get(key string) (T, error) {
 	if c.db == nil {
 		return *new(T), fmt.Errorf("error missing database connection")
 	}
@@ -66,7 +70,7 @@ func (c *Client[T]) get(key string) (T, error) {
 	dataBytes, err := c.db.Get(key)
 	if err != nil {
 		if errors.Is(hord.ErrNil, err) {
-			return *new(T), babyapi.ErrNotFound
+			return *new(T), ErrNotFound
 		}
 		return *new(T), fmt.Errorf("error getting data: %w", err)
 	}
@@ -82,7 +86,7 @@ func (c *Client[T]) get(key string) (T, error) {
 
 // GetAll will use the provided prefix to read data from the data source. Then, it will use Get
 // to read each element into the correct type
-func (c *Client[T]) GetAll(_ context.Context, _ url.Values) ([]T, error) {
+func (c *KVStorage[T]) GetAll(_ context.Context, query url.Values) ([]T, error) {
 	keys, err := c.db.Keys()
 	if err != nil {
 		return nil, fmt.Errorf("error getting keys: %w", err)
@@ -99,6 +103,12 @@ func (c *Client[T]) GetAll(_ context.Context, _ url.Values) ([]T, error) {
 			return nil, fmt.Errorf("error getting data: %w", err)
 		}
 
+		getEndDated := query.Get("end_dated") == "true"
+		endDateable, ok := any(result).(EndDateable)
+		if ok && !getEndDated && endDateable.EndDated() {
+			continue
+		}
+
 		results = append(results, result)
 	}
 
@@ -106,7 +116,7 @@ func (c *Client[T]) GetAll(_ context.Context, _ url.Values) ([]T, error) {
 }
 
 // Set marshals the provided item and writes it to the database
-func (c *Client[T]) Set(_ context.Context, item T) error {
+func (c *KVStorage[T]) Set(_ context.Context, item T) error {
 	asBytes, err := json.Marshal(item)
 	if err != nil {
 		return fmt.Errorf("error marshalling data: %w", err)

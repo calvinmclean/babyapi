@@ -8,6 +8,16 @@ import (
 	"github.com/madflojo/hord/drivers/redis"
 )
 
+// NewDefaultDB creates a default in-memory KV-storage. Theoretically it should not error, but if it does, it panics
+func NewDefaultDB() hord.Database {
+	db, err := NewFileDB(hashmap.Config{})
+	if err != nil {
+		panic(err)
+	}
+
+	return db
+}
+
 func NewFileDB(cfg hashmap.Config) (hord.Database, error) {
 	db, err := hashmap.Dial(cfg)
 	if err != nil {
