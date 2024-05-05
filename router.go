@@ -70,6 +70,11 @@ func (a *API[T]) Route(r chi.Router) error {
 		}
 	})
 
+	// Only set these middleware for root-level API
+	if a.parent == nil {
+		a.DefaultMiddleware(r)
+	}
+
 	for _, m := range a.middlewares {
 		r.Use(m)
 	}
@@ -80,11 +85,6 @@ func (a *API[T]) Route(r chi.Router) error {
 
 	var returnErr error
 	r.Route(a.base, func(r chi.Router) {
-		// Only set these middleware for root-level API
-		if a.parent == nil {
-			a.DefaultMiddleware(r)
-		}
-
 		if a.rootAPI {
 			returnErr = a.rootAPIRoutes(r)
 			return
