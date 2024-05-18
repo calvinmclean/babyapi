@@ -34,12 +34,12 @@ func NewContextWithLogger(ctx context.Context, logger *slog.Logger) context.Cont
 
 // GetRequestBodyFromContext gets an API resource from the request context. It can only be used in
 // URL paths that include the resource ID
-func (a *API[T]) GetRequestBodyFromContext(ctx context.Context) T {
+func GetRequestBodyFromContext[T any](ctx context.Context) (T, bool) {
 	value, ok := ctx.Value(requestBodyCtxKey).(T)
 	if !ok {
-		return *new(T)
+		return *new(T), false
 	}
-	return value
+	return value, true
 }
 
 // NewContextWithRequestBody stores the API resource in the context

@@ -121,11 +121,8 @@ func (a *API[T]) GetRequestedResourceAndDoMiddleware(do func(*http.Request, T) (
 // ReadRequestBodyAndDo is a wrapper that handles decoding the request body into the resource type and rendering a response
 func (a *API[T]) ReadRequestBodyAndDo(do func(*http.Request, T) (T, *ErrResponse)) http.HandlerFunc {
 	return Handler(func(w http.ResponseWriter, r *http.Request) render.Renderer {
-		logger := GetLoggerFromContext(r.Context())
-
 		resource, httpErr := a.GetFromRequest(r)
 		if httpErr != nil {
-			logger.Error("invalid request to create resource", "error", httpErr.Error())
 			return httpErr
 		}
 
@@ -143,14 +140,36 @@ func (a *API[T]) ReadRequestBodyAndDo(do func(*http.Request, T) (T, *ErrResponse
 	})
 }
 
+// ReadRequestBodyAndDo is a helper function that can be used without an API to handle a request
+func ReadRequestBodyAndDo[T RendererBinder](do func(*http.Request, T) (T, *ErrResponse), instance func() T) http.HandlerFunc {
+	return Handler(func(w http.ResponseWriter, r *http.Request) render.Renderer {
+		resource, httpErr := GetFromRequest(r, instance)
+		if httpErr != nil {
+			return httpErr
+		}
+
+		resp, httpErr := do(r, resource)
+		if httpErr != nil {
+			return httpErr
+		}
+
+		return resp
+	})
+}
+
 // GetFromRequest will read the API's resource type from the request body or request context
 func (a *API[T]) GetFromRequest(r *http.Request) (T, *ErrResponse) {
-	resource := a.GetRequestBodyFromContext(r.Context())
-	if resource != *new(T) {
+	return GetFromRequest(r, a.instance)
+}
+
+// GetFromRequest will read a resource type from the request body or request context
+func GetFromRequest[T RendererBinder](r *http.Request, instance func() T) (T, *ErrResponse) {
+	resource, ok := GetRequestBodyFromContext[T](r.Context())
+	if ok {
 		return resource, nil
 	}
 
-	resource = a.instance()
+	resource = instance()
 	err := render.Bind(r, resource)
 	if err != nil {
 		return *new(T), ErrInvalidRequest(err)
