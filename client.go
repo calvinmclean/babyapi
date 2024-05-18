@@ -401,27 +401,33 @@ func (c *Client[T]) MakeRequest(req *http.Request, expectedStatusCode int) (*Res
 
 // MakeGenericRequest allows making a request without specifying the return type. It accepts a pointer receiver
 // to pass to json.Unmarshal. This allows returning any type using the Client.
-func (c *Client[T]) MakeGenericRequest(req *http.Request, target any) error {
+func (c *Client[T]) MakeGenericRequest(req *http.Request, target any) (*Response[any], error) {
 	resp, err := makeRequest(req, c.client, c.requestEditor)
 	if err != nil {
-		return err
+		return nil, err
+	}
+
+	result := &Response[any]{
+		Response: resp,
+		Data:     target,
 	}
 
 	if resp.Body == nil {
-		return nil
+		return result, nil
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("error decoding error response: %w", err)
+		return nil, fmt.Errorf("error decoding error response: %w", err)
 	}
+	result.Body = string(body)
 
 	err = json.Unmarshal(body, target)
 	if err != nil {
-		return fmt.Errorf("error decoding response body %q: %w", string(body), err)
+		return nil, fmt.Errorf("error decoding response body %q: %w", string(body), err)
 	}
 
-	return nil
+	return result, nil
 }
 
 // MakeRequest generically sends an HTTP request after calling the request editor and checks the response code

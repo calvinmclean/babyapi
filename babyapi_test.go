@@ -1425,9 +1425,11 @@ func TestGetAllResponseWrapperWithClient(t *testing.T) {
 		require.NoError(t, err)
 
 		var albums AllAlbumsWrapper
-		err = client.MakeGenericRequest(req, &albums)
+		resp, err := client.MakeGenericRequest(req, &albums)
 		require.NoError(t, err)
 		require.Equal(t, "Album", albums[0].Title)
+		require.NotNil(t, resp.Data)
+		require.Equal(t, http.StatusOK, resp.Response.StatusCode)
 	})
 
 	t.Run("GetAllCLI", func(t *testing.T) {
