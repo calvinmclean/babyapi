@@ -13,6 +13,14 @@ import (
 // It enables HTTP request/response handling and getting resources by ID
 type Resource interface {
 	comparable
+
+	RendererBinder
+
+	GetID() string
+}
+
+// RendererBinder just combines render.Renderer and render.Binder
+type RendererBinder interface {
 	// Renderer is used to control the output behavior when creating a response.
 	// Use this for any after-request logic or response modifications
 	render.Renderer
@@ -20,8 +28,6 @@ type Resource interface {
 	// Binder is used to control the input behavior, after decoding the request.
 	// Use it for input validation or additional modification of the resource using request headers or other params
 	render.Binder
-
-	GetID() string
 }
 
 // Patcher is used to optionally-enable PATCH endpoint. Since the library cannot generically modify resources without using

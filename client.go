@@ -422,6 +422,10 @@ func (c *Client[T]) MakeGenericRequest(req *http.Request, target any) (*Response
 	}
 	result.Body = string(body)
 
+	if target == nil {
+		return result, nil
+	}
+
 	err = json.Unmarshal(body, target)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding response body %q: %w", string(body), err)
