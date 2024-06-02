@@ -201,10 +201,15 @@ func Handler(do func(http.ResponseWriter, *http.Request) render.Renderer) http.H
 		if response == nil {
 			return
 		}
+		logger := GetLoggerFromContext(r.Context())
+
+		httpErr, ok := response.(*ErrResponse)
+		if ok {
+			logger.Error("error returned from handler", "error", httpErr.Err)
+		}
 
 		err := render.Render(w, r, response)
 		if err != nil {
-			logger := GetLoggerFromContext(r.Context())
 			logger.Error("unable to render response", "error", err)
 			_ = render.Render(w, r, ErrRender(err))
 		}
