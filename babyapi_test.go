@@ -1462,3 +1462,89 @@ func TestClient(t *testing.T) {
 		require.NoError(t, err)
 	})
 }
+
+// Test that a root API can have children with their own middleware operating independently
+func TestChildAPIWithMiddleware(t *testing.T) {
+	api := babyapi.NewRootAPI("root", "/")
+
+	api.Get = func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+	}
+
+	api.AddCustomRoute(http.MethodGet, "/teapot", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTeapot)
+	}))
+
+	rootMiddlewareHits := 0
+	api.AddMiddleware(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			rootMiddlewareHits++
+			next.ServeHTTP(w, r)
+		})
+	})
+
+	songAPI := babyapi.NewAPI("Songs", "/songs", func() *Song { return &Song{} })
+	api.AddNestedAPI(songAPI)
+
+	songMiddlewareHits := 0
+	songAPI.AddMiddleware(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			songMiddlewareHits++
+			next.ServeHTTP(w, r)
+		})
+	})
+
+	musicVideoAPI := babyapi.NewAPI("MusicVideos", "/music_videos", func() *MusicVideo { return &MusicVideo{} })
+	api.AddNestedAPI(musicVideoAPI)
+	musicVideoMiddlewareHits := 0
+	musicVideoAPI.AddMiddleware(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			musicVideoMiddlewareHits++
+			next.ServeHTTP(w, r)
+		})
+	})
+
+	t.Run("GetRootAPI", func(t *testing.T) {
+		r := httptest.NewRequest(http.MethodGet, "/", http.NoBody)
+		w := babytest.TestRequest(t, api, r)
+
+		require.Equal(t, http.StatusOK, w.Result().StatusCode)
+		require.Equal(t, 1, rootMiddlewareHits)
+	})
+
+	t.Run("GetRootAPICustomRoute", func(t *testing.T) {
+		r := httptest.NewRequest(http.MethodGet, "/teapot", http.NoBody)
+		w := babytest.TestRequest(t, api, r)
+
+		require.Equal(t, http.StatusTeapot, w.Result().StatusCode)
+		require.Equal(t, 2, rootMiddlewareHits)
+	})
+
+	t.Run("GetSongAPI", func(t *testing.T) {
+		r := httptest.NewRequest(http.MethodGet, "/songs", http.NoBody)
+		w := babytest.TestRequest(t, api, r)
+
+		require.Equal(t, http.StatusOK, w.Result().StatusCode)
+
+		require.Equal(t, 3, rootMiddlewareHits)
+		require.Equal(t, 1, songMiddlewareHits)
+		require.Equal(t, 0, musicVideoMiddlewareHits)
+	})
+
+	t.Run("GetMusicVideoAPI", func(t *testing.T) {
+		r := httptest.NewRequest(http.MethodGet, "/music_videos", http.NoBody)
+		w := babytest.TestRequest(t, api, r)
+
+		require.Equal(t, http.StatusOK, w.Result().StatusCode)
+
+		require.Equal(t, 4, rootMiddlewareHits)
+		require.Equal(t, 1, songMiddlewareHits)
+		require.Equal(t, 1, musicVideoMiddlewareHits)
+	})
+
+	t.Run("AssertMiddlewareHits", func(t *testing.T) {
+		require.Equal(t, 4, rootMiddlewareHits)
+		require.Equal(t, 1, songMiddlewareHits)
+		require.Equal(t, 1, musicVideoMiddlewareHits)
+	})
+}

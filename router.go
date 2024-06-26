@@ -76,7 +76,7 @@ func (a *API[T]) Route(r chi.Router) error {
 	}
 
 	for _, m := range a.middlewares {
-		r.Use(m)
+		r = r.With(m)
 	}
 
 	if a.parent == nil {
@@ -95,7 +95,7 @@ func (a *API[T]) Route(r chi.Router) error {
 
 		r.With(a.resourceExistsMiddleware).Route(fmt.Sprintf("/{%s}", a.IDParamKey()), func(r chi.Router) {
 			for _, m := range a.idMiddlewares {
-				r.Use(m)
+				r = r.With(m)
 			}
 
 			routeIfNotNil(r.Get, "/", a.Get)
