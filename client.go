@@ -156,12 +156,17 @@ func (c *Client[T]) SetRequestEditor(requestEditor RequestEditor) *Client[T] {
 
 // Get will get a resource by ID
 func (c *Client[T]) Get(ctx context.Context, id string, parentIDs ...string) (*Response[T], error) {
+	return c.GetWithEditor(ctx, id, c.requestEditor, parentIDs...)
+}
+
+// GetWithEditor will get a resource by ID after modifying the request with requestEditor
+func (c *Client[T]) GetWithEditor(ctx context.Context, id string, requestEditor RequestEditor, parentIDs ...string) (*Response[T], error) {
 	req, err := c.GetRequest(ctx, id, parentIDs...)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	result, err := c.MakeRequest(req, c.customResponseCodes[http.MethodGet])
+	result, err := c.MakeRequestWithEditor(req, c.customResponseCodes[http.MethodGet], requestEditor)
 	if err != nil {
 		return nil, fmt.Errorf("error getting resource: %w", err)
 	}
@@ -176,12 +181,17 @@ func (c *Client[T]) GetRequest(ctx context.Context, id string, parentIDs ...stri
 
 // GetAll gets all resources from the API
 func (c *Client[T]) GetAll(ctx context.Context, rawQuery string, parentIDs ...string) (*Response[*ResourceList[T]], error) {
+	return c.GetAllWithEditor(ctx, rawQuery, c.requestEditor, parentIDs...)
+}
+
+// GetAllWithEditor gets all resources from the API after modifying the request with requestEditor
+func (c *Client[T]) GetAllWithEditor(ctx context.Context, rawQuery string, requestEditor RequestEditor, parentIDs ...string) (*Response[*ResourceList[T]], error) {
 	req, err := c.GetAllRequest(ctx, rawQuery, parentIDs...)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	result, err := MakeRequest[*ResourceList[T]](req, c.client, c.customResponseCodes[MethodGetAll], c.requestEditor)
+	result, err := MakeRequest[*ResourceList[T]](req, c.client, c.customResponseCodes[MethodGetAll], requestEditor)
 	if err != nil {
 		return nil, fmt.Errorf("error getting all resources: %w", err)
 	}
@@ -203,12 +213,17 @@ func (c *Client[T]) GetAllRequest(ctx context.Context, rawQuery string, parentID
 
 // GetAllAny allows using GetAll when using a custom response wrapper
 func (c *Client[T]) GetAllAny(ctx context.Context, rawQuery string, parentIDs ...string) (*Response[any], error) {
+	return c.GetAllAnyWithEditor(ctx, rawQuery, c.requestEditor, parentIDs...)
+}
+
+// GetAllAnyWithEditor allows using GetAll when using a custom response wrapper after modifying the request with requestEditor
+func (c *Client[T]) GetAllAnyWithEditor(ctx context.Context, rawQuery string, requestEditor RequestEditor, parentIDs ...string) (*Response[any], error) {
 	req, err := c.GetAllRequest(ctx, rawQuery, parentIDs...)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	result, err := MakeRequest[any](req, c.client, c.customResponseCodes[MethodGetAll], c.requestEditor)
+	result, err := MakeRequest[any](req, c.client, c.customResponseCodes[MethodGetAll], requestEditor)
 	if err != nil {
 		return nil, fmt.Errorf("error getting all resources: %w", err)
 	}
@@ -218,13 +233,18 @@ func (c *Client[T]) GetAllAny(ctx context.Context, rawQuery string, parentIDs ..
 
 // Put makes a PUT request to create/modify a resource by ID
 func (c *Client[T]) Put(ctx context.Context, resource T, parentIDs ...string) (*Response[T], error) {
+	return c.PutWithEditor(ctx, resource, c.requestEditor, parentIDs...)
+}
+
+// PutWithEditor makes a PUT request to create/modify a resource by ID after modifying the request with requestEditor
+func (c *Client[T]) PutWithEditor(ctx context.Context, resource T, requestEditor RequestEditor, parentIDs ...string) (*Response[T], error) {
 	var body bytes.Buffer
 	err := json.NewEncoder(&body).Encode(resource)
 	if err != nil {
 		return nil, fmt.Errorf("error encoding request body: %w", err)
 	}
 
-	return c.put(ctx, resource.GetID(), &body, parentIDs...)
+	return c.put(ctx, resource.GetID(), &body, requestEditor, parentIDs...)
 }
 
 // PutRequest creates a request that can be used to PUT a resource
@@ -241,16 +261,21 @@ func (c *Client[T]) PutRequest(ctx context.Context, body io.Reader, id string, p
 
 // PutRaw makes a PUT request to create/modify a resource by ID. It uses the provided string as the request body
 func (c *Client[T]) PutRaw(ctx context.Context, id, body string, parentIDs ...string) (*Response[T], error) {
-	return c.put(ctx, id, bytes.NewBufferString(body), parentIDs...)
+	return c.PutRawWithEditor(ctx, id, body, c.requestEditor, parentIDs...)
 }
 
-func (c *Client[T]) put(ctx context.Context, id string, body io.Reader, parentIDs ...string) (*Response[T], error) {
+// PutRaw makes a PUT request to create/modify a resource by ID. It uses the provided string as the request body
+func (c *Client[T]) PutRawWithEditor(ctx context.Context, id, body string, requestEditor RequestEditor, parentIDs ...string) (*Response[T], error) {
+	return c.put(ctx, id, bytes.NewBufferString(body), requestEditor, parentIDs...)
+}
+
+func (c *Client[T]) put(ctx context.Context, id string, body io.Reader, requestEditor RequestEditor, parentIDs ...string) (*Response[T], error) {
 	req, err := c.PutRequest(ctx, body, id, parentIDs...)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	result, err := c.MakeRequest(req, c.customResponseCodes[http.MethodPut])
+	result, err := c.MakeRequestWithEditor(req, c.customResponseCodes[http.MethodPut], requestEditor)
 	if err != nil {
 		return nil, fmt.Errorf("error putting resource: %w", err)
 	}
@@ -260,13 +285,18 @@ func (c *Client[T]) put(ctx context.Context, id string, body io.Reader, parentID
 
 // Post makes a POST request to create a new resource
 func (c *Client[T]) Post(ctx context.Context, resource T, parentIDs ...string) (*Response[T], error) {
+	return c.PostWithEditor(ctx, resource, c.requestEditor, parentIDs...)
+}
+
+// PostWithEditor makes a POST request to create a new resource after modifying the request with requestEditor
+func (c *Client[T]) PostWithEditor(ctx context.Context, resource T, requestEditor RequestEditor, parentIDs ...string) (*Response[T], error) {
 	var body bytes.Buffer
 	err := json.NewEncoder(&body).Encode(resource)
 	if err != nil {
 		return nil, fmt.Errorf("error encoding request body: %w", err)
 	}
 
-	return c.post(ctx, &body, parentIDs...)
+	return c.post(ctx, &body, requestEditor, parentIDs...)
 }
 
 // PostRequest creates a request that can be used to POST a resource
@@ -283,16 +313,21 @@ func (c *Client[T]) PostRequest(ctx context.Context, body io.Reader, parentIDs .
 
 // PostRaw makes a POST request using the provided string as the body
 func (c *Client[T]) PostRaw(ctx context.Context, body string, parentIDs ...string) (*Response[T], error) {
-	return c.post(ctx, bytes.NewBufferString(body), parentIDs...)
+	return c.PostRawWithEditor(ctx, body, c.requestEditor, parentIDs...)
 }
 
-func (c *Client[T]) post(ctx context.Context, body io.Reader, parentIDs ...string) (*Response[T], error) {
+// PostRawWithEditor makes a POST request using the provided string as the body after modifying the request with requestEditor
+func (c *Client[T]) PostRawWithEditor(ctx context.Context, body string, requestEditor RequestEditor, parentIDs ...string) (*Response[T], error) {
+	return c.post(ctx, bytes.NewBufferString(body), requestEditor, parentIDs...)
+}
+
+func (c *Client[T]) post(ctx context.Context, body io.Reader, requestEditor RequestEditor, parentIDs ...string) (*Response[T], error) {
 	req, err := c.PostRequest(ctx, body, parentIDs...)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	result, err := c.MakeRequest(req, c.customResponseCodes[http.MethodPost])
+	result, err := c.MakeRequestWithEditor(req, c.customResponseCodes[http.MethodPost], requestEditor)
 	if err != nil {
 		return result, fmt.Errorf("error posting resource: %w", err)
 	}
@@ -302,13 +337,18 @@ func (c *Client[T]) post(ctx context.Context, body io.Reader, parentIDs ...strin
 
 // Patch makes a PATCH request to modify a resource by ID
 func (c *Client[T]) Patch(ctx context.Context, id string, resource T, parentIDs ...string) (*Response[T], error) {
+	return c.PatchWithEditor(ctx, id, resource, c.requestEditor, parentIDs...)
+}
+
+// PatchWithEditor makes a PATCH request to modify a resource by ID after modifying the request with requestEditor
+func (c *Client[T]) PatchWithEditor(ctx context.Context, id string, resource T, requestEditor RequestEditor, parentIDs ...string) (*Response[T], error) {
 	var body bytes.Buffer
 	err := json.NewEncoder(&body).Encode(resource)
 	if err != nil {
 		return nil, fmt.Errorf("error encoding request body: %w", err)
 	}
 
-	return c.patch(ctx, id, &body, parentIDs...)
+	return c.patch(ctx, id, &body, requestEditor, parentIDs...)
 }
 
 // PatchRequest creates a request that can be used to PATCH a resource
@@ -325,16 +365,21 @@ func (c *Client[T]) PatchRequest(ctx context.Context, body io.Reader, id string,
 
 // PatchRaw makes a PATCH request to modify a resource by ID. It uses the provided string as the request body
 func (c *Client[T]) PatchRaw(ctx context.Context, id, body string, parentIDs ...string) (*Response[T], error) {
-	return c.patch(ctx, id, bytes.NewBufferString(body), parentIDs...)
+	return c.PatchRawWithEditor(ctx, id, body, c.requestEditor, parentIDs...)
 }
 
-func (c *Client[T]) patch(ctx context.Context, id string, body io.Reader, parentIDs ...string) (*Response[T], error) {
+// PatchRawWithEditor makes a PATCH request to modify a resource by ID after modifying the request with requestEditor. It uses the provided string as the request body
+func (c *Client[T]) PatchRawWithEditor(ctx context.Context, id, body string, requestEditor RequestEditor, parentIDs ...string) (*Response[T], error) {
+	return c.patch(ctx, id, bytes.NewBufferString(body), requestEditor, parentIDs...)
+}
+
+func (c *Client[T]) patch(ctx context.Context, id string, body io.Reader, requestEditor RequestEditor, parentIDs ...string) (*Response[T], error) {
 	req, err := c.PatchRequest(ctx, body, id, parentIDs...)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	resp, err := c.MakeRequest(req, c.customResponseCodes[http.MethodPatch])
+	resp, err := c.MakeRequestWithEditor(req, c.customResponseCodes[http.MethodPatch], requestEditor)
 	if err != nil {
 		return nil, fmt.Errorf("error patching resource: %w", err)
 	}
@@ -344,12 +389,17 @@ func (c *Client[T]) patch(ctx context.Context, id string, body io.Reader, parent
 
 // Delete makes a DELETE request to delete a resource by ID
 func (c *Client[T]) Delete(ctx context.Context, id string, parentIDs ...string) (*Response[T], error) {
+	return c.DeleteWithEditor(ctx, id, c.requestEditor, parentIDs...)
+}
+
+// DeleteWithEditor makes a DELETE request to delete a resource by ID after modifying the request with requestEditor
+func (c *Client[T]) DeleteWithEditor(ctx context.Context, id string, requestEditor RequestEditor, parentIDs ...string) (*Response[T], error) {
 	req, err := c.DeleteRequest(ctx, id, parentIDs...)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	resp, err := c.MakeRequest(req, c.customResponseCodes[http.MethodDelete])
+	resp, err := c.MakeRequestWithEditor(req, c.customResponseCodes[http.MethodDelete], requestEditor)
 	if err != nil {
 		return nil, fmt.Errorf("error deleting resource: %w", err)
 	}
@@ -397,6 +447,12 @@ func (c *Client[T]) URL(id string, parentIDs ...string) (string, error) {
 // JSON decoding the resource type into Data if the response is JSON
 func (c *Client[T]) MakeRequest(req *http.Request, expectedStatusCode int) (*Response[T], error) {
 	return MakeRequest[T](req, c.client, expectedStatusCode, c.requestEditor)
+}
+
+// MakeRequestWithEditor is like MakeRequest, but allows setting a RequestEditor instead of using the Client's
+// configured editor
+func (c *Client[T]) MakeRequestWithEditor(req *http.Request, expectedStatusCode int, requestEditor RequestEditor) (*Response[T], error) {
+	return MakeRequest[T](req, c.client, expectedStatusCode, requestEditor)
 }
 
 // MakeGenericRequest allows making a request without specifying the return type. It accepts a pointer receiver
