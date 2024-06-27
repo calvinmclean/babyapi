@@ -49,16 +49,17 @@ func (tt RequestTest[T]) Run(t *testing.T, client *babyapi.Client[T], getRespons
 		body = tt.BodyFunc(getResponse)
 	}
 
+	requestEditor := babyapi.DefaultRequestEditor
+
 	rawQuery := tt.RawQuery
 	if tt.RawQueryFunc != nil {
 		rawQuery = tt.RawQueryFunc(getResponse)
 	}
 	if rawQuery != "" {
-		client.SetRequestEditor(func(r *http.Request) error {
+		requestEditor = func(r *http.Request) error {
 			r.URL.RawQuery = rawQuery
 			return nil
-		})
-		defer client.SetRequestEditor(babyapi.DefaultRequestEditor)
+		}
 	}
 
 	parentIDs := tt.ParentIDs
@@ -70,17 +71,17 @@ func (tt RequestTest[T]) Run(t *testing.T, client *babyapi.Client[T], getRespons
 	var err error
 	switch tt.Method {
 	case babyapi.MethodGetAll:
-		r, err = client.GetAll(context.Background(), rawQuery, parentIDs...)
+		r, err = client.GetAllWithEditor(context.Background(), rawQuery, requestEditor, parentIDs...)
 	case http.MethodPost:
-		r, err = client.PostRaw(context.Background(), body, parentIDs...)
+		r, err = client.PostRawWithEditor(context.Background(), body, requestEditor, parentIDs...)
 	case http.MethodGet:
-		r, err = client.Get(context.Background(), id, parentIDs...)
+		r, err = client.GetWithEditor(context.Background(), id, requestEditor, parentIDs...)
 	case http.MethodPut:
-		r, err = client.PutRaw(context.Background(), id, body, parentIDs...)
+		r, err = client.PutRawWithEditor(context.Background(), id, body, requestEditor, parentIDs...)
 	case http.MethodPatch:
-		r, err = client.PatchRaw(context.Background(), id, body, parentIDs...)
+		r, err = client.PatchRawWithEditor(context.Background(), id, body, requestEditor, parentIDs...)
 	case http.MethodDelete:
-		r, err = client.Delete(context.Background(), id, parentIDs...)
+		r, err = client.DeleteWithEditor(context.Background(), id, requestEditor, parentIDs...)
 	}
 
 	switch v := r.(type) {
