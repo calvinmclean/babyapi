@@ -427,6 +427,15 @@ func (a *API[T]) WithContext(ctx context.Context) *API[T] {
 	return a
 }
 
+// Modify allows inline, fluent-style modification of the API, so custom modifications can be made in the same
+// fluent style as the built-in methods
+func (a *API[T]) Modify(modify func(*API[T])) *API[T] {
+	a.panicIfReadOnly()
+
+	modify(a)
+	return a
+}
+
 func (a *API[T]) panicIfReadOnly() {
 	if !a.readOnly.TryLock() {
 		panic(errors.New("API cannot be modified after starting"))

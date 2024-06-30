@@ -1004,39 +1004,37 @@ func TestRootAPIWithMiddlewareAndCustomHandlers(t *testing.T) {
 `, err.Error())
 	})
 
-	api := babyapi.NewRootAPI("root", "/")
-
-	api.Get = func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(201)
-	}
-	api.Delete = func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(202)
-	}
-	api.Patch = func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(203)
-	}
-	api.Post = func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(204)
-	}
-	api.Put = func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(205)
-	}
-
-	api.AddCustomRoute(http.MethodGet, "/customRoute", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(206)
-	}))
-
-	api.AddCustomRootRoute(http.MethodGet, "/customRootRoute", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(207)
-	}))
-
 	middlewareHits := 0
-	api.AddMiddleware(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			middlewareHits++
-			next.ServeHTTP(w, r)
+	api := babyapi.NewRootAPI("root", "/").
+		Modify(func(a *babyapi.API[*babyapi.NilResource]) {
+			a.Get = func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(201)
+			}
+			a.Delete = func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(202)
+			}
+			a.Patch = func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(203)
+			}
+			a.Post = func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(204)
+			}
+			a.Put = func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(205)
+			}
+		}).
+		AddCustomRoute(http.MethodGet, "/customRoute", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(206)
+		})).
+		AddCustomRootRoute(http.MethodGet, "/customRootRoute", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(207)
+		})).
+		AddMiddleware(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				middlewareHits++
+				next.ServeHTTP(w, r)
+			})
 		})
-	})
 
 	tests := []struct {
 		method         string
