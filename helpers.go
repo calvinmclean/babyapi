@@ -2,6 +2,7 @@ package babyapi
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"html/template"
@@ -22,6 +23,11 @@ func GetIDParam(r *http.Request, name string) string {
 	return chi.URLParam(r, IDParamKey(name))
 }
 
+// GetIDParamFromCtx gets resource ID from the request URL for a resource by name
+func GetIDParamFromCtx(ctx context.Context, name string) string {
+	return chi.URLParamFromCtx(ctx, IDParamKey(name))
+}
+
 // IDParamKey gets the chi URL param key used for this API
 func (a *API[T]) IDParamKey() string {
 	return IDParamKey(a.name)
@@ -34,6 +40,11 @@ func (a *API[T]) GetIDParam(r *http.Request) string {
 		param = a.findIDParam(r)
 	}
 	return param
+}
+
+// GetIDParamFromCtx gets resource ID from the request URL for this API's resource
+func (a *API[T]) GetIDParamFromCtx(ctx context.Context) string {
+	return GetIDParamFromCtx(ctx, a.name)
 }
 
 // findIDParam will loop through the whole path to manually find the ID parameter that follows this
