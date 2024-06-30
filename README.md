@@ -23,55 +23,55 @@ Implement custom request/response handling by implemented `Renderer` and `Binder
 
 1. Create a new Go module:
 
-    ```shell
-    mkdir babyapi-example
-    cd babyapi-example
-    go mod init babyapi-example
-    ```
+   ```shell
+   mkdir babyapi-example
+   cd babyapi-example
+   go mod init babyapi-example
+   ```
 
 2. Write `main.go` to create a `TODO` struct and initialize `babyapi.API`:
 
-    ```go
-    package main
+   ```go
+   package main
 
-    import "github.com/calvinmclean/babyapi"
+   import "github.com/calvinmclean/babyapi"
 
-    type TODO struct {
-        babyapi.DefaultResource
+   type TODO struct {
+       babyapi.DefaultResource
 
-        Title       string
-        Description string
-        Completed   bool
-    }
+       Title       string
+       Description string
+       Completed   bool
+   }
 
-    func main() {
-        api := babyapi.NewAPI(
-            "TODOs", "/todos",
-            func() *TODO { return &TODO{} },
-        )
-        api.RunCLI()
-    }
-    ```
+   func main() {
+       api := babyapi.NewAPI(
+           "TODOs", "/todos",
+           func() *TODO { return &TODO{} },
+       )
+       api.RunCLI()
+   }
+   ```
 
 3. Run!
 
-    ```shell
-    go mod tidy
-    go run main.go serve
-    ```
+   ```shell
+   go mod tidy
+   go run main.go serve
+   ```
 
 4. Use the built-in CLI to interact with the API:
 
-    ```shell
-    # Create a new TODO
-    go run main.go client todos post --data '{"title": "use babyapi!"}'
+   ```shell
+   # Create a new TODO
+   go run main.go client todos post --data '{"title": "use babyapi!"}'
 
-    # Get all TODOs
-    go run main.go client todos list
+   # Get all TODOs
+   go run main.go client todos list
 
-    # Get TODO by ID (use ID from previous responses)
-    go run main.go client todos get cljvfslo4020kglbctog
-    ```
+   # Get TODO by ID (use ID from previous responses)
+   go run main.go client todos get cljvfslo4020kglbctog
+   ```
 
 <img alt="Simple Example" src="examples/simple/simple.gif" width="600" />
 
@@ -152,6 +152,7 @@ The `babyapi.EndDateable` interface can be implemented to enable soft-delete wit
 | [Multiple APIs](./examples/multiple-apis/)         | This example shows how multiple top-level (or any level) sibling APIs can be served, and have CLI functionality, under one root API                                                                                             | <ul><li>Use `NewRootAPI` to create a root API</li><li>Add multiple children to create siblings</li></ul>                                                                                                                                                                                                                                                                          |
 | [Background Worker](./examples/background-worker/) | This example shows how you can use `babyapi` in an application alongside background workers and have runtime control over all goroutines                                                                                        | <ul><li>Use `WithContext` to add a context to an API so the API will stop when the context is cancelled</li><li>Use `api.Done()` to have other goroutines stop when the API is stopped</li></ul>                                                                                                                                                                                  |
 | [SQL](./examples/sql/)                             | This example shows how you can build an API with a custom implementation of `babyapi.Storage` using [`sqlc`](https://sqlc.dev)                                                                                                  | <ul><li>Implement an Extension using a custom implementation of `babyapi.Storage`</li><li>Use `api.Done()` to clean up DB resources</li><li>Extend the built-in CLI to add flags or other customizations</li></ul>                                                                                                                                                                |
+| [Pokemon Client](./examples/pokemon-client/)       | This example shows how you can leverage the client and CLI features of `babyapi` to create a client for an external API                                                                                                         | <ul><li>Add custom CLI command</li><li>Use just the client for an external API</li></ul>                                                                                                                                                                                                                                                                                          |
 
 Also see a full example of an application implementing a REST API using `babyapi` in my [`automated-garden` project](https://github.com/calvinmclean/automated-garden/tree/main/garden-app).
 

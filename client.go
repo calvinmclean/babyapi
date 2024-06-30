@@ -48,7 +48,7 @@ func newResponse[T any](resp *http.Response, expectedStatusCode int) (*Response[
 		return nil, httpErr
 	}
 
-	if result.ContentType == "application/json" {
+	if strings.Contains(result.ContentType, "application/json") {
 		err := json.Unmarshal([]byte(result.Body), &result.Data)
 		if err != nil {
 			return nil, fmt.Errorf("error decoding response body %q: %w", result.Body, err)
@@ -67,8 +67,8 @@ func (sr *Response[T]) Fprint(out io.Writer, pretty bool) error {
 	}
 
 	var err error
-	switch sr.ContentType {
-	case "application/json":
+	switch {
+	case strings.Contains(sr.ContentType, "application/json"):
 		encoder := json.NewEncoder(out)
 		if pretty {
 			encoder.SetIndent("", "\t")
