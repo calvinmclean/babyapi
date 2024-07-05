@@ -58,8 +58,8 @@ type API[T Resource] struct {
 	beforeDelete beforeAfterFunc
 	afterDelete  beforeAfterFunc
 
-	onCreateOrUpdate    func(*http.Request, T) *ErrResponse
-	afterCreateOrUpdate func(*http.Request, T) *ErrResponse
+	onCreateOrUpdate    func(http.ResponseWriter, *http.Request, T) *ErrResponse
+	afterCreateOrUpdate func(http.ResponseWriter, *http.Request, T) *ErrResponse
 
 	parent relatedAPI
 
@@ -114,8 +114,8 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 		func(*http.Request) FilterFunc[T] { return nil },
 		defaultBeforeAfter,
 		defaultBeforeAfter,
-		func(*http.Request, T) *ErrResponse { return nil },
-		func(*http.Request, T) *ErrResponse { return nil },
+		func(http.ResponseWriter, *http.Request, T) *ErrResponse { return nil },
+		func(http.ResponseWriter, *http.Request, T) *ErrResponse { return nil },
 		nil,
 		defaultResponseCodes(),
 		nil,
@@ -188,14 +188,14 @@ func (a *API[T]) SetGetAllResponseWrapper(getAllResponder func([]T) render.Rende
 // SetOnCreateOrUpdate runs on POST, PATCH, and PUT requests before saving the created/updated resource.
 // This is useful for adding more validations or performing tasks related to resources such as initializing
 // schedules or sending events
-func (a *API[T]) SetOnCreateOrUpdate(onCreateOrUpdate func(*http.Request, T) *ErrResponse) *API[T] {
+func (a *API[T]) SetOnCreateOrUpdate(onCreateOrUpdate func(http.ResponseWriter, *http.Request, T) *ErrResponse) *API[T] {
 	a.panicIfReadOnly()
 
 	a.onCreateOrUpdate = onCreateOrUpdate
 	return a
 }
 
-func (a *API[T]) SetAfterCreateOrUpdate(afterCreateOrUpdate func(*http.Request, T) *ErrResponse) *API[T] {
+func (a *API[T]) SetAfterCreateOrUpdate(afterCreateOrUpdate func(http.ResponseWriter, *http.Request, T) *ErrResponse) *API[T] {
 	a.panicIfReadOnly()
 
 	a.afterCreateOrUpdate = afterCreateOrUpdate
@@ -204,7 +204,7 @@ func (a *API[T]) SetAfterCreateOrUpdate(afterCreateOrUpdate func(*http.Request, 
 
 // SetBeforeDelete sets a function that is executing before deleting a resource. It is useful for additional
 // validation before completing the delete
-func (a *API[T]) SetBeforeDelete(before func(*http.Request) *ErrResponse) *API[T] {
+func (a *API[T]) SetBeforeDelete(before func(http.ResponseWriter, *http.Request) *ErrResponse) *API[T] {
 	a.panicIfReadOnly()
 
 	if before == nil {
@@ -217,7 +217,7 @@ func (a *API[T]) SetBeforeDelete(before func(*http.Request) *ErrResponse) *API[T
 
 // SetAfterDelete sets a function that is executed after deleting a resource. It is useful for additional
 // cleanup or other actions that should be done after deleting
-func (a *API[T]) SetAfterDelete(after func(*http.Request) *ErrResponse) *API[T] {
+func (a *API[T]) SetAfterDelete(after func(http.ResponseWriter, *http.Request) *ErrResponse) *API[T] {
 	a.panicIfReadOnly()
 
 	if after == nil {
@@ -397,9 +397,9 @@ func (a *API[T]) Done() <-chan struct{} {
 	return a.quit
 }
 
-type beforeAfterFunc func(*http.Request) *ErrResponse
+type beforeAfterFunc func(http.ResponseWriter, *http.Request) *ErrResponse
 
-func defaultBeforeAfter(*http.Request) *ErrResponse {
+func defaultBeforeAfter(http.ResponseWriter, *http.Request) *ErrResponse {
 	return nil
 }
 

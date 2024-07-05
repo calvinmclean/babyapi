@@ -792,19 +792,19 @@ func TestAPIModifiers(t *testing.T) {
 				next.ServeHTTP(w, r)
 			})
 		}).
-		SetOnCreateOrUpdate(func(r *http.Request, a *Album) *babyapi.ErrResponse {
+		SetOnCreateOrUpdate(func(w http.ResponseWriter, r *http.Request, a *Album) *babyapi.ErrResponse {
 			onCreateOrUpdate++
 			return nil
 		}).
-		SetAfterCreateOrUpdate(func(r *http.Request, a *Album) *babyapi.ErrResponse {
+		SetAfterCreateOrUpdate(func(w http.ResponseWriter, r *http.Request, a *Album) *babyapi.ErrResponse {
 			afterCreateOrUpdate++
 			return nil
 		}).
-		SetBeforeDelete(func(r *http.Request) *babyapi.ErrResponse {
+		SetBeforeDelete(func(http.ResponseWriter, *http.Request) *babyapi.ErrResponse {
 			beforeDelete++
 			return nil
 		}).
-		SetAfterDelete(func(r *http.Request) *babyapi.ErrResponse {
+		SetAfterDelete(func(http.ResponseWriter, *http.Request) *babyapi.ErrResponse {
 			afterDelete++
 			return nil
 		})
@@ -870,7 +870,7 @@ func TestAPIModifierErrors(t *testing.T) {
 		api := babyapi.NewAPI("Albums", "/albums", func() *Album { return &Album{} })
 		albumID := "cljcqg5o402e9s28rbp0"
 
-		api.SetOnCreateOrUpdate(func(_ *http.Request, _ *Album) *babyapi.ErrResponse {
+		api.SetOnCreateOrUpdate(func(http.ResponseWriter, *http.Request, *Album) *babyapi.ErrResponse {
 			return babyapi.ErrRender(fmt.Errorf("test error"))
 		})
 
@@ -892,7 +892,7 @@ func TestAPIModifierErrors(t *testing.T) {
 		api := babyapi.NewAPI("Albums", "/albums", func() *Album { return &Album{} })
 		albumID := "cljcqg5o402e9s28rbp0"
 
-		api.SetAfterCreateOrUpdate(func(_ *http.Request, _ *Album) *babyapi.ErrResponse {
+		api.SetAfterCreateOrUpdate(func(http.ResponseWriter, *http.Request, *Album) *babyapi.ErrResponse {
 			return babyapi.ErrRender(fmt.Errorf("test error"))
 		})
 
@@ -917,7 +917,7 @@ func TestAPIModifierErrors(t *testing.T) {
 		api := babyapi.NewAPI("Albums", "/albums", func() *Album { return &Album{} })
 		albumID := "cljcqg5o402e9s28rbp0"
 
-		api.SetBeforeDelete(func(_ *http.Request) *babyapi.ErrResponse {
+		api.SetBeforeDelete(func(http.ResponseWriter, *http.Request) *babyapi.ErrResponse {
 			return babyapi.ErrRender(fmt.Errorf("test error"))
 		})
 
@@ -953,7 +953,7 @@ func TestAPIModifierErrors(t *testing.T) {
 		api := babyapi.NewAPI("Albums", "/albums", func() *Album { return &Album{} })
 		albumID := "cljcqg5o402e9s28rbp0"
 
-		api.SetAfterDelete(func(_ *http.Request) *babyapi.ErrResponse {
+		api.SetAfterDelete(func(http.ResponseWriter, *http.Request) *babyapi.ErrResponse {
 			return babyapi.ErrRender(fmt.Errorf("test error"))
 		})
 
@@ -1320,7 +1320,7 @@ func TestReadOnlyPanicAfterStart(t *testing.T) {
 	require.NoError(t, err)
 
 	require.PanicsWithError(t, "API cannot be modified after starting", func() {
-		api.SetOnCreateOrUpdate(func(_ *http.Request, _ *Album) *babyapi.ErrResponse {
+		api.SetOnCreateOrUpdate(func(http.ResponseWriter, *http.Request, *Album) *babyapi.ErrResponse {
 			return nil
 		})
 	})
