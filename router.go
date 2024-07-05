@@ -206,10 +206,10 @@ func (a *API[T]) defaultGetAll() http.HandlerFunc {
 }
 
 func (a *API[T]) defaultPost() http.HandlerFunc {
-	return a.ReadRequestBodyAndDo(func(r *http.Request, resource T) (T, *ErrResponse) {
+	return a.ReadRequestBodyAndDo(func(w http.ResponseWriter, r *http.Request, resource T) (T, *ErrResponse) {
 		logger := GetLoggerFromContext(r.Context())
 
-		httpErr := a.onCreateOrUpdate(r, resource)
+		httpErr := a.onCreateOrUpdate(w, r, resource)
 		if httpErr != nil {
 			return *new(T), httpErr
 		}
@@ -221,7 +221,7 @@ func (a *API[T]) defaultPost() http.HandlerFunc {
 			return *new(T), InternalServerError(err)
 		}
 
-		httpErr = a.afterCreateOrUpdate(r, resource)
+		httpErr = a.afterCreateOrUpdate(w, r, resource)
 		if httpErr != nil {
 			return *new(T), httpErr
 		}
@@ -233,14 +233,14 @@ func (a *API[T]) defaultPost() http.HandlerFunc {
 }
 
 func (a *API[T]) defaultPut() http.HandlerFunc {
-	return a.ReadRequestBodyAndDo(func(r *http.Request, resource T) (T, *ErrResponse) {
+	return a.ReadRequestBodyAndDo(func(w http.ResponseWriter, r *http.Request, resource T) (T, *ErrResponse) {
 		logger := GetLoggerFromContext(r.Context())
 
 		if resource.GetID() != a.GetIDParam(r) {
 			return *new(T), ErrInvalidRequest(fmt.Errorf("id must match URL path"))
 		}
 
-		httpErr := a.onCreateOrUpdate(r, resource)
+		httpErr := a.onCreateOrUpdate(w, r, resource)
 		if httpErr != nil {
 			return *new(T), httpErr
 		}
@@ -252,7 +252,7 @@ func (a *API[T]) defaultPut() http.HandlerFunc {
 			return *new(T), InternalServerError(err)
 		}
 
-		httpErr = a.afterCreateOrUpdate(r, resource)
+		httpErr = a.afterCreateOrUpdate(w, r, resource)
 		if httpErr != nil {
 			return *new(T), httpErr
 		}
@@ -264,7 +264,7 @@ func (a *API[T]) defaultPut() http.HandlerFunc {
 }
 
 func (a *API[T]) defaultPatch() http.HandlerFunc {
-	return a.ReadRequestBodyAndDo(func(r *http.Request, patchRequest T) (T, *ErrResponse) {
+	return a.ReadRequestBodyAndDo(func(w http.ResponseWriter, r *http.Request, patchRequest T) (T, *ErrResponse) {
 		logger := GetLoggerFromContext(r.Context())
 
 		resource, httpErr := a.GetRequestedResource(r)
@@ -284,7 +284,7 @@ func (a *API[T]) defaultPatch() http.HandlerFunc {
 			return *new(T), httpErr
 		}
 
-		httpErr = a.onCreateOrUpdate(r, resource)
+		httpErr = a.onCreateOrUpdate(w, r, resource)
 		if httpErr != nil {
 			return *new(T), httpErr
 		}
@@ -297,7 +297,7 @@ func (a *API[T]) defaultPatch() http.HandlerFunc {
 			return *new(T), InternalServerError(err)
 		}
 
-		httpErr = a.afterCreateOrUpdate(r, resource)
+		httpErr = a.afterCreateOrUpdate(w, r, resource)
 		if httpErr != nil {
 			return *new(T), httpErr
 		}
@@ -311,7 +311,7 @@ func (a *API[T]) defaultPatch() http.HandlerFunc {
 func (a *API[T]) defaultDelete() http.HandlerFunc {
 	return Handler(func(w http.ResponseWriter, r *http.Request) render.Renderer {
 		logger := GetLoggerFromContext(r.Context())
-		httpErr := a.beforeDelete(r)
+		httpErr := a.beforeDelete(w, r)
 		if httpErr != nil {
 			logger.Error("error executing before func", "error", httpErr)
 			return httpErr
@@ -332,7 +332,7 @@ func (a *API[T]) defaultDelete() http.HandlerFunc {
 			return InternalServerError(err)
 		}
 
-		httpErr = a.afterDelete(r)
+		httpErr = a.afterDelete(w, r)
 		if httpErr != nil {
 			logger.Error("error executing after func", "error", httpErr)
 			return httpErr

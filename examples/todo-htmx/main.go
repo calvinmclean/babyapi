@@ -140,7 +140,7 @@ func createAPI() *babyapi.API[*TODO] {
 	todoChan := api.AddServerSentEventHandler("/listen")
 
 	// Push events onto the SSE channel when new TODOs are created
-	api.SetOnCreateOrUpdate(func(r *http.Request, t *TODO) *babyapi.ErrResponse {
+	api.SetOnCreateOrUpdate(func(_ http.ResponseWriter, r *http.Request, t *TODO) *babyapi.ErrResponse {
 		if r.Method != http.MethodPost {
 			return nil
 		}

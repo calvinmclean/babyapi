@@ -130,14 +130,14 @@ func (a *API[T]) GetRequestedResourceAndDoMiddleware(do func(*http.Request, T) (
 }
 
 // ReadRequestBodyAndDo is a wrapper that handles decoding the request body into the resource type and rendering a response
-func (a *API[T]) ReadRequestBodyAndDo(do func(*http.Request, T) (T, *ErrResponse)) http.HandlerFunc {
+func (a *API[T]) ReadRequestBodyAndDo(do func(http.ResponseWriter, *http.Request, T) (T, *ErrResponse)) http.HandlerFunc {
 	return Handler(func(w http.ResponseWriter, r *http.Request) render.Renderer {
 		resource, httpErr := a.GetFromRequest(r)
 		if httpErr != nil {
 			return httpErr
 		}
 
-		resp, httpErr := do(r, resource)
+		resp, httpErr := do(w, r, resource)
 		if httpErr != nil {
 			return httpErr
 		}
@@ -152,14 +152,14 @@ func (a *API[T]) ReadRequestBodyAndDo(do func(*http.Request, T) (T, *ErrResponse
 }
 
 // ReadRequestBodyAndDo is a helper function that can be used without an API to handle a request
-func ReadRequestBodyAndDo[T RendererBinder](do func(*http.Request, T) (render.Renderer, *ErrResponse), instance func() T) http.HandlerFunc {
+func ReadRequestBodyAndDo[T RendererBinder](do func(http.ResponseWriter, *http.Request, T) (render.Renderer, *ErrResponse), instance func() T) http.HandlerFunc {
 	return Handler(func(w http.ResponseWriter, r *http.Request) render.Renderer {
 		resource, httpErr := GetFromRequest(r, instance)
 		if httpErr != nil {
 			return httpErr
 		}
 
-		resp, httpErr := do(r, resource)
+		resp, httpErr := do(w, r, resource)
 		if httpErr != nil {
 			return httpErr
 		}
