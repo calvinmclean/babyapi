@@ -115,7 +115,7 @@ Check out some of the [examples](./examples) for examples of using the `babytest
 
 You can bring any storage backend to `babyapi` by implementing the `Storage` interface. By default, the API will use the built-in `KVStorage` with the default configuration for in-memory map.
 
-This storage implementation leverages [`madflojo/hord`](https://github.com/madflojo/hord) to support a variety of key-value store backends. Currently, the `babyapi/storage/kv` package provides helpers to create file or redis-based storage implementations.
+This storage implementation leverages [`tarmac-project/hord`](https://github.com/tarmac-project/hord) to support a variety of key-value store backends. Currently, the `babyapi/storage/kv` package provides helpers to create file or redis-based storage implementations.
 
 ```go
 db, err := kv.NewFileDB(hashmap.Config{

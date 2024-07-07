@@ -3,9 +3,9 @@ package kv
 import (
 	"fmt"
 
-	"github.com/madflojo/hord"
-	"github.com/madflojo/hord/drivers/hashmap"
-	"github.com/madflojo/hord/drivers/redis"
+	"github.com/tarmac-project/hord"
+	"github.com/tarmac-project/hord/drivers/hashmap"
+	"github.com/tarmac-project/hord/drivers/redis"
 )
 
 // NewDefaultDB creates a default in-memory KV-storage. Theoretically it should not error, but if it does, it panics

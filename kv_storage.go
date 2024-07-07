@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/madflojo/hord"
+	"github.com/tarmac-project/hord"
 )
 
 // KVStorage implements the Storage interface for the provided type using hord.Database for the storage backend
