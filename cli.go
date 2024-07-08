@@ -12,6 +12,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/calvinmclean/babyapi/generate"
 	"github.com/spf13/cobra"
 )
 
@@ -55,6 +56,20 @@ func (a *API[T]) Command() *cobra.Command {
 			}
 		},
 	}
+
+	var fname string
+	var force bool
+	generateTestCmd := &cobra.Command{
+		Use:     "generate-test",
+		Aliases: []string{"gt"},
+		Short:   "Generate a simple API test boilerplate",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return generate.GenerateTest(fname, force)
+		},
+	}
+	generateTestCmd.Flags().StringVarP(&fname, "out", "o", "api_test.go", "Target output filename for the generated test")
+	generateTestCmd.Flags().BoolVarP(&force, "force", "f", false, "Enable to overwrite existing file")
+	rootCmd.AddCommand(generateTestCmd)
 
 	rootCmd.PersistentFlags().StringVar(&a.cliArgs.address, "address", "", "bind address for server or target host address for client")
 
