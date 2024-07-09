@@ -48,14 +48,9 @@ type HTMLer interface {
 	HTML(*http.Request) string
 }
 
-// Create API routes on the given router
-func (a *API[T]) Route(r chi.Router) error {
-	a.readOnly.TryLock()
-
-	if len(a.errors) > 0 {
-		return BuilderError{a.errors}
-	}
-
+// EnableHTMLRender overrides the default render.Respond function to add support for the
+// babyapi.HTMLer interface that renders HTML responses
+func EnableHTMLRender() {
 	respondOnce.Do(func() {
 		render.Respond = func(w http.ResponseWriter, r *http.Request, v interface{}) {
 			if render.GetAcceptedContentType(r) == render.ContentTypeHTML {
@@ -69,6 +64,17 @@ func (a *API[T]) Route(r chi.Router) error {
 			render.DefaultResponder(w, r, v)
 		}
 	})
+}
+
+// Create API routes on the given router
+func (a *API[T]) Route(r chi.Router) error {
+	a.readOnly.TryLock()
+
+	if len(a.errors) > 0 {
+		return BuilderError{a.errors}
+	}
+
+	EnableHTMLRender()
 
 	// Only set these middleware for root-level API
 	if a.parent == nil {

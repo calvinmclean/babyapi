@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -213,6 +214,9 @@ func Handler(do func(http.ResponseWriter, *http.Request) render.Renderer) http.H
 			return
 		}
 		logger := GetLoggerFromContext(r.Context())
+		if logger == nil {
+			logger = slog.Default()
+		}
 
 		httpErr, ok := response.(*ErrResponse)
 		if ok {

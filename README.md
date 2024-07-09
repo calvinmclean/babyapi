@@ -19,6 +19,8 @@ Implement custom request/response handling by implemented `Renderer` and `Binder
 - And many more! (see [examples](https://github.com/calvinmclean/babyapi/tree/main/examples) and [docs](https://pkg.go.dev/github.com/calvinmclean/babyapi))
 - Override any of the default handlers and use `babyapi.Handler` shortcut to easily render errors and responses
 
+You can also opt to just use the `api.Router()` function to get the API's router/handler and add to your application's existing server.
+
 ## Getting Started
 
 1. Create a new Go module:
@@ -111,6 +113,11 @@ The `babytest` package provides some shortcuts and utilities for easily building
 
 Check out some of the [examples](./examples) for examples of using the `babytest` package.
 
+If your application uses `api.RunCLI()`, you can execute the `generate-test` command to generate a boilerplate CRUD test for the API:
+```shell
+go run main.go generate-test
+```
+
 ## Storage
 
 You can bring any storage backend to `babyapi` by implementing the `Storage` interface. By default, the API will use the built-in `KVStorage` with the default configuration for in-memory map.
@@ -153,6 +160,7 @@ The `babyapi.EndDateable` interface can be implemented to enable soft-delete wit
 | [Background Worker](./examples/background-worker/) | This example shows how you can use `babyapi` in an application alongside background workers and have runtime control over all goroutines                                                                                        | <ul><li>Use `WithContext` to add a context to an API so the API will stop when the context is cancelled</li><li>Use `api.Done()` to have other goroutines stop when the API is stopped</li></ul>                                                                                                                                                                                  |
 | [SQL](./examples/sql/)                             | This example shows how you can build an API with a custom implementation of `babyapi.Storage` using [`sqlc`](https://sqlc.dev)                                                                                                  | <ul><li>Implement an Extension using a custom implementation of `babyapi.Storage`</li><li>Use `api.Done()` to clean up DB resources</li><li>Extend the built-in CLI to add flags or other customizations</li></ul>                                                                                                                                                                |
 | [Pokemon Client](./examples/pokemon-client/)       | This example shows how you can leverage the client and CLI features of `babyapi` to create a client for an external API                                                                                                         | <ul><li>Add custom CLI command</li><li>Use just the client for an external API</li></ul>                                                                                                                                                                                                                                                                                          |
+| [Use As Library](./examples/use-as-library/)       | This example shows how a subset of `babyapi` features can be used as a library rather than a full framework                                                                                                         | <ul><li>Use `babyapi.Handler` and `babyapi.ReadRequestBodyAndDo` to simplify HTTP handlers</li><li>Use the generic `babyapi.MakeRequest` function to make a request to the server</li><li>Use `babyapi/html` package to simplify responding with HTML templates</li></ul>                                                                                                                                                                                                                                                                                          |
 
 Also see a full example of an application implementing a REST API using `babyapi` in my [`automated-garden` project](https://github.com/calvinmclean/automated-garden/tree/main/garden-app).
 
