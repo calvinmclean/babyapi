@@ -147,6 +147,24 @@ The `babyapi.EndDateable` interface can be implemented to enable soft-delete wit
 - `KVStorage`: provide a few simple configurations to use the `KVStorage` client with a local file or Redis
 - `HTMX`: HTMX expects 200 responses from DELETE requests, so this changes the response code
 
+## When to use `babyapi`
+
+Like anything in software engineering, there are cases where `babyapi` is a good choice and others where it's not a great fit.
+
+**You should use `babyapi` if you**:
+  - Need a resource-driven REST HTTP API and want to get moving quickly. This can be a standalone application or a component of a larger application
+  - Have multiple APIs that will interact and can benefit from a compatible client with no extra work
+  - Want to learn about framework development and contribute to an open source project
+  - Know the extent of the application's scope and know it won't grow beyond `babyapi`'s capabilities
+
+**You should _not_ use `babyapi` if you**:
+  - Need to have ultimate control over the application's execution that might not be compatible with `babyapi` (although maybe you can add support!)
+  - Aren't willing to dig into the framework's code and learn how it works
+  - Don't understand how to build an API without it. It's important to understand the fundamentals before taking shortcuts
+
+If `babyapi` is not a great fit for your use-case, you can still use some of its features to speed up development! Check out the [Use As Library](./examples/use-as-library/) example.
+
+
 ## Examples
 
 |                                                    | Description                                                                                                                                                                                                                     | Features                                                                                                                                                                                                                                                                                                                                                                          |
