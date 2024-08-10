@@ -72,7 +72,7 @@ func (a *API[T]) findIDParam(r *http.Request) string {
 
 // GetRequestedResourceAndDo is a wrapper that handles getting a resource from storage based on the ID in the request URL
 // and rendering the response. This is useful for imlementing a CustomIDRoute
-func (a *API[T]) GetRequestedResourceAndDo(do func(*http.Request, T) (render.Renderer, *ErrResponse)) http.HandlerFunc {
+func (a *API[T]) GetRequestedResourceAndDo(do func(http.ResponseWriter, *http.Request, T) (render.Renderer, *ErrResponse)) http.HandlerFunc {
 	return Handler(func(w http.ResponseWriter, r *http.Request) render.Renderer {
 		logger := GetLoggerFromContext(r.Context())
 
@@ -82,7 +82,7 @@ func (a *API[T]) GetRequestedResourceAndDo(do func(*http.Request, T) (render.Ren
 			return httpErr
 		}
 
-		resp, httpErr := do(r, resource)
+		resp, httpErr := do(w, r, resource)
 		if httpErr != nil {
 			return httpErr
 		}
@@ -99,7 +99,7 @@ func (a *API[T]) GetRequestedResourceAndDo(do func(*http.Request, T) (render.Ren
 // GetRequestedResourceAndDoMiddleware is a shortcut for creating an ID-scoped middleware that gets the requested resource from storage,
 // calls the provided 'do' function, and calls next.ServeHTTP. If the resource is not found for a PUT request, the error is ignored
 // The 'do' function returns *http.Request so the request context can be modified by middleware
-func (a *API[T]) GetRequestedResourceAndDoMiddleware(do func(*http.Request, T) (*http.Request, *ErrResponse)) func(next http.Handler) http.Handler {
+func (a *API[T]) GetRequestedResourceAndDoMiddleware(do func(http.ResponseWriter, *http.Request, T) (*http.Request, *ErrResponse)) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -119,7 +119,7 @@ func (a *API[T]) GetRequestedResourceAndDoMiddleware(do func(*http.Request, T) (
 				return
 			}
 
-			r, httpErr = do(r, resource)
+			r, httpErr = do(w, r, resource)
 			if httpErr != nil {
 				_ = render.Render(w, r, httpErr)
 				return

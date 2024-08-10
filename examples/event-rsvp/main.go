@@ -96,7 +96,7 @@ func (api *API) export(w http.ResponseWriter, r *http.Request) render.Renderer {
 }
 
 // Use a custom route to set RSVP so rsvpResponse can be used to return HTML buttons
-func (api *API) rsvp(r *http.Request, invite *Invite) (render.Renderer, *babyapi.ErrResponse) {
+func (api *API) rsvp(_ http.ResponseWriter, r *http.Request, invite *Invite) (render.Renderer, *babyapi.ErrResponse) {
 	if err := r.ParseForm(); err != nil {
 		return nil, babyapi.ErrInvalidRequest(fmt.Errorf("error parsing form data: %w", err))
 	}
@@ -116,7 +116,7 @@ func (api *API) rsvp(r *http.Request, invite *Invite) (render.Renderer, *babyapi
 }
 
 // Allow adding bulk invites with a single request
-func (api *API) addBulkInvites(r *http.Request, event *Event) (render.Renderer, *babyapi.ErrResponse) {
+func (api *API) addBulkInvites(_ http.ResponseWriter, r *http.Request, event *Event) (render.Renderer, *babyapi.ErrResponse) {
 	if err := r.ParseForm(); err != nil {
 		return nil, babyapi.ErrInvalidRequest(fmt.Errorf("error parsing form data: %w", err))
 	}
@@ -154,7 +154,7 @@ func (api *API) addBulkInvites(r *http.Request, event *Event) (render.Renderer, 
 // authenticationMiddleware enforces access to Events and Invites. Admin access to an Event requires a password query parameter.
 // Access to Invites is allowed by the invite ID and requires no extra auth. The invite ID in the path or query parameter allows
 // read-only access to the Event
-func (api *API) authenticationMiddleware(r *http.Request, event *Event) (*http.Request, *babyapi.ErrResponse) {
+func (api *API) authenticationMiddleware(_ http.ResponseWriter, r *http.Request, event *Event) (*http.Request, *babyapi.ErrResponse) {
 	password := r.URL.Query().Get("password")
 	inviteID := r.URL.Query().Get("invite")
 	if inviteID == "" {
@@ -184,7 +184,7 @@ func (api *API) authenticationMiddleware(r *http.Request, event *Event) (*http.R
 }
 
 // getAllInvitesMiddleware will get all invites when rendering HTML so it is accessible to the endpoint
-func (api *API) getAllInvitesMiddleware(r *http.Request, event *Event) (*http.Request, *babyapi.ErrResponse) {
+func (api *API) getAllInvitesMiddleware(_ http.ResponseWriter, r *http.Request, event *Event) (*http.Request, *babyapi.ErrResponse) {
 	if render.GetAcceptedContentType(r) != render.ContentTypeHTML {
 		return r, nil
 	}
@@ -265,7 +265,7 @@ func (e *Event) Bind(r *http.Request) error {
 	return e.DefaultResource.Bind(r)
 }
 
-func (e *Event) HTML(r *http.Request) string {
+func (e *Event) HTML(_ http.ResponseWriter, r *http.Request) string {
 	return eventPage.Render(r, struct {
 		Password string
 		*Event
@@ -300,7 +300,7 @@ func (i *Invite) Bind(r *http.Request) error {
 	return i.DefaultResource.Bind(r)
 }
 
-func (i *Invite) HTML(r *http.Request) string {
+func (i *Invite) HTML(_ http.ResponseWriter, r *http.Request) string {
 	event, _ := babyapi.GetResourceFromContext[*Event](r.Context(), babyapi.ContextKey("Event"))
 
 	return invitePage.Render(r, struct {
