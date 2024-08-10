@@ -68,6 +68,6 @@ func (h htmlRenderer) Render(_ http.ResponseWriter, _ *http.Request) error {
 	return nil
 }
 
-func (h htmlRenderer) HTML(r *http.Request) string {
+func (h htmlRenderer) HTML(_ http.ResponseWriter, r *http.Request) string {
 	return h.t.Render(r, h.data)
 }

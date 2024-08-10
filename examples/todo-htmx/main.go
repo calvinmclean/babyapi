@@ -108,7 +108,7 @@ type TODO struct {
 	Completed   *bool
 }
 
-func (t *TODO) HTML(r *http.Request) string {
+func (t *TODO) HTML(_ http.ResponseWriter, r *http.Request) string {
 	return todoRow.Render(r, t)
 }
 
@@ -120,7 +120,7 @@ func (at AllTODOs) Render(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (at AllTODOs) HTML(r *http.Request) string {
+func (at AllTODOs) HTML(_ http.ResponseWriter, r *http.Request) string {
 	return allTODOs.Render(r, at.Items)
 }
 
@@ -131,7 +131,7 @@ func createAPI() *babyapi.API[*TODO] {
 
 	// Use AllTODOs in the GetAll response since it implements HTMLer
 	api.SetGetAllResponseWrapper(func(todos []*TODO) render.Renderer {
-		return AllTODOs{ResourceList: babyapi.ResourceList[*TODO]{todos}}
+		return AllTODOs{ResourceList: babyapi.ResourceList[*TODO]{Items: todos}}
 	})
 
 	api.ApplyExtension(extensions.HTMX[*TODO]{})
@@ -140,13 +140,13 @@ func createAPI() *babyapi.API[*TODO] {
 	todoChan := api.AddServerSentEventHandler("/listen")
 
 	// Push events onto the SSE channel when new TODOs are created
-	api.SetOnCreateOrUpdate(func(_ http.ResponseWriter, r *http.Request, t *TODO) *babyapi.ErrResponse {
+	api.SetOnCreateOrUpdate(func(w http.ResponseWriter, r *http.Request, t *TODO) *babyapi.ErrResponse {
 		if r.Method != http.MethodPost {
 			return nil
 		}
 
 		select {
-		case todoChan <- &babyapi.ServerSentEvent{Event: "newTODO", Data: t.HTML(r)}:
+		case todoChan <- &babyapi.ServerSentEvent{Event: "newTODO", Data: t.HTML(w, r)}:
 		default:
 			logger := babyapi.GetLoggerFromContext(r.Context())
 			logger.Info("no listeners for server-sent event")

@@ -51,7 +51,7 @@ func TestBabyAPI(t *testing.T) {
 		w.WriteHeader(http.StatusTeapot)
 	}))
 
-	api.AddCustomIDRoute(http.MethodGet, "/teapot", api.GetRequestedResourceAndDo(func(r *http.Request, album *Album) (render.Renderer, *babyapi.ErrResponse) {
+	api.AddCustomIDRoute(http.MethodGet, "/teapot", api.GetRequestedResourceAndDo(func(_ http.ResponseWriter, r *http.Request, album *Album) (render.Renderer, *babyapi.ErrResponse) {
 		render.Status(r, http.StatusTeapot)
 		return album, nil
 	}))
@@ -634,7 +634,7 @@ func (ul *UnorderedList) Render(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (ul *UnorderedList) HTML(r *http.Request) string {
+func (ul *UnorderedList) HTML(_ http.ResponseWriter, r *http.Request) string {
 	templates := map[string]string{
 		"ul": `<ul>
 {{- range .Items }}
@@ -652,7 +652,7 @@ type ListItem struct {
 	Content string
 }
 
-func (d *ListItem) HTML(*http.Request) string {
+func (d *ListItem) HTML(http.ResponseWriter, *http.Request) string {
 	tmpl := template.Must(template.New("li").Parse(`<li>{{ .Content }}</li>`))
 	return babyapi.MustRenderHTML(tmpl, d)
 }
@@ -810,7 +810,7 @@ func TestAPIModifiers(t *testing.T) {
 		})
 
 	api.AddIDMiddleware(api.GetRequestedResourceAndDoMiddleware(
-		func(r *http.Request, a *Album) (*http.Request, *babyapi.ErrResponse) {
+		func(_ http.ResponseWriter, r *http.Request, a *Album) (*http.Request, *babyapi.ErrResponse) {
 			require.NotNil(t, a)
 			idMiddlewareWithRequestResource++
 			return r, nil

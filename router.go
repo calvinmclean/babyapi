@@ -45,7 +45,7 @@ var _ error = BuilderError{}
 // HTMLer allows for easily represending reponses as HTML strings when accepted content
 // type is text/html
 type HTMLer interface {
-	HTML(*http.Request) string
+	HTML(http.ResponseWriter, *http.Request) string
 }
 
 // EnableHTMLRender overrides the default render.Respond function to add support for the
@@ -56,7 +56,7 @@ func EnableHTMLRender() {
 			if render.GetAcceptedContentType(r) == render.ContentTypeHTML {
 				htmler, ok := v.(HTMLer)
 				if ok {
-					render.HTML(w, r, htmler.HTML(r))
+					render.HTML(w, r, htmler.HTML(w, r))
 					return
 				}
 			}
