@@ -10,10 +10,16 @@ import (
 	"github.com/go-chi/render"
 )
 
-func (a *API[T]) DefaultMiddleware(r chi.Router) {
-	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
-	r.Use(middleware.Recoverer)
+var DefaultMiddleware = []func(http.Handler) http.Handler{
+	middleware.RequestID,
+	middleware.RealIP,
+	middleware.Recoverer,
+}
+
+func (a *API[T]) ApplyDefaultMiddleware(r chi.Router) {
+	for _, m := range DefaultMiddleware {
+		r.Use(m)
+	}
 	r.Use(a.logMiddleware)
 }
 

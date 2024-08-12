@@ -78,7 +78,7 @@ func (a *API[T]) Route(r chi.Router) error {
 
 	// Only set these middleware for root-level API
 	if a.parent == nil {
-		a.DefaultMiddleware(r)
+		a.ApplyDefaultMiddleware(r)
 	}
 
 	for _, m := range a.middlewares {
