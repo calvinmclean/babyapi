@@ -90,6 +90,8 @@ type API[T Resource] struct {
 	errors []error
 
 	cliArgs cliArgs
+
+	address string
 }
 
 // NewAPI initializes an API using the provided name, base URL path, and function to create a new instance of
@@ -128,6 +130,7 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 		sync.Mutex{},
 		nil,
 		cliArgs{},
+		"",
 	}
 
 	api.GetAll = api.defaultGetAll()
@@ -165,6 +168,14 @@ func (a *API[T]) Base() string {
 // Name returns the name of the API
 func (a *API[T]) Name() string {
 	return a.name
+}
+
+// SetAddress sets the bind address for the application. The default is `0.0.0.0:8080`
+func (a *API[T]) SetAddress(addr string) *API[T] {
+	a.panicIfReadOnly()
+
+	a.address = addr
+	return a
 }
 
 // SetCustomResponseCode will override the default response codes for the specified HTTP verb. Use MethodGetAll to set the
@@ -331,17 +342,17 @@ func (a *API[T]) AddIDMiddleware(m func(http.Handler) http.Handler) *API[T] {
 	return a
 }
 
-// Serve will serve the API on the given port
-func (a *API[T]) Serve(address string) error {
-	if address == "" {
-		address = ":8080"
+// Serve will serve the API on the given address
+func (a *API[T]) Serve() error {
+	if a.address == "" {
+		a.address = ":8080"
 	}
 
 	router, err := a.Router()
 	if err != nil {
 		return fmt.Errorf("error creating router: %w", err)
 	}
-	server := &http.Server{Addr: address, Handler: router}
+	server := &http.Server{Addr: a.address, Handler: router}
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -375,7 +386,7 @@ func (a *API[T]) Serve(address string) error {
 		}
 	}()
 
-	slog.Info("starting server", "address", address, "api", a.name)
+	slog.Info("starting server", "address", a.address, "api", a.name)
 	err = server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("error starting the server: %w", err)

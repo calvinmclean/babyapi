@@ -66,7 +66,7 @@ func TestBabyAPI(t *testing.T) {
 	album1 := &Album{Title: "Album1"}
 
 	go func() {
-		err := api.Serve("localhost:8080")
+		err := api.SetAddress("localhost:8080").Serve()
 		require.NoError(t, err)
 	}()
 	serverURL := "http://localhost:8080"
@@ -1368,7 +1368,7 @@ func TestWithContextShutdown(t *testing.T) {
 	api := babyapi.NewAPI("Albums", "/albums", func() *Album { return &Album{} }).WithContext(ctx)
 
 	go func() {
-		err := api.Serve(":8080")
+		err := api.Serve()
 		require.NoError(t, err)
 	}()
 
