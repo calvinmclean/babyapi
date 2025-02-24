@@ -95,7 +95,11 @@ func (a *API[T]) serveCmd(_ *cobra.Command, _ []string) error {
 		a.Stop()
 	}()
 
-	return a.SetAddress(a.cliArgs.address).Serve()
+	if a.cliArgs.address != "" {
+		a.SetAddress(a.cliArgs.address)
+	}
+
+	return a.Serve()
 }
 
 // CreateClientMap returns a map of API names to the corresponding Client for that child API. This makes it easy to use
