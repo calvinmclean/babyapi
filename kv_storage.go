@@ -69,7 +69,7 @@ func (c *KVStorage[T]) get(key string) (T, error) {
 
 	dataBytes, err := c.db.Get(key)
 	if err != nil {
-		if errors.Is(hord.ErrNil, err) {
+		if errors.Is(err, hord.ErrNil) {
 			return *new(T), ErrNotFound
 		}
 		return *new(T), fmt.Errorf("error getting data: %w", err)
