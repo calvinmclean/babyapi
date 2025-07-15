@@ -160,6 +160,10 @@ func (a *API[T]) Router() (chi.Router, error) {
 func (a *API[T]) doCustomRoutes(r chi.Router, routes []chi.Route) {
 	for _, cr := range routes {
 		for method, handler := range cr.Handlers {
+			if method == "" {
+				r.Handle(cr.Pattern, handler)
+				continue
+			}
 			r.MethodFunc(method, cr.Pattern, handler.ServeHTTP)
 		}
 	}
