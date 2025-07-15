@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/calvinmclean/babyapi"
+	"github.com/mark3labs/mcp-go/server"
 )
 
 type TODO struct {
@@ -66,6 +67,12 @@ func main() {
 
 			return t.Completed == nil || !*t.Completed
 		}
+	})
+
+	api.EnableMCP("TODOs", "/mcp", babyapi.MCPPermCRUD, babyapi.MCPConfig{
+		ServerOpts: []server.ServerOption{
+			server.WithInstructions("This is a web server for managing TODO list items"),
+		},
 	})
 
 	api.RunCLI()
