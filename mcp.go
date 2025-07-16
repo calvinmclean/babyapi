@@ -3,10 +3,12 @@ package babyapi
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 
+	"github.com/invopop/jsonschema"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -38,12 +40,13 @@ type mcpConfig struct {
 }
 
 type mcpServer[T Resource] struct {
-	storage Storage[T]
+	storage  Storage[T]
+	instance func() T
 }
 
 // mcpCRUDTools is the default CRUD tools based on the API's permissions
 func (a *API[T]) mcpCRUDTools() []server.ServerTool {
-	mcpServer := mcpServer[T]{a.Storage}
+	mcpServer := mcpServer[T]{a.Storage, a.instance}
 
 	_, endDateable := any(a.instance()).(EndDateable)
 
@@ -87,20 +90,35 @@ func (a *API[T]) mcpCRUDTools() []server.ServerTool {
 		)
 	}
 
+	schema := (&jsonschema.Reflector{
+		ExpandedStruct:             true,
+		DoNotReference:             true,
+		RequiredFromJSONSchemaTags: true,
+	}).Reflect(a.instance())
+	schema.Version = ""
+	schemaJSON, _ := json.Marshal(schema)
+
 	// TODO: enabling create and update will require reflection to know parameters
 	if a.mcpConfig.Permissions.Has(MCPPermCreate) {
 		tools = append(tools, server.ServerTool{
-			Tool: mcp.NewTool(
+			Tool: mcp.NewToolWithRawSchema(
 				fmt.Sprintf("create_%s", a.name),
+				fmt.Sprintf("Create a new %s. Do not include an ID since it will be ignored", a.name),
+				schemaJSON,
 			),
+			Handler: mcpServer.create,
 		})
 	}
 
-	if a.mcpConfig.Permissions.Has(MCPPermUpdate) {
+	_, patchable := any(a.instance()).(Patcher[T])
+	if a.mcpConfig.Permissions.Has(MCPPermUpdate) && patchable {
 		tools = append(tools, server.ServerTool{
-			Tool: mcp.NewTool(
+			Tool: mcp.NewToolWithRawSchema(
 				fmt.Sprintf("update_%s", a.name),
+				fmt.Sprintf("Update a %s by ID. This is similar to a PATCH request and will only change specified fields", a.name),
+				schemaJSON,
 			),
+			Handler: mcpServer.updatePatch,
 		})
 	}
 
@@ -119,7 +137,15 @@ func (a *API[T]) mcpCRUDTools() []server.ServerTool {
 }
 
 func (m mcpServer[T]) listAll(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	items, err := m.storage.GetAll(ctx, url.Values{})
+	values := url.Values{}
+
+	_, endDateable := any(m.instance()).(EndDateable)
+	if endDateable {
+		endDated := request.GetBool("include_end_dated", false)
+		values.Set("end_dated", fmt.Sprint(endDated))
+	}
+
+	items, err := m.storage.GetAll(ctx, values)
 	if err != nil {
 		return nil, err
 	}
@@ -151,6 +177,57 @@ func (m mcpServer[T]) delete(ctx context.Context, request mcp.CallToolRequest) (
 	}
 
 	return mcp.NewToolResultText("deleted"), nil
+}
+
+func (m mcpServer[T]) create(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	newItem := m.instance()
+	err := request.BindArguments(newItem)
+	if err != nil {
+		return nil, err
+	}
+
+	// Run Bind which should do any initialization like setting an ID
+	err = newItem.Bind(&http.Request{Method: http.MethodPost})
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.storage.Set(ctx, newItem)
+	if err != nil {
+		return nil, err
+	}
+
+	return mcp.NewToolResultText(fmt.Sprintf("new item created with ID %s", newItem.GetID())), nil
+}
+
+func (m mcpServer[T]) updatePatch(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	newItem := m.instance()
+	err := request.BindArguments(newItem)
+	if err != nil {
+		return nil, err
+	}
+
+	item, err := m.storage.Get(ctx, newItem.GetID())
+	if err != nil {
+		return nil, err
+	}
+
+	patchable, ok := any(item).(Patcher[T])
+	if !ok {
+		return nil, errors.New("cannot use update with non-patchable type")
+	}
+
+	patchErr := patchable.Patch(newItem)
+	if patchErr != nil {
+		return nil, patchErr.Err
+	}
+
+	err = m.storage.Set(ctx, patchable.(T))
+	if err != nil {
+		return nil, err
+	}
+
+	return mcp.NewToolResultText("updated"), nil
 }
 
 func newToolResultJSON(out any) (*mcp.CallToolResult, error) {
