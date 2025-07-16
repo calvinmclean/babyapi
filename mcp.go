@@ -282,7 +282,9 @@ func (a *API[T]) AddMCPTools(tools ...server.ServerTool) *API[T] {
 	return a
 }
 
-// EnableMCP sets MCP to Enabled with the provided permissions for initializing default CRUD tools for the API
+// EnableMCP sets MCP to Enabled with the provided permissions for initializing default CRUD tools for the API.
+// Update only works if the API Resource implements Patcher (can be PATCHed).
+// Update and Create use jsonschema (https://github.com/invopop/jsonschema) to define the tool input.
 func (a *API[T]) EnableMCP(defaultCRUDPerm MCPPerm) *API[T] {
 	a.panicIfReadOnly()
 
