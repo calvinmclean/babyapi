@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -26,7 +27,11 @@ func (p MCPPerm) Has(flag MCPPerm) bool {
 	return p&flag != 0
 }
 
-type MCPConfig struct {
+type mcpConfig struct {
+	Enabled     bool
+	Path        string
+	Permissions MCPPerm
+
 	ServerOpts []server.ServerOption
 	Tools      []server.ServerTool
 	HTTPOpts   []server.StreamableHTTPOption
@@ -36,18 +41,27 @@ type mcpServer[T Resource] struct {
 	storage Storage[T]
 }
 
-func (a *API[T]) mcpCRUDTools(perm MCPPerm) []server.ServerTool {
+// mcpCRUDTools is the default CRUD tools based on the API's permissions
+func (a *API[T]) mcpCRUDTools() []server.ServerTool {
 	mcpServer := mcpServer[T]{a.Storage}
 
 	_, endDateable := any(a.instance()).(EndDateable)
 
 	tools := []server.ServerTool{}
 
-	if perm.Has(MCPPermRead) {
+	if a.mcpConfig.Permissions.Has(MCPPermRead) {
 		listTool := mcp.NewTool(
 			fmt.Sprintf("list_%s", a.name),
 			mcp.WithDescription(fmt.Sprintf("list all %s", a.name)),
 		)
+
+		if parent := a.Parent(); parent != nil {
+			mcp.WithString(
+				fmt.Sprintf("%s_id", parent.Name()),
+				mcp.Required(),
+				mcp.Description("This is the ID for the parent object needed to list instances of this object."),
+			)(&listTool)
+		}
 
 		if endDateable {
 			mcp.WithBoolean(
@@ -74,7 +88,7 @@ func (a *API[T]) mcpCRUDTools(perm MCPPerm) []server.ServerTool {
 	}
 
 	// TODO: enabling create and update will require reflection to know parameters
-	if perm.Has(MCPPermCreate) {
+	if a.mcpConfig.Permissions.Has(MCPPermCreate) {
 		tools = append(tools, server.ServerTool{
 			Tool: mcp.NewTool(
 				fmt.Sprintf("create_%s", a.name),
@@ -82,7 +96,7 @@ func (a *API[T]) mcpCRUDTools(perm MCPPerm) []server.ServerTool {
 		})
 	}
 
-	if perm.Has(MCPPermUpdate) {
+	if a.mcpConfig.Permissions.Has(MCPPermUpdate) {
 		tools = append(tools, server.ServerTool{
 			Tool: mcp.NewTool(
 				fmt.Sprintf("update_%s", a.name),
@@ -90,7 +104,7 @@ func (a *API[T]) mcpCRUDTools(perm MCPPerm) []server.ServerTool {
 		})
 	}
 
-	if perm.Has(MCPPermDelete) {
+	if a.mcpConfig.Permissions.Has(MCPPermDelete) {
 		tools = append(tools, server.ServerTool{
 			Tool: mcp.NewTool(
 				fmt.Sprintf("delete_%s", a.name),
@@ -147,17 +161,83 @@ func newToolResultJSON(out any) (*mcp.CallToolResult, error) {
 	return mcp.NewToolResultText(string(jsonData)), nil
 }
 
-// EnableMCP sets up an MCP server for CRUD operations
-// TODO: this currently doesn't work well for multi-api or nested API servers. Do I want to make it only run at the root and use all children?
-// or should each resource have its own MCP server?
-func (a *API[T]) EnableMCP(name, path string, crudPerm MCPPerm, cfg MCPConfig) *API[T] {
+// MCPHandler creates an http.Handler for the MCP server with configured tools
+func (a *API[T]) MCPHandler() http.Handler {
+	s := server.NewMCPServer(a.name, "", a.mcpConfig.ServerOpts...)
+	s.AddTools(a.mcpConfig.Tools...)
+
+	return server.NewStreamableHTTPServer(s, a.mcpConfig.HTTPOpts...)
+}
+
+// SetMCPPath sets the base path for the MCP handler. Default is "/mcp" at the root level
+func (a *API[T]) SetMCPPath(path string) *API[T] {
 	a.panicIfReadOnly()
 
-	cfg.Tools = append(cfg.Tools, a.mcpCRUDTools(crudPerm)...)
-
-	s := server.NewMCPServer(name, "", cfg.ServerOpts...)
-	s.AddTools(cfg.Tools...)
-	a.AddCustomRootRoute("", path, server.NewStreamableHTTPServer(s, cfg.HTTPOpts...))
+	a.mcpConfig.Path = path
 
 	return a
+}
+
+// AddMCPHTTPOptions adds StreamableHTTPOptions for the MCP HTTP server
+func (a *API[T]) AddMCPHTTPOptions(opts ...server.StreamableHTTPOption) *API[T] {
+	a.panicIfReadOnly()
+
+	a.mcpConfig.HTTPOpts = append(a.mcpConfig.HTTPOpts, opts...)
+
+	return a
+}
+
+// AddMCPServerOptions adds ServerOptions to use when initializing the MCP server
+func (a *API[T]) AddMCPServerOptions(opts ...server.ServerOption) *API[T] {
+	a.panicIfReadOnly()
+
+	a.mcpConfig.ServerOpts = append(a.mcpConfig.ServerOpts, opts...)
+
+	return a
+}
+
+// AddMCPTools appends custom tools to the MCP server
+func (a *API[T]) AddMCPTools(tools ...server.ServerTool) *API[T] {
+	a.panicIfReadOnly()
+
+	a.mcpConfig.Tools = append(a.mcpConfig.Tools, tools...)
+
+	return a
+}
+
+// EnableMCP sets MCP to Enabled with the provided permissions for initializing default CRUD tools for the API
+func (a *API[T]) EnableMCP(defaultCRUDPerm MCPPerm) *API[T] {
+	a.panicIfReadOnly()
+
+	a.mcpConfig.Enabled = true
+	a.mcpConfig.Permissions = defaultCRUDPerm
+
+	if a.mcpConfig.Path == "" {
+		a.mcpConfig.Path = "/mcp"
+	}
+
+	return a
+}
+
+// mcpTools initializes the default CRUD tools for this API based on the provided permission,
+// appends user-added tools, and child API tools using aggregateChildTools()
+func (a *API[T]) mcpTools() []server.ServerTool {
+	if !a.mcpConfig.Enabled {
+		return nil
+	}
+
+	a.mcpConfig.Tools = append(a.mcpConfig.Tools, a.mcpCRUDTools()...)
+	a.aggregateChildTools()
+	return a.mcpConfig.Tools
+}
+
+// aggregateChildTools appends all child API's tools to this API's tools. It uses mcpTools() to initialize
+// the child's tools
+func (a *API[T]) aggregateChildTools() {
+	if !a.mcpConfig.Enabled {
+		return
+	}
+	for _, childAPI := range a.subAPIs {
+		a.mcpConfig.Tools = append(a.mcpConfig.Tools, childAPI.mcpTools()...)
+	}
 }

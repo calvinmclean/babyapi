@@ -92,6 +92,8 @@ type API[T Resource] struct {
 	cliArgs cliArgs
 
 	address string
+
+	mcpConfig mcpConfig
 }
 
 // NewAPI initializes an API using the provided name, base URL path, and function to create a new instance of
@@ -131,6 +133,7 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 		nil,
 		cliArgs{},
 		"",
+		mcpConfig{Path: "/mcp"},
 	}
 
 	api.GetAll = api.defaultGetAll()

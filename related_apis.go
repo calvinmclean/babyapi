@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/mark3labs/mcp-go/server"
 )
 
 // RelatedAPI declares a subset of methods from the API struct that are required to enable
@@ -25,6 +26,8 @@ type relatedAPI interface {
 	setParent(relatedAPI)
 	getCustomResponseCodeMap() map[string]int
 	isRoot() bool
+	mcpTools() []server.ServerTool
+	mcpCRUDTools() []server.ServerTool
 }
 
 // Parent returns the API's parent API

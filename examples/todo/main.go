@@ -69,11 +69,8 @@ func main() {
 		}
 	})
 
-	api.EnableMCP("TODOs", "/mcp", babyapi.MCPPermCRUD, babyapi.MCPConfig{
-		ServerOpts: []server.ServerOption{
-			server.WithInstructions("This is a web server for managing TODO list items"),
-		},
-	})
+	api.EnableMCP(babyapi.MCPPermCRUD)
+	api.AddMCPServerOptions(server.WithInstructions("This is a web server for managing TODO list items"))
 
 	api.RunCLI()
 }
