@@ -133,7 +133,7 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 		nil,
 		cliArgs{},
 		"",
-		mcpConfig{Path: "/mcp"},
+		mcpConfig{},
 	}
 
 	api.GetAll = api.defaultGetAll()

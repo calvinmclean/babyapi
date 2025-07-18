@@ -58,13 +58,15 @@ func (a *API[T]) mcpCRUDTools() []server.ServerTool {
 			mcp.WithDescription(fmt.Sprintf("list all %s", a.name)),
 		)
 
-		if parent := a.Parent(); parent != nil {
-			mcp.WithString(
-				fmt.Sprintf("%s_id", parent.Name()),
-				mcp.Required(),
-				mcp.Description("This is the ID for the parent object needed to list instances of this object."),
-			)(&listTool)
-		}
+		// TODO: Currently ParentID is not relevant for listing since this is implemented at the API-level
+		// using api.SetGetAllFilter. Ideally I could refactor this to happen at the storage level
+		// if parent := a.Parent(); parent != nil {
+		// 	mcp.WithString(
+		// 		fmt.Sprintf("%s_id", parent.Name()),
+		// 		mcp.Required(),
+		// 		mcp.Description("This is the ID for the parent object needed to list instances of this object."),
+		// 	)(&listTool)
+		// }
 
 		if endDateable {
 			mcp.WithBoolean(
@@ -98,7 +100,6 @@ func (a *API[T]) mcpCRUDTools() []server.ServerTool {
 	schema.Version = ""
 	schemaJSON, _ := json.Marshal(schema)
 
-	// TODO: enabling create and update will require reflection to know parameters
 	if a.mcpConfig.Permissions.Has(MCPPermCreate) {
 		tools = append(tools, server.ServerTool{
 			Tool: mcp.NewToolWithRawSchema(
@@ -197,7 +198,7 @@ func (m mcpServer[T]) create(ctx context.Context, request mcp.CallToolRequest) (
 		return nil, err
 	}
 
-	return mcp.NewToolResultText(fmt.Sprintf("new item created with ID %s", newItem.GetID())), nil
+	return mcp.NewToolResultText(fmt.Sprintf(`{"id":"%s"}`, newItem.GetID())), nil
 }
 
 func (m mcpServer[T]) updatePatch(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {

@@ -23,7 +23,8 @@ import (
 
 type Album struct {
 	babyapi.DefaultResource
-	Title string `json:"title"`
+	Title    string `json:"title"`
+	ArtistID string `json:"artist_id,omitempty"`
 }
 
 func (a *Album) Patch(newAlbum *Album) *babyapi.ErrResponse {

@@ -6,6 +6,12 @@ tasks:
     cmds:
       - go test -short -race -covermode=atomic -coverprofile=coverage.out -coverpkg=.,./storage,./test,./extensions {{ .CLI_ARGS }} ./...
 
+  cover:
+    desc: Create HTML test coverage
+    cmds:
+      - task: test
+      - go tool cover -html coverage.out -o coverage.html
+
   lint:
     desc: Run linting
     cmds:
