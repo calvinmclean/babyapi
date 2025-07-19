@@ -87,6 +87,16 @@ func (a *API[T]) Route(r chi.Router) error {
 
 	if a.parent == nil {
 		a.doCustomRoutes(r, a.rootRoutes)
+
+		if a.mcpConfig.Enabled {
+			// Mount MCP handler only for top-level API.
+			// First, initialize tools and then aggregate tools from all child APIs
+			a.mcpTools()
+			a.aggregateChildTools()
+
+			// Now mount MCP Handler
+			r.Handle(a.mcpConfig.Path, a.MCPHandler())
+		}
 	}
 
 	var returnErr error

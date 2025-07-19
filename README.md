@@ -6,7 +6,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/calvinmclean/babyapi.svg)](https://pkg.go.dev/github.com/calvinmclean/babyapi)
 [![codecov](https://codecov.io/gh/calvinmclean/babyapi/graph/badge.svg?token=BCVPF745D8)](https://codecov.io/gh/calvinmclean/babyapi)
 
-A Go CRUD API framework so simple a baby could use it.
+A Go CRUD API framework so simple a baby could use it. Now with MCP!
 
 `babyapi` is a super simple framework that automatically creates an HTTP API for create, read, update, and delete operations on a struct. Simply extend the `babyapi.DefaultResource` type to get started.
 
@@ -139,6 +139,48 @@ api.SetStorage(babyapi.NewKVStorage[*TODO](db, "TODO"))
 
 The `babyapi.EndDateable` interface can be implemented to enable soft-delete with the `KVStorage`. This will set an end-date instead of permanently deleting a resource. Then, deleting it again will permanently delete. Also, the `GetAll` implementation will filter out end-dated resources unless the `end_dated` query parameter is set to enable getting end-dated resources.
 
+## MCP
+
+Babyapi uses [`mark3labs/mcp-go`](https://github.com/mark3labs/mcp-go) to implement a simple MCP Server for CRUD operations. This is also completely customizable with additional tools and options using the provided MCP functions.
+
+MCP can simply be enabled like this:
+```go
+api := babyapi.NewAPI("TODOs", "/todos", func() *TODO { return &TODO{} })
+
+// Read only
+api.EnableMCP(babyapi.MCPPermRead)
+// Read and Create only
+api.EnableMCP(babyapi.MCPPermRead | babyapi.MCPPermCreate)
+// Enable all CRUD operations
+api.EnableMCP(babyapi.MCPPermCRUD)
+
+// Custom tools
+api.AddMCPTools(...)
+
+// Custom options
+api.AddMCPServerOptions(
+	server.WithInstructions("This is a web server for managing TODO list items"),
+	...,
+)
+
+// Custom HTTP options
+api.AddMCPHTTPOptions(...)
+```
+
+Check out the simple [TODO example](./examples/todo/) and [Nested API example](./examples/nested/)!
+
+I recommend testing with [`mark3labs/mcphost`](https://github.com/mark3labs/mcphost) with a config like this:
+```yaml
+mcpServers:
+  todos:
+    type: remote
+    url: "${env://URL:-http://localhost:8080/mcp}"
+    environment:
+      DEBUG: "${env://DEBUG:-false}"
+      LOG_LEVEL: "${env://LOG_LEVEL:-info}"
+```
+
+
 ## Extensions
 
 `babyapi` provides an `Extension` interface that can be applied to any API with `api.ApplyExtension()`. Implementations of this interface create custom configurations and modifications that can be applied to multiple APIs. A few extensions are provided by the `babyapi/extensions` package:
@@ -169,7 +211,7 @@ If `babyapi` is not a great fit for your use-case, you can still use some of its
 
 |                                                    | Description                                                                                                                                                                                                                     | Features                                                                                                                                                                                                                                                                                                                                                                          |
 | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [TODO list](./examples/todo/)                      | This example expands upon the base example to create a realistic TODO list application                                                                                                                                          | <ul><li>Custom `PATCH` logic</li><li>Additional request validation</li><li>Automatically set `CreatedAt` field</li><li>Query parameter parsing to only show completed items</li></ul>                                                                                                                                                                                             |
+| [TODO list](./examples/todo/)                      | This example expands upon the base example to create a realistic TODO list application                                                                                                                                          | <ul><li>MCP example</li><<li>Custom `PATCH` logic</li><li>Additional request validation</li><li>Automatically set `CreatedAt` field</li><li>Query parameter parsing to only show completed items</li></ul>                                                                                                                                                                                             |
 | [Nested resources](./examples/nested/)             | Demonstrates how to build APIs with nested/related resources. The root resource is an `Artist` which can have `Albums` and `MusicVideos`. Then, `Albums` can have `Songs`                                                       | <ul><li>Nested API resources</li><li>Custom `ResponseWrapper` to add fields from related resources</li><li>HATEOAS Extension for hypermedia linking</li></ul>                                                                                                                                                                                                                     |
 | [Storage](./examples/storage/)                     | The example shows how to use the `babyapi/storage` package to implement persistent storage                                                                                                                                      | <ul><li>Use `SetStorage` to use a custom storage implementation</li><li>Create a `hord` storage client using `babyapi/storage`</li></ul>                                                                                                                                                                                                                                          |
 | [TODO list with HTMX UI](./examples/todo-htmx/)    | This is a more complex example that demonstrates an application with HTMX frontend. It uses server-sent events to automatically update with newly-created items                                                                 | <ul><li>Implement `babyapi.HTMLer` for HTML responses</li><li>Set custom HTTP response codes per HTTP method</li><li>Use built-in helpers for handling server-sent events on a custom route</li><li>Use `SetOnCreateOrUpdate` to do additional actions on create</li><li>Handle HTML forms as input instead of JSON (which works automatically and required no changes)</li></ul> |

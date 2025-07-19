@@ -69,10 +69,14 @@ type API struct {
 }
 
 func createAPI() API {
-	artistAPI := babyapi.NewAPI("Artists", "/artists", func() *Artist { return &Artist{} })
-	albumAPI := babyapi.NewAPI("Albums", "/albums", func() *Album { return &Album{} })
-	musicVideoAPI := babyapi.NewAPI("MusicVideos", "/music_videos", func() *MusicVideo { return &MusicVideo{} })
-	songAPI := babyapi.NewAPI("Songs", "/songs", func() *Song { return &Song{} })
+	artistAPI := babyapi.NewAPI("Artists", "/artists", func() *Artist { return &Artist{} }).
+		EnableMCP(babyapi.MCPPermCRUD)
+	albumAPI := babyapi.NewAPI("Albums", "/albums", func() *Album { return &Album{} }).
+		EnableMCP(babyapi.MCPPermCRUD)
+	musicVideoAPI := babyapi.NewAPI("MusicVideos", "/music_videos", func() *MusicVideo { return &MusicVideo{} }).
+		EnableMCP(babyapi.MCPPermCRUD)
+	songAPI := babyapi.NewAPI("Songs", "/songs", func() *Song { return &Song{} }).
+		EnableMCP(babyapi.MCPPermCRUD)
 
 	songAPI.SetResponseWrapper(func(s *Song) render.Renderer {
 		return &SongResponse{Song: s, api: songAPI}
