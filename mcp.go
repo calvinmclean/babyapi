@@ -46,6 +46,9 @@ type mcpServer[T Resource] struct {
 
 // mcpCRUDTools is the default CRUD tools based on the API's permissions
 func (a *API[T]) mcpCRUDTools() []server.ServerTool {
+	if a.isRoot() {
+		return nil
+	}
 	mcpServer := mcpServer[T]{a.Storage, a.instance}
 
 	_, endDateable := any(a.instance()).(EndDateable)
