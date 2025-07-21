@@ -46,6 +46,7 @@ type mcpServer[T Resource] struct {
 
 // mcpCRUDTools is the default CRUD tools based on the API's permissions
 func (a *API[T]) mcpCRUDTools() []server.ServerTool {
+	// RootAPIs don't have any CRUD resources, so the default CRUD tools are not relevant
 	if a.isRoot() {
 		return nil
 	}

@@ -395,3 +395,41 @@ func TestMCPPermissions(t *testing.T) {
 		})
 	}
 }
+
+func TestMCPRootAPI(t *testing.T) {
+	rootAPI := babyapi.NewRootAPI("Root", "/").
+		EnableMCP(babyapi.MCPPermNone)
+	todoAPI := babyapi.NewAPI("TODO", "/todos", func() *babyapi.EndDateableTODO { return &babyapi.EndDateableTODO{} }).
+		EnableMCP(babyapi.MCPPermCRUD)
+
+	rootAPI.AddNestedAPI(todoAPI)
+
+	serverURL, stop := babytest.TestServe(t, rootAPI)
+	defer stop()
+
+	mcpClient, err := client.NewStreamableHttpClient(serverURL + "/mcp")
+	require.NoError(t, err)
+
+	var initReq mcp.InitializeRequest
+	initReq.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
+	_, err = mcpClient.Initialize(t.Context(), initReq)
+	require.NoError(t, err)
+
+	toolsResp, err := mcpClient.ListTools(t.Context(), mcp.ListToolsRequest{})
+	require.NoError(t, err)
+
+	tools := map[string]mcp.Tool{}
+	for _, tool := range toolsResp.Tools {
+		tools[tool.Name] = tool
+	}
+
+	t.Run("AllToolsExist", func(t *testing.T) {
+		expectedToolNames := []string{
+			"create_TODO",
+			"get_TODO",
+			"list_TODO",
+			"delete_TODO",
+		}
+		require.ElementsMatch(t, expectedToolNames, slices.Collect(maps.Keys(tools)))
+	})
+}
