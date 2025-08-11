@@ -86,7 +86,7 @@ func (c *KVStorage[T]) get(key string) (T, error) {
 
 // GetAll will use the provided prefix to read data from the data source. Then, it will use Get
 // to read each element into the correct type
-func (c *KVStorage[T]) GetAll(_ context.Context, query url.Values) ([]T, error) {
+func (c *KVStorage[T]) GetAll(_ context.Context, parentID string, query url.Values) ([]T, error) {
 	keys, err := c.db.Keys()
 	if err != nil {
 		return nil, fmt.Errorf("error getting keys: %w", err)
@@ -101,6 +101,12 @@ func (c *KVStorage[T]) GetAll(_ context.Context, query url.Values) ([]T, error) 
 		result, err := c.get(key)
 		if err != nil {
 			return nil, fmt.Errorf("error getting data: %w", err)
+		}
+
+		itemParentID := result.ParentID()
+		hasParent := itemParentID != ""
+		if hasParent && itemParentID != parentID {
+			continue
 		}
 
 		getEndDated := query.Get("end_dated") == "true"

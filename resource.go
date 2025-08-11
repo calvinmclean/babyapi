@@ -16,7 +16,10 @@ type Resource interface {
 
 	RendererBinder
 
+	// GetID returns the resource's ID
 	GetID() string
+	// ParentID returns the resource's ParentID (if it has one). Return empty string if the Resource does not have a parent
+	ParentID() string
 }
 
 // RendererBinder just combines render.Renderer and render.Binder
@@ -57,6 +60,10 @@ func (*NilResource) GetID() string {
 	return ""
 }
 
+func (*NilResource) ParentID() string {
+	return ""
+}
+
 var _ render.Renderer = &NilResource{}
 var _ render.Binder = &NilResource{}
 
@@ -78,6 +85,10 @@ var _ render.Binder = &DefaultResource{}
 
 func (dr *DefaultResource) GetID() string {
 	return dr.ID.String()
+}
+
+func (*DefaultResource) ParentID() string {
+	return ""
 }
 
 func (dr *DefaultResource) Bind(r *http.Request) error {
@@ -145,6 +156,10 @@ type AnyResource map[string]any
 func (ar AnyResource) GetID() string {
 	id, _ := ar["id"].(string)
 	return id
+}
+
+func (*AnyResource) ParentID() string {
+	return ""
 }
 
 func (*AnyResource) Render(w http.ResponseWriter, r *http.Request) error {

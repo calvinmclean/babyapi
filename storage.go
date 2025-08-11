@@ -31,8 +31,9 @@ func (f FilterFunc[T]) Filter(in []T) []T {
 type Storage[T Resource] interface {
 	// Get a single resource by ID
 	Get(context.Context, string) (T, error)
-	// GetAll will return all resources that match the provided query filters
-	GetAll(context.Context, url.Values) ([]T, error)
+	// GetAll will return all resources that match the provided query filters. It can also receive a
+	// parentID string if it is a nested resource (empty string if not)
+	GetAll(ctx context.Context, parentID string, query url.Values) ([]T, error)
 	// Set will save the provided resource
 	Set(context.Context, T) error
 	// Delete will delete a resource by ID

@@ -150,7 +150,8 @@ func (m mcpServer[T]) listAll(ctx context.Context, request mcp.CallToolRequest) 
 		values.Set("end_dated", fmt.Sprint(endDated))
 	}
 
-	items, err := m.storage.GetAll(ctx, values)
+	// TODO: parent ID?
+	items, err := m.storage.GetAll(ctx, "", values)
 	if err != nil {
 		return nil, err
 	}

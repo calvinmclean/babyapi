@@ -46,6 +46,10 @@ func (p *Pokemon) GetID() string {
 	return fmt.Sprint(p.ID)
 }
 
+func (p *Pokemon) ParentID() string {
+	return ""
+}
+
 func (*Pokemon) Bind(*http.Request) error {
 	return nil
 }

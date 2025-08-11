@@ -37,6 +37,9 @@ func (a *API[T]) Parent() RelatedAPI {
 
 // GetParentIDParam reads the URL param from the request to get the ID of the parent resource
 func (a *API[T]) GetParentIDParam(r *http.Request) string {
+	if a.parent == nil {
+		return ""
+	}
 	return a.parent.GetIDParam(r)
 }
 
