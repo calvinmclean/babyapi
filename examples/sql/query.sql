@@ -23,3 +23,28 @@ DO UPDATE SET
 -- name: DeleteAuthor :exec
 DELETE FROM authors
 WHERE id = ?;
+
+-- name: GetBook :one
+SELECT id, title, isbn, year, author_id FROM books
+WHERE id = ? LIMIT 1;
+
+-- name: ListBooksByAuthor :many
+SELECT id, title, isbn, year, author_id FROM books
+WHERE author_id = ?
+ORDER BY year DESC, title;
+
+-- name: UpsertBook :exec
+INSERT INTO books (
+  id, title, isbn, year, author_id
+) VALUES (
+  ?, ?, ?, ?, ?
+) ON CONFLICT (id)
+DO UPDATE SET
+  title = EXCLUDED.title,
+  isbn = EXCLUDED.isbn,
+  year = EXCLUDED.year,
+  author_id = EXCLUDED.author_id;
+
+-- name: DeleteBook :exec
+DELETE FROM books
+WHERE id = ?;
