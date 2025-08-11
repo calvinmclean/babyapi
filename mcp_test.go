@@ -2,6 +2,7 @@ package babyapi_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"maps"
 	"slices"
 	"testing"
@@ -55,45 +56,46 @@ func TestMCP(t *testing.T) {
 		expectedToolNames := []string{
 			"create_Artists",
 			"get_Artists",
-			"list_Artists",
+			"search_Artists",
 			"delete_Artists",
 
 			"create_Albums",
 			"get_Albums",
-			"list_Albums",
+			"search_Albums",
 			"delete_Albums",
 			"update_Albums", // Patcher
 
 			"create_MusicVideos",
 			"get_MusicVideos",
-			"list_MusicVideos",
+			"search_MusicVideos",
 			"delete_MusicVideos",
 			"update_MusicVideos", // Patcher
 
 			"create_Songs",
 			"get_Songs",
-			"list_Songs",
+			"search_Songs",
 			"delete_Songs",
 		}
 		require.ElementsMatch(t, expectedToolNames, slices.Collect(maps.Keys(tools)))
 	})
 
-	// TODO: See comment in mcp.go
-	// t.Run("ListAlbumsHasParentID", func(t *testing.T) {
-	// 	listAlbums := tools["list_Albums"]
-	// 	_, ok := listAlbums.InputSchema.Properties["Artists_id"]
-	// 	require.True(t, ok)
-	// })
-	// t.Run("ListSongsHasParentID", func(t *testing.T) {
-	// 	listSongs := tools["list_Songs"]
-	// 	_, ok := listSongs.InputSchema.Properties["Albums_id"]
-	// 	require.True(t, ok)
-	// })
-	// t.Run("ListMusicVideosHasParentID", func(t *testing.T) {
-	// 	listMusicVideos := tools["list_MusicVideos"]
-	// 	_, ok := listMusicVideos.InputSchema.Properties["Artists_id"]
-	// 	require.True(t, ok)
-	// })
+	t.Run("SearchAlbumsHasParentID", func(t *testing.T) {
+		searchAlbums := tools["search_Albums"]
+
+		fmt.Println(searchAlbums.InputSchema.Properties)
+		_, ok := searchAlbums.InputSchema.Properties["Artists_id"]
+		require.True(t, ok)
+	})
+	t.Run("SearchSongsHasParentID", func(t *testing.T) {
+		searchSongs := tools["search_Songs"]
+		_, ok := searchSongs.InputSchema.Properties["Albums_id"]
+		require.True(t, ok)
+	})
+	t.Run("SearchMusicVideosHasParentID", func(t *testing.T) {
+		searchMusicVideos := tools["search_MusicVideos"]
+		_, ok := searchMusicVideos.InputSchema.Properties["Artists_id"]
+		require.True(t, ok)
+	})
 
 	var artistID string
 	t.Run("CreateArtist", func(t *testing.T) {
@@ -160,7 +162,7 @@ func TestMCP(t *testing.T) {
 		resp, err := mcpClient.CallTool(t.Context(), mcp.CallToolRequest{
 			Request: mcp.Request{},
 			Params: mcp.CallToolParams{
-				Name: "list_Artists",
+				Name: "search_Artists",
 			},
 		})
 		require.NoError(t, err)
@@ -317,7 +319,7 @@ func TestMCPEndDateable(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, tool := range toolsResp.Tools {
-		if tool.Name == "list_TODO" {
+		if tool.Name == "search_TODO" {
 			_, ok := tool.InputSchema.Properties["include_end_dated"]
 			require.True(t, ok)
 		}
@@ -338,7 +340,7 @@ func TestMCPPermissions(t *testing.T) {
 		{
 			"ReadOnly",
 			babyapi.MCPPermRead,
-			[]string{"get_Albums", "list_Albums"},
+			[]string{"get_Albums", "search_Albums"},
 		},
 		{
 			"CreateOnly",
@@ -358,12 +360,12 @@ func TestMCPPermissions(t *testing.T) {
 		{
 			"ReadCreate",
 			babyapi.MCPPermRead | babyapi.MCPPermCreate,
-			[]string{"get_Albums", "list_Albums", "create_Albums"},
+			[]string{"get_Albums", "search_Albums", "create_Albums"},
 		},
 		{
 			"CRUD",
 			babyapi.MCPPermCRUD,
-			[]string{"get_Albums", "list_Albums", "create_Albums", "update_Albums", "delete_Albums"},
+			[]string{"get_Albums", "search_Albums", "create_Albums", "update_Albums", "delete_Albums"},
 		},
 	}
 
@@ -427,7 +429,7 @@ func TestMCPRootAPI(t *testing.T) {
 		expectedToolNames := []string{
 			"create_TODO",
 			"get_TODO",
-			"list_TODO",
+			"search_TODO",
 			"delete_TODO",
 		}
 		require.ElementsMatch(t, expectedToolNames, slices.Collect(maps.Keys(tools)))

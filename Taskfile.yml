@@ -4,7 +4,7 @@ tasks:
   test:
     desc: Run unit tests
     cmds:
-      - go test -short -race -covermode=atomic -coverprofile=coverage.out -coverpkg=.,./storage,./test,./extensions {{ .CLI_ARGS }} ./...
+      - go test -short -race -covermode=atomic -coverprofile=coverage.out -coverpkg=.,./storage/...,./test/...,./extensions/... {{ .CLI_ARGS }} ./...
 
   cover:
     desc: Create HTML test coverage

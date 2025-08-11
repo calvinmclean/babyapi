@@ -70,9 +70,9 @@ func TestAPI(t *testing.T) {
 			},
 		},
 		{
-			Name: "GetAllEventsForbidden",
+			Name: "SearchEventsForbidden",
 			Test: babytest.RequestTest[*babyapi.AnyResource]{
-				Method:   babyapi.MethodGetAll,
+				Method:   babyapi.MethodSearch,
 				RawQuery: "password=secret",
 				IDFunc: func(getResponse babytest.PreviousResponseGetter) string {
 					return getResponse("CreateEvent").Data.GetID()
@@ -85,7 +85,7 @@ func TestAPI(t *testing.T) {
 			},
 		},
 		{
-			Name: "GetAllEventsForbiddenUsingRequestFuncTest",
+			Name: "SearchEventsForbiddenUsingRequestFuncTest",
 			Test: babytest.RequestFuncTest[*babyapi.AnyResource](func(getResponse babytest.PreviousResponseGetter, address string) *http.Request {
 				r, err := http.NewRequest(http.MethodGet, address+"/events", http.NoBody)
 				require.NoError(t, err)
@@ -181,7 +181,7 @@ func TestAPI(t *testing.T) {
 		{
 			Name: "ListInvites",
 			Test: babytest.RequestTest[*babyapi.AnyResource]{
-				Method:   babyapi.MethodGetAll,
+				Method:   babyapi.MethodSearch,
 				RawQuery: "password=secret",
 				ParentIDsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
 					return []string{getResponse("CreateEvent").Data.GetID()}
@@ -199,7 +199,7 @@ func TestAPI(t *testing.T) {
 		{
 			Name: "ListInvitesForbidden",
 			Test: babytest.RequestTest[*babyapi.AnyResource]{
-				Method: babyapi.MethodGetAll,
+				Method: babyapi.MethodSearch,
 				ParentIDsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
 					return []string{getResponse("CreateEvent").Data.GetID()}
 				},
@@ -220,7 +220,7 @@ func TestAPI(t *testing.T) {
 				id := getResponse("CreateEvent").Data.GetID()
 				address = fmt.Sprintf("%s/events/%s/invites", address, id)
 
-				r, err := http.NewRequest(babyapi.MethodGetAll, address, http.NoBody)
+				r, err := http.NewRequest(babyapi.MethodSearch, address, http.NoBody)
 				require.NoError(t, err)
 
 				q := r.URL.Query()

@@ -36,6 +36,23 @@ And use the provided CLI client to create resources:
 ./babyapi-sql client authors list -q "genre=Fantasy"
 ```
 
+
+### Books API
+
+First, get the author ID
+```shell
+export AUTHOR_ID=$(./babyapi-sql client authors list | jq -r '.items[0].ID')
+```
+
+```shell
+./babyapi-sql client books --authors-id $AUTHOR_ID post --data '{
+    "Title": "The Hobbit"
+}'
+
+./babyapi-sql client books --authors-id $AUTHOR_ID list
+```
+
+
 ### Storage Options
 
 By default, this will use an in-memory SQLite database. You can also use a local file storage or cloud-based Turso DB.

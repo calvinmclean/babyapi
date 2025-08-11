@@ -15,8 +15,8 @@ import (
 	"github.com/go-chi/render"
 )
 
-// MethodGetAll is the same as http.MethodGet, but can be used when setting custom response codes
-const MethodGetAll = "GetAll"
+// MethodSearch is the same as http.MethodGet, but can be used when setting custom response codes
+const MethodSearch = "Search"
 
 // API encapsulates all handlers and other pieces of code required to run the CRUID API based on
 // the provided Resource type
@@ -51,9 +51,9 @@ type API[T Resource] struct {
 	customIDRoutes []chi.Route
 
 	responseWrapper       func(T) render.Renderer
-	getAllResponseWrapper func([]T) render.Renderer
+	searchResponseWrapper func([]T) render.Renderer
 
-	getAllFilter func(*http.Request) FilterFunc[T]
+	searchFilter func(*http.Request) FilterFunc[T]
 
 	beforeDelete beforeAfterFunc
 	afterDelete  beforeAfterFunc
@@ -65,8 +65,8 @@ type API[T Resource] struct {
 
 	responseCodes map[string]int
 
-	// GetAll is the handler for /base and returns an array of resources
-	GetAll http.HandlerFunc
+	// Search is the handler for /base and returns an array of resources
+	Search http.HandlerFunc
 
 	// Get is the handler for /base/{ID} and returns a requested resource by ID
 	Get http.HandlerFunc
@@ -136,7 +136,7 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 		mcpConfig{},
 	}
 
-	api.GetAll = api.defaultGetAll()
+	api.Search = api.defaultSearch()
 	api.Get = api.defaultGet()
 	api.Post = api.defaultPost()
 	api.Put = api.defaultPut()
@@ -148,12 +148,12 @@ func NewAPI[T Resource](name, base string, instance func() T) *API[T] {
 
 // NewRootAPI initializes an API which can serve as a top-level parent of other APIs, so multiple unrelated resources
 // can exist without any parent/child relationship. This API does not have any default handlers, but custom handlers can
-// still be added. Since there are no IDs in the path, Get and GetAll routes cannot be differentiated so only Get is used
+// still be added. Since there are no IDs in the path, Get and Search routes cannot be differentiated so only Get is used
 func NewRootAPI(name, base string) *API[*NilResource] {
 	api := NewAPI[*NilResource](name, base, nil)
 	api.rootAPI = true
 
-	api.GetAll = nil
+	api.Search = nil
 	api.Get = nil
 	api.Post = nil
 	api.Put = nil
@@ -181,7 +181,7 @@ func (a *API[T]) SetAddress(addr string) *API[T] {
 	return a
 }
 
-// SetCustomResponseCode will override the default response codes for the specified HTTP verb. Use MethodGetAll to set the
+// SetCustomResponseCode will override the default response codes for the specified HTTP verb. Use MethodSearch to set the
 // response code for listing all resources
 func (a *API[T]) SetCustomResponseCode(verb string, code int) *API[T] {
 	a.panicIfReadOnly()
@@ -190,12 +190,12 @@ func (a *API[T]) SetCustomResponseCode(verb string, code int) *API[T] {
 	return a
 }
 
-// SetGetAllResponseWrapper sets a function that can create a custom response for GetAll. This function will receive
+// SetSearchResponseWrapper sets a function that can create a custom response for Search. This function will receive
 // a slice of Resources from storage and must return a render.Renderer
-func (a *API[T]) SetGetAllResponseWrapper(getAllResponder func([]T) render.Renderer) *API[T] {
+func (a *API[T]) SetSearchResponseWrapper(searchResponder func([]T) render.Renderer) *API[T] {
 	a.panicIfReadOnly()
 
-	a.getAllResponseWrapper = getAllResponder
+	a.searchResponseWrapper = searchResponder
 	return a
 }
 
@@ -242,14 +242,14 @@ func (a *API[T]) SetAfterDelete(after func(http.ResponseWriter, *http.Request) *
 	return a
 }
 
-// SetGetAllFilter sets a function that can use the request context to create a filter for GetAll. Use this
+// SetSearchFilter sets a function that can use the request context to create a filter for Search. Use this
 // to introduce custom filtering after reading from storage. This should mostly be used with the default storage
 // client options. If you are using a custom SQL or other query-based implementation, it is better to use the url.Values
 // to create custom filtering
-func (a *API[T]) SetGetAllFilter(f func(*http.Request) FilterFunc[T]) *API[T] {
+func (a *API[T]) SetSearchFilter(f func(*http.Request) FilterFunc[T]) *API[T] {
 	a.panicIfReadOnly()
 
-	a.getAllFilter = f
+	a.searchFilter = f
 	return a
 }
 

@@ -27,6 +27,10 @@ type Album struct {
 	ArtistID string `json:"artist_id,omitempty"`
 }
 
+func (a *Album) ParentID() string {
+	return a.ArtistID
+}
+
 func (a *Album) Patch(newAlbum *Album) *babyapi.ErrResponse {
 	if newAlbum.Title != "" {
 		a.Title = newAlbum.Title
@@ -57,7 +61,7 @@ func TestBabyAPI(t *testing.T) {
 		return album, nil
 	}))
 
-	api.SetGetAllFilter(func(r *http.Request) babyapi.FilterFunc[*Album] {
+	api.SetSearchFilter(func(r *http.Request) babyapi.FilterFunc[*Album] {
 		return func(a *Album) bool {
 			title := r.URL.Query().Get("title")
 			return title == "" || a.Title == title
@@ -105,21 +109,21 @@ func TestBabyAPI(t *testing.T) {
 		})
 	})
 
-	t.Run("GetAll", func(t *testing.T) {
+	t.Run("Search", func(t *testing.T) {
 		t.Run("Successful", func(t *testing.T) {
-			albums, err := client.GetAll(context.Background(), "")
+			albums, err := client.Search(context.Background(), "")
 			require.NoError(t, err)
 			require.ElementsMatch(t, []*Album{album1}, albums.Data.Items)
 		})
 
 		t.Run("SuccessfulWithFilter", func(t *testing.T) {
-			albums, err := client.GetAll(context.Background(), "title=Album1")
+			albums, err := client.Search(context.Background(), "title=Album1")
 			require.NoError(t, err)
 			require.ElementsMatch(t, []*Album{album1}, albums.Data.Items)
 		})
 
 		t.Run("SuccessfulWithFilterShowingNoResults", func(t *testing.T) {
-			albums, err := client.GetAll(context.Background(), "title=Album2")
+			albums, err := client.Search(context.Background(), "title=Album2")
 			require.NoError(t, err)
 			require.Len(t, albums.Data.Items, 0)
 		})
@@ -218,7 +222,12 @@ func TestBabyAPI(t *testing.T) {
 
 type Song struct {
 	babyapi.DefaultResource
-	Title string `json:"title"`
+	Title   string `json:"title"`
+	AlbumID string `json:"-"`
+}
+
+func (s *Song) ParentID() string {
+	return s.AlbumID
 }
 
 type SongResponse struct {
@@ -247,7 +256,12 @@ func (sr *SongResponse) Render(w http.ResponseWriter, r *http.Request) error {
 
 type MusicVideo struct {
 	babyapi.DefaultResource
-	Title string `json:"title"`
+	Title    string `json:"title"`
+	ArtistID string `json:"-"`
+}
+
+func (m *MusicVideo) ParentID() string {
+	return m.ArtistID
 }
 
 func (m *MusicVideo) Patch(newVideo *MusicVideo) *babyapi.ErrResponse {
@@ -388,17 +402,17 @@ func TestNestedAPI(t *testing.T) {
 		})
 	})
 
-	t.Run("GetAllAlbums", func(t *testing.T) {
+	t.Run("SearchAlbums", func(t *testing.T) {
 		t.Run("Successful", func(t *testing.T) {
-			albums, err := albumClient.GetAll(context.Background(), "", artist1.GetID())
+			albums, err := albumClient.Search(context.Background(), "", artist1.GetID())
 			require.NoError(t, err)
 			require.ElementsMatch(t, []*Album{album1}, albums.Data.Items)
 		})
 	})
 
-	t.Run("GetAllSongs", func(t *testing.T) {
+	t.Run("SearchSongs", func(t *testing.T) {
 		t.Run("Successful", func(t *testing.T) {
-			songs, err := songClient.GetAll(context.Background(), "", artist1.GetID(), album1.GetID())
+			songs, err := songClient.Search(context.Background(), "", artist1.GetID(), album1.GetID())
 			require.NoError(t, err)
 			require.ElementsMatch(t, []*SongResponse{song1Response}, songs.Data.Items)
 		})
@@ -430,7 +444,7 @@ func TestCLI(t *testing.T) {
 		expectedErr    bool
 	}{
 		{
-			"GetAll",
+			"Search",
 			[]string{"Albums", "list"},
 			`\[\{"id":"cljcqg5o402e9s28rbp0","title":"New Album"\}\]`,
 			false,
@@ -484,7 +498,7 @@ func TestCLI(t *testing.T) {
 			true,
 		},
 		{
-			"GetAllSongs",
+			"SearchSongs",
 			[]string{"Songs", "list", "--albums-id", "cljcqg5o402e9s28rbp0"},
 			`\[{"id":"clknc0do4023onrn3bqg","title":"NewSong"}\]`,
 			false,
@@ -555,7 +569,7 @@ func TestCLI(t *testing.T) {
 	songAPI := babyapi.NewAPI("Songs", "/songs", func() *Song { return &Song{} })
 	api.AddNestedAPI(songAPI)
 
-	api.SetGetAllFilter(func(r *http.Request) babyapi.FilterFunc[*Album] {
+	api.SetSearchFilter(func(r *http.Request) babyapi.FilterFunc[*Album] {
 		return func(a *Album) bool {
 			title := r.URL.Query().Get("title")
 			return title == "" || a.Title == title
@@ -584,7 +598,7 @@ func TestCLI(t *testing.T) {
 	_, err = songClient.Put(context.Background(), song, album.GetID())
 	require.NoError(t, err)
 
-	t.Run("GetAllQueryParams", func(t *testing.T) {
+	t.Run("SearchQueryParams", func(t *testing.T) {
 		t.Run("Successful", func(t *testing.T) {
 			out, err := runCommand(api.Command(), []string{"client", "--pretty=false", "--address", address, "--query", "title=New Album", "Albums", "list"})
 			require.NoError(t, err)
@@ -661,7 +675,7 @@ func (d *ListItem) HTML(http.ResponseWriter, *http.Request) string {
 func TestHTML(t *testing.T) {
 	api := babyapi.NewAPI("Items", "/items", func() *ListItem { return &ListItem{} })
 
-	api.SetGetAllResponseWrapper(func(d []*ListItem) render.Renderer {
+	api.SetSearchResponseWrapper(func(d []*ListItem) render.Renderer {
 		return &UnorderedList{d}
 	})
 
@@ -696,7 +710,7 @@ func TestHTML(t *testing.T) {
 		})
 	})
 
-	t.Run("GetAllItemsHTML", func(t *testing.T) {
+	t.Run("SearchItemsHTML", func(t *testing.T) {
 		t.Run("Successful", func(t *testing.T) {
 			url, err := client.URL("")
 			require.NoError(t, err)
@@ -718,7 +732,7 @@ func TestHTML(t *testing.T) {
 func TestServerSentEvents(t *testing.T) {
 	api := babyapi.NewAPI("Items", "/items", func() *ListItem { return &ListItem{} })
 
-	api.SetGetAllResponseWrapper(func(d []*ListItem) render.Renderer {
+	api.SetSearchResponseWrapper(func(d []*ListItem) render.Renderer {
 		return &UnorderedList{d}
 	})
 
@@ -883,7 +897,7 @@ func TestAPIModifierErrors(t *testing.T) {
 		w := babytest.TestRequest[*Album](t, api, r)
 		require.Equal(t, http.StatusUnprocessableEntity, w.Result().StatusCode)
 
-		allAlbums, err := api.Storage.GetAll(context.Background(), nil)
+		allAlbums, err := api.Storage.Search(context.Background(), "", nil)
 		require.NoError(t, err)
 
 		require.Equal(t, 0, len(allAlbums))
@@ -904,7 +918,7 @@ func TestAPIModifierErrors(t *testing.T) {
 		w := babytest.TestRequest[*Album](t, api, r)
 		require.Equal(t, http.StatusUnprocessableEntity, w.Result().StatusCode)
 
-		allAlbums, err := api.Storage.GetAll(context.Background(), nil)
+		allAlbums, err := api.Storage.Search(context.Background(), "", nil)
 		require.NoError(t, err)
 
 		require.Greater(t, len(allAlbums), 0)
@@ -929,7 +943,7 @@ func TestAPIModifierErrors(t *testing.T) {
 			r.Header.Add("Content-Type", "application/json")
 			babytest.TestRequest[*Album](t, api, r)
 
-			allAlbums, err := api.Storage.GetAll(context.Background(), nil)
+			allAlbums, err := api.Storage.Search(context.Background(), "", nil)
 			require.NoError(t, err)
 
 			require.Greater(t, len(allAlbums), 0)
@@ -943,7 +957,7 @@ func TestAPIModifierErrors(t *testing.T) {
 
 			require.Equal(t, http.StatusUnprocessableEntity, w.Result().StatusCode)
 
-			allAlbums, err := api.Storage.GetAll(context.Background(), nil)
+			allAlbums, err := api.Storage.Search(context.Background(), "", nil)
 			require.NoError(t, err)
 
 			require.Equal(t, len(allAlbums), 1)
@@ -965,7 +979,7 @@ func TestAPIModifierErrors(t *testing.T) {
 			r.Header.Add("Content-Type", "application/json")
 			babytest.TestRequest[*Album](t, api, r)
 
-			allAlbums, err := api.Storage.GetAll(context.Background(), nil)
+			allAlbums, err := api.Storage.Search(context.Background(), "", nil)
 			require.NoError(t, err)
 
 			require.Greater(t, len(allAlbums), 0)
@@ -979,7 +993,7 @@ func TestAPIModifierErrors(t *testing.T) {
 
 			require.Equal(t, http.StatusUnprocessableEntity, w.Result().StatusCode)
 
-			allAlbums, err := api.Storage.GetAll(context.Background(), nil)
+			allAlbums, err := api.Storage.Search(context.Background(), "", nil)
 			require.NoError(t, err)
 			afterCount := len(allAlbums)
 
@@ -1092,7 +1106,7 @@ func TestRootAPIAsChildOfResourceAPI(t *testing.T) {
 		artist1 = result.Data
 	})
 
-	t.Run("TestGetAllSongsEmpty", func(t *testing.T) {
+	t.Run("TestSearchSongsEmpty", func(t *testing.T) {
 		out, err := runCommand(artistAPI.Command(), []string{"client", "--pretty=false", "--address", address, "Songs", "list", "--artists-id", artist1.GetID()})
 		require.NoError(t, err)
 		require.Regexp(t, `{"items":\[\]}`, strings.TrimSpace(out))
@@ -1115,7 +1129,7 @@ func TestRootAPICLI(t *testing.T) {
 		expectedErr    bool
 	}{
 		{
-			"GetAll",
+			"Search",
 			[]string{"MusicVideos", "list"},
 			`\[\{"id":"cljcqg5o402e9s28rbp0","title":"New Video"\}\]`,
 			false,
@@ -1169,7 +1183,7 @@ func TestRootAPICLI(t *testing.T) {
 			true,
 		},
 		{
-			"GetAllSongs",
+			"SearchSongs",
 			[]string{"Songs", "list"},
 			`\[{"id":"clknc0do4023onrn3bqg","title":"NewSong"}\]`,
 			false,
@@ -1250,14 +1264,14 @@ func TestRootAPICLI(t *testing.T) {
 			}()
 			defer rootAPI.Stop()
 
-			songAPI.SetGetAllFilter(func(r *http.Request) babyapi.FilterFunc[*Song] {
+			songAPI.SetSearchFilter(func(r *http.Request) babyapi.FilterFunc[*Song] {
 				return func(s *Song) bool {
 					title := r.URL.Query().Get("title")
 					return title == "" || s.Title == title
 				}
 			})
 
-			musicVideoAPI.SetGetAllFilter(func(r *http.Request) babyapi.FilterFunc[*MusicVideo] {
+			musicVideoAPI.SetSearchFilter(func(r *http.Request) babyapi.FilterFunc[*MusicVideo] {
 				return func(m *MusicVideo) bool {
 					title := r.URL.Query().Get("title")
 					return title == "" || m.Title == title
@@ -1280,7 +1294,7 @@ func TestRootAPICLI(t *testing.T) {
 			_, err = songAPI.Client(address).Put(context.Background(), song)
 			require.NoError(t, err)
 
-			t.Run("GetAllQueryParams", func(t *testing.T) {
+			t.Run("SearchQueryParams", func(t *testing.T) {
 				t.Run("Successful", func(t *testing.T) {
 					out, err := runCommand(rootAPI.Command(), []string{"client", "--pretty=false", "--address", "http://localhost:8080", "--query", "title=New Video", "MusicVideos", "list"})
 					require.NoError(t, err)
@@ -1391,9 +1405,9 @@ func (AllAlbumsWrapper) Render(http.ResponseWriter, *http.Request) error {
 	return nil
 }
 
-func TestGetAllResponseWrapperWithClient(t *testing.T) {
+func TestSearchResponseWrapperWithClient(t *testing.T) {
 	api := babyapi.NewAPI("Albums", "/albums", func() *Album { return &Album{} })
-	api.SetGetAllResponseWrapper(func(a []*Album) render.Renderer {
+	api.SetSearchResponseWrapper(func(a []*Album) render.Renderer {
 		return AllAlbumsWrapper(a)
 	})
 
@@ -1405,13 +1419,13 @@ func TestGetAllResponseWrapperWithClient(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("RegularGetAllRequestErrors", func(t *testing.T) {
-		_, err := client.GetAll(context.Background(), "")
+	t.Run("RegularSearchRequestErrors", func(t *testing.T) {
+		_, err := client.Search(context.Background(), "")
 		require.Error(t, err)
 	})
 
 	t.Run("MakeRequestCanBeUsed", func(t *testing.T) {
-		req, err := client.GetAllRequest(context.Background(), "")
+		req, err := client.SearchRequest(context.Background(), "")
 		require.NoError(t, err)
 
 		resp, err := babyapi.MakeRequest[AllAlbumsWrapper](req, http.DefaultClient, http.StatusOK, nil)
@@ -1420,7 +1434,7 @@ func TestGetAllResponseWrapperWithClient(t *testing.T) {
 	})
 
 	t.Run("MakeGenericRequestCanBeUsed", func(t *testing.T) {
-		req, err := client.GetAllRequest(context.Background(), "")
+		req, err := client.SearchRequest(context.Background(), "")
 		require.NoError(t, err)
 
 		var albums AllAlbumsWrapper
@@ -1431,7 +1445,7 @@ func TestGetAllResponseWrapperWithClient(t *testing.T) {
 		require.Equal(t, http.StatusOK, resp.Response.StatusCode)
 	})
 
-	t.Run("GetAllCLI", func(t *testing.T) {
+	t.Run("SearchCLI", func(t *testing.T) {
 		out, err := runCommand(api.Command(), []string{"client", "--pretty=false", "--address", client.Address, "Albums", "list"})
 		require.NoError(t, err)
 		require.Regexp(t, `[{"id":"[0-9a-v]{20}","title":"Album"}]`, strings.TrimSpace(out))
@@ -1440,7 +1454,7 @@ func TestGetAllResponseWrapperWithClient(t *testing.T) {
 
 func TestClient(t *testing.T) {
 	api := babyapi.NewAPI("Albums", "/albums", func() *Album { return &Album{} })
-	api.SetGetAllResponseWrapper(func(a []*Album) render.Renderer {
+	api.SetSearchResponseWrapper(func(a []*Album) render.Renderer {
 		return AllAlbumsWrapper(a)
 	})
 
@@ -1448,8 +1462,8 @@ func TestClient(t *testing.T) {
 	defer stop()
 
 	t.Run("CustomResponseCodeSuccess", func(t *testing.T) {
-		client.SetCustomResponseCode(babyapi.MethodGetAll, http.StatusCreated)
-		resp, err := client.GetAllAny(context.Background(), "")
+		client.SetCustomResponseCode(babyapi.MethodSearch, http.StatusCreated)
+		resp, err := client.SearchAny(context.Background(), "")
 		require.NoError(t, err)
 		require.Equal(t, http.StatusCreated, resp.Response.StatusCode)
 	})
@@ -1457,7 +1471,7 @@ func TestClient(t *testing.T) {
 	t.Run("SetHTTPClient", func(t *testing.T) {
 		client.SetHTTPClient(http.DefaultClient)
 
-		_, err := client.GetAllAny(context.Background(), "")
+		_, err := client.SearchAny(context.Background(), "")
 		require.NoError(t, err)
 	})
 }

@@ -20,7 +20,7 @@ func TestIndividualTest(t *testing.T) {
 		Name:            "Artist",
 	}
 
-	t.Run("GetAllArtistForAlbum_Empty", func(t *testing.T) {
+	t.Run("SearchArtistForAlbum_Empty", func(t *testing.T) {
 		r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/artists/%s/albums", artist.GetID()), http.NoBody)
 		w := babytest.TestWithParentRoute[*Album, *Artist](t, api.Albums, artist, "Artist", "/artists", r)
 

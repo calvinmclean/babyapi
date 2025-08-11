@@ -70,8 +70,8 @@ func (tt RequestTest[T]) Run(t *testing.T, client *babyapi.Client[T], getRespons
 	var r any
 	var err error
 	switch tt.Method {
-	case babyapi.MethodGetAll:
-		r, err = client.GetAllWithEditor(context.Background(), rawQuery, requestEditor, parentIDs...)
+	case babyapi.MethodSearch:
+		r, err = client.SearchWithEditor(context.Background(), rawQuery, requestEditor, parentIDs...)
 	case http.MethodPost:
 		r, err = client.PostRawWithEditor(context.Background(), body, requestEditor, parentIDs...)
 	case http.MethodGet:
@@ -88,7 +88,7 @@ func (tt RequestTest[T]) Run(t *testing.T, client *babyapi.Client[T], getRespons
 	case *babyapi.Response[T]:
 		return &Response[T]{Response: v}, err
 	case *babyapi.Response[*babyapi.ResourceList[T]]:
-		return &Response[T]{GetAllResponse: v}, err
+		return &Response[T]{SearchResponse: v}, err
 	}
 
 	return nil, err
@@ -104,12 +104,12 @@ var _ Test[*babyapi.AnyResource] = RequestFuncTest[*babyapi.AnyResource](func(ge
 func (tt RequestFuncTest[T]) Run(t *testing.T, client *babyapi.Client[T], getResponse PreviousResponseGetter) (*Response[T], error) {
 	r := tt(getResponse, client.Address)
 
-	if r.Method == babyapi.MethodGetAll {
+	if r.Method == babyapi.MethodSearch {
 		r.Method = http.MethodGet
 		resp, err := babyapi.MakeRequest[*babyapi.ResourceList[T]](r, http.DefaultClient, 0, func(r *http.Request) error {
 			return nil
 		})
-		return &Response[T]{GetAllResponse: resp}, err
+		return &Response[T]{SearchResponse: resp}, err
 	}
 
 	resp, err := client.MakeRequest(r, 0)

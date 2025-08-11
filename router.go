@@ -16,7 +16,7 @@ var respondOnce sync.Once
 func defaultResponseCodes() map[string]int {
 	return map[string]int{
 		http.MethodGet:    http.StatusOK,
-		MethodGetAll:      http.StatusOK,
+		MethodSearch:      http.StatusOK,
 		http.MethodDelete: http.StatusNoContent,
 		http.MethodPost:   http.StatusCreated,
 		http.MethodPatch:  http.StatusOK,
@@ -107,7 +107,7 @@ func (a *API[T]) Route(r chi.Router) error {
 		}
 
 		routeIfNotNil(r.With(a.requestBodyMiddleware).Post, "/", a.Post)
-		routeIfNotNil(r.Get, "/", a.GetAll)
+		routeIfNotNil(r.Get, "/", a.Search)
 
 		r.With(a.resourceExistsMiddleware).Route(fmt.Sprintf("/{%s}", a.IDParamKey()), func(r chi.Router) {
 			for _, m := range a.idMiddlewares {
@@ -195,22 +195,24 @@ func (a *API[T]) defaultGet() http.HandlerFunc {
 	})
 }
 
-func (a *API[T]) defaultGetAll() http.HandlerFunc {
+func (a *API[T]) defaultSearch() http.HandlerFunc {
 	return Handler(func(w http.ResponseWriter, r *http.Request) render.Renderer {
 		logger := GetLoggerFromContext(r.Context())
 
-		resources, err := a.Storage.GetAll(r.Context(), r.URL.Query())
+		parentID := a.GetParentIDParam(r)
+
+		resources, err := a.Storage.Search(r.Context(), parentID, r.URL.Query())
 		if err != nil {
 			logger.Error("error getting resources", "error", err)
 			return InternalServerError(err)
 		}
 
-		resources = a.getAllFilter(r).Filter(resources)
+		resources = a.searchFilter(r).Filter(resources)
 		logger.Debug("responding with resources", "count", len(resources))
 
 		var resp render.Renderer
-		if a.getAllResponseWrapper != nil {
-			resp = a.getAllResponseWrapper(resources)
+		if a.searchResponseWrapper != nil {
+			resp = a.searchResponseWrapper(resources)
 		} else {
 			items := []render.Renderer{}
 			for _, item := range resources {
@@ -219,7 +221,7 @@ func (a *API[T]) defaultGetAll() http.HandlerFunc {
 			resp = &ResourceList[render.Renderer]{Items: items}
 		}
 
-		render.Status(r, a.responseCodes[MethodGetAll])
+		render.Status(r, a.responseCodes[MethodSearch])
 
 		return resp
 	})

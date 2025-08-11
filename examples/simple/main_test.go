@@ -43,7 +43,7 @@ func TestAPI(t *testing.T) {
 		{
 			Name: "List",
 			Test: babytest.RequestTest[*babyapi.AnyResource]{
-				Method: babyapi.MethodGetAll,
+				Method: babyapi.MethodSearch,
 			},
 			ExpectedResponse: babytest.ExpectedResponse{
 				Status:     http.StatusOK,

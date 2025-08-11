@@ -97,7 +97,7 @@ todo, err := client.Post(context.Background(), &TODO{Title: "use babyapi!"})
 todo, err := client.Get(context.Background(), todo.GetID())
 
 // Get all incomplete TODO items
-incompleteTODOs, err := client.GetAll(context.Background(), url.Values{
+incompleteTODOs, err := client.Search(context.Background(), url.Values{
     "completed": []string{"false"},
 })
 
@@ -137,7 +137,7 @@ api.SetStorage(babyapi.NewKVStorage[*TODO](db, "TODO"))
 
 ### EndDateable
 
-The `babyapi.EndDateable` interface can be implemented to enable soft-delete with the `KVStorage`. This will set an end-date instead of permanently deleting a resource. Then, deleting it again will permanently delete. Also, the `GetAll` implementation will filter out end-dated resources unless the `end_dated` query parameter is set to enable getting end-dated resources.
+The `babyapi.EndDateable` interface can be implemented to enable soft-delete with the `KVStorage`. This will set an end-date instead of permanently deleting a resource. Then, deleting it again will permanently delete. Also, the `Search` implementation will filter out end-dated resources unless the `end_dated` query parameter is set to enable getting end-dated resources.
 
 ## MCP
 

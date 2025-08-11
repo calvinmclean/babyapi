@@ -163,9 +163,9 @@ func TestAPIWithExtension(t *testing.T) {
 			},
 		},
 		{
-			Name: "GetAllParents",
+			Name: "SearchParents",
 			Test: babytest.RequestTest[*babyapi.AnyResource]{
-				Method: babyapi.MethodGetAll,
+				Method: babyapi.MethodSearch,
 			},
 			ExpectedResponse: babytest.ExpectedResponse{
 				Status:     http.StatusOK,
@@ -206,9 +206,9 @@ func TestAPIWithExtension(t *testing.T) {
 			},
 		},
 		{
-			Name: "GetAllChildren",
+			Name: "SearchChildren",
 			Test: babytest.RequestTest[*babyapi.AnyResource]{
-				Method: babyapi.MethodGetAll,
+				Method: babyapi.MethodSearch,
 				ParentIDsFunc: func(getResponse babytest.PreviousResponseGetter) []string {
 					return []string{getResponse("CreateParent").Data.GetID()}
 				},

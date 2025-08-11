@@ -52,11 +52,11 @@ type ExpectedResponse struct {
 	Error string
 }
 
-// Response wraps a *babyapi.Response and a *ResourceList response to enable GetAll/List endpoints
-// GetAll/List requests can be made using babytest.MethodGetAll and the response will be in this GetAllResponse field
+// Response wraps a *babyapi.Response and a *ResourceList response to enable Search/List endpoints
+// Search/List requests can be made using babytest.MethodSearch and the response will be in this SearchResponse field
 type Response[T babyapi.Resource] struct {
 	*babyapi.Response[T]
-	GetAllResponse *babyapi.Response[*babyapi.ResourceList[T]]
+	SearchResponse *babyapi.Response[*babyapi.ResourceList[T]]
 	CLIOut         string
 }
 
@@ -132,9 +132,9 @@ func (tt TestCase[T]) assertResponse(t *testing.T, r *Response[T]) {
 	var body string
 	var resp *http.Response
 	switch {
-	case r.GetAllResponse != nil:
-		body = r.GetAllResponse.Body
-		resp = r.GetAllResponse.Response
+	case r.SearchResponse != nil:
+		body = r.SearchResponse.Body
+		resp = r.SearchResponse.Response
 	case r.Response != nil:
 		body = r.Response.Body
 		resp = r.Response.Response
