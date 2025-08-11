@@ -42,6 +42,7 @@ type mcpConfig struct {
 type mcpServer[T Resource] struct {
 	storage  Storage[T]
 	instance func() T
+	parent   RelatedAPI
 }
 
 // mcpCRUDTools is the default CRUD tools based on the API's permissions
@@ -50,7 +51,7 @@ func (a *API[T]) mcpCRUDTools() []server.ServerTool {
 	if a.isRoot() {
 		return nil
 	}
-	mcpServer := mcpServer[T]{a.Storage, a.instance}
+	mcpServer := mcpServer[T]{a.Storage, a.instance, a.Parent()}
 
 	_, endDateable := any(a.instance()).(EndDateable)
 
@@ -62,15 +63,13 @@ func (a *API[T]) mcpCRUDTools() []server.ServerTool {
 			mcp.WithDescription(fmt.Sprintf("search all %s", a.name)),
 		)
 
-		// TODO: Currently ParentID is not relevant for listing since this is implemented at the API-level
-		// using api.SetSearchFilter. Ideally I could refactor this to happen at the storage level
-		// if parent := a.Parent(); parent != nil {
-		// 	mcp.WithString(
-		// 		fmt.Sprintf("%s_id", parent.Name()),
-		// 		mcp.Required(),
-		// 		mcp.Description("This is the ID for the parent object needed to list instances of this object."),
-		// 	)(&listTool)
-		// }
+		if parentParam := mcpParentIDInput[T](a.Parent()); parentParam != "" {
+			mcp.WithString(
+				parentParam,
+				mcp.Required(),
+				mcp.Description("This is the ID for the parent object needed to list instances of this object."),
+			)(&searchTool)
+		}
 
 		if endDateable {
 			mcp.WithBoolean(
@@ -141,6 +140,13 @@ func (a *API[T]) mcpCRUDTools() []server.ServerTool {
 	return tools
 }
 
+func mcpParentIDInput[T Resource](parent RelatedAPI) string {
+	if parent == nil {
+		return ""
+	}
+	return fmt.Sprintf("%s_id", parent.Name())
+}
+
 func (m mcpServer[T]) search(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	values := url.Values{}
 
@@ -150,8 +156,17 @@ func (m mcpServer[T]) search(ctx context.Context, request mcp.CallToolRequest) (
 		values.Set("end_dated", fmt.Sprint(endDated))
 	}
 
-	// TODO: parent ID?
-	items, err := m.storage.Search(ctx, "", values)
+	parentIDKey := mcpParentIDInput[T](m.parent)
+	var parentID string
+	if parentIDKey != "" {
+		var err error
+		parentID, err = request.RequireString(parentIDKey)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	items, err := m.storage.Search(ctx, parentID, values)
 	if err != nil {
 		return nil, err
 	}

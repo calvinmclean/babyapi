@@ -27,6 +27,10 @@ type Album struct {
 	ArtistID string `json:"artist_id,omitempty"`
 }
 
+func (a *Album) ParentID() string {
+	return a.ArtistID
+}
+
 func (a *Album) Patch(newAlbum *Album) *babyapi.ErrResponse {
 	if newAlbum.Title != "" {
 		a.Title = newAlbum.Title
@@ -218,7 +222,12 @@ func TestBabyAPI(t *testing.T) {
 
 type Song struct {
 	babyapi.DefaultResource
-	Title string `json:"title"`
+	Title   string `json:"title"`
+	AlbumID string `json:"-"`
+}
+
+func (s *Song) ParentID() string {
+	return s.AlbumID
 }
 
 type SongResponse struct {
@@ -247,7 +256,12 @@ func (sr *SongResponse) Render(w http.ResponseWriter, r *http.Request) error {
 
 type MusicVideo struct {
 	babyapi.DefaultResource
-	Title string `json:"title"`
+	Title    string `json:"title"`
+	ArtistID string `json:"-"`
+}
+
+func (m *MusicVideo) ParentID() string {
+	return m.ArtistID
 }
 
 func (m *MusicVideo) Patch(newVideo *MusicVideo) *babyapi.ErrResponse {
