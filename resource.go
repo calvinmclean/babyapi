@@ -135,7 +135,7 @@ func (id *ID) Bind(r *http.Request) error {
 	return nil
 }
 
-// ResourceList is used to automatically enable the GetAll endpoint that returns an array of Resources
+// ResourceList is used to automatically enable the Search endpoint that returns an array of Resources
 type ResourceList[T render.Renderer] struct {
 	Items []T `json:"items"`
 }

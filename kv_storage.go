@@ -16,7 +16,7 @@ import (
 //
 // It allows soft-deleting if your type implements the kv.EndDateable interface. This means Delete will set the end-date
 // to now and update in storage instead of deleting. If something is already end-dated, then it is hard-deleted. Also,
-// the GetAll method will automatically read the 'end_dated' query param to determine if end-dated resources should
+// the Search method will automatically read the 'end_dated' query param to determine if end-dated resources should
 // be filtered out
 type KVStorage[T Resource] struct {
 	prefix string
@@ -84,9 +84,9 @@ func (c *KVStorage[T]) get(key string) (T, error) {
 	return result, nil
 }
 
-// GetAll will use the provided prefix to read data from the data source. Then, it will use Get
+// Search will use the provided prefix to read data from the data source. Then, it will use Get
 // to read each element into the correct type
-func (c *KVStorage[T]) GetAll(_ context.Context, parentID string, query url.Values) ([]T, error) {
+func (c *KVStorage[T]) Search(_ context.Context, parentID string, query url.Values) ([]T, error) {
 	keys, err := c.db.Keys()
 	if err != nil {
 		return nil, fmt.Errorf("error getting keys: %w", err)

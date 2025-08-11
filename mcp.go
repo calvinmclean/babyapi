@@ -57,13 +57,13 @@ func (a *API[T]) mcpCRUDTools() []server.ServerTool {
 	tools := []server.ServerTool{}
 
 	if a.mcpConfig.Permissions.Has(MCPPermRead) {
-		listTool := mcp.NewTool(
-			fmt.Sprintf("list_%s", a.name),
-			mcp.WithDescription(fmt.Sprintf("list all %s", a.name)),
+		searchTool := mcp.NewTool(
+			fmt.Sprintf("search_%s", a.name),
+			mcp.WithDescription(fmt.Sprintf("search all %s", a.name)),
 		)
 
 		// TODO: Currently ParentID is not relevant for listing since this is implemented at the API-level
-		// using api.SetGetAllFilter. Ideally I could refactor this to happen at the storage level
+		// using api.SetSearchFilter. Ideally I could refactor this to happen at the storage level
 		// if parent := a.Parent(); parent != nil {
 		// 	mcp.WithString(
 		// 		fmt.Sprintf("%s_id", parent.Name()),
@@ -76,14 +76,14 @@ func (a *API[T]) mcpCRUDTools() []server.ServerTool {
 			mcp.WithBoolean(
 				"include_end_dated",
 				mcp.Description(fmt.Sprintf("Include end-dated/deleted %s. Default is false.", a.name)),
-			)(&listTool)
+			)(&searchTool)
 		}
 
 		tools = append(tools,
-			// TODO: how can I support url.Values{} for getAll? What about more complex filtering?
+			// TODO: how can I support url.Values{} for search? What about more complex filtering?
 			server.ServerTool{
-				Tool:    listTool,
-				Handler: mcpServer.listAll,
+				Tool:    searchTool,
+				Handler: mcpServer.search,
 			},
 			server.ServerTool{
 				Tool: mcp.NewTool(
@@ -141,7 +141,7 @@ func (a *API[T]) mcpCRUDTools() []server.ServerTool {
 	return tools
 }
 
-func (m mcpServer[T]) listAll(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (m mcpServer[T]) search(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	values := url.Values{}
 
 	_, endDateable := any(m.instance()).(EndDateable)
@@ -151,7 +151,7 @@ func (m mcpServer[T]) listAll(ctx context.Context, request mcp.CallToolRequest) 
 	}
 
 	// TODO: parent ID?
-	items, err := m.storage.GetAll(ctx, "", values)
+	items, err := m.storage.Search(ctx, "", values)
 	if err != nil {
 		return nil, err
 	}

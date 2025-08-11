@@ -53,7 +53,7 @@ func (t *TODO) Bind(r *http.Request) error {
 
 func main() {
 	api := babyapi.NewAPI("TODOs", "/todos", func() *TODO { return &TODO{} })
-	api.SetGetAllFilter(func(r *http.Request) babyapi.FilterFunc[*TODO] {
+	api.SetSearchFilter(func(r *http.Request) babyapi.FilterFunc[*TODO] {
 		return func(t *TODO) bool {
 			getCompletedParam := r.URL.Query().Get("completed")
 			// No filtering if param is not provided

@@ -46,7 +46,7 @@ func (api *API) export(w http.ResponseWriter, r *http.Request) render.Renderer {
 		return httpErr
 	}
 
-	invites, err := api.Invites.Storage.GetAll(r.Context(), "", nil)
+	invites, err := api.Invites.Storage.Search(r.Context(), "", nil)
 	if err != nil {
 		return babyapi.InternalServerError(err)
 	}
@@ -175,8 +175,8 @@ func (api *API) authenticationMiddleware(_ http.ResponseWriter, r *http.Request,
 	return r, babyapi.ErrForbidden
 }
 
-// getAllInvitesMiddleware will get all invites when rendering HTML so it is accessible to the endpoint
-func (api *API) getAllInvitesMiddleware(_ http.ResponseWriter, r *http.Request, event *Event) (*http.Request, *babyapi.ErrResponse) {
+// searchInvitesMiddleware will get all invites when rendering HTML so it is accessible to the endpoint
+func (api *API) searchInvitesMiddleware(_ http.ResponseWriter, r *http.Request, event *Event) (*http.Request, *babyapi.ErrResponse) {
 	if render.GetAcceptedContentType(r) != render.ContentTypeHTML {
 		return r, nil
 	}
@@ -186,7 +186,7 @@ func (api *API) getAllInvitesMiddleware(_ http.ResponseWriter, r *http.Request, 
 		return r, nil
 	}
 
-	invites, err := api.Invites.Storage.GetAll(r.Context(), event.GetID(), nil)
+	invites, err := api.Invites.Storage.Search(r.Context(), event.GetID(), nil)
 	if err != nil {
 		return r, babyapi.InternalServerError(err)
 	}
@@ -352,7 +352,7 @@ func createAPI() *API {
 		})).
 		AddNestedAPI(api.Invites)
 
-	api.Events.GetAll = babyapi.Handler(func(_ http.ResponseWriter, r *http.Request) render.Renderer {
+	api.Events.Search = babyapi.Handler(func(_ http.ResponseWriter, r *http.Request) render.Renderer {
 		if render.GetAcceptedContentType(r) != render.ContentTypeHTML {
 			return babyapi.ErrForbidden
 		}
@@ -362,7 +362,7 @@ func createAPI() *API {
 
 	api.Events.
 		AddIDMiddleware(api.Events.GetRequestedResourceAndDoMiddleware(api.authenticationMiddleware)).
-		AddIDMiddleware(api.Events.GetRequestedResourceAndDoMiddleware(api.getAllInvitesMiddleware))
+		AddIDMiddleware(api.Events.GetRequestedResourceAndDoMiddleware(api.searchInvitesMiddleware))
 
 	filename := os.Getenv("STORAGE_FILE")
 	if filename == "" {

@@ -64,9 +64,9 @@ func (h *HATEOASResponse[T]) Render(w http.ResponseWriter, r *http.Request) erro
 
 	self := r.URL.Path
 
-	isGetAll := r.Method == http.MethodGet && !strings.HasSuffix(self, h.Resource.GetID())
+	isSearch := r.Method == http.MethodGet && !strings.HasSuffix(self, h.Resource.GetID())
 	isPost := r.Method == http.MethodPost
-	if isPost || isGetAll {
+	if isPost || isSearch {
 		self += "/" + h.Resource.GetID()
 	}
 

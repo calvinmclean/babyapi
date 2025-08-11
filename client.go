@@ -179,19 +179,19 @@ func (c *Client[T]) GetRequest(ctx context.Context, id string, parentIDs ...stri
 	return c.NewRequestWithParentIDs(ctx, http.MethodGet, http.NoBody, id, parentIDs...)
 }
 
-// GetAll gets all resources from the API
-func (c *Client[T]) GetAll(ctx context.Context, rawQuery string, parentIDs ...string) (*Response[*ResourceList[T]], error) {
-	return c.GetAllWithEditor(ctx, rawQuery, c.requestEditor, parentIDs...)
+// Search gets all resources from the API
+func (c *Client[T]) Search(ctx context.Context, rawQuery string, parentIDs ...string) (*Response[*ResourceList[T]], error) {
+	return c.SearchWithEditor(ctx, rawQuery, c.requestEditor, parentIDs...)
 }
 
-// GetAllWithEditor gets all resources from the API after modifying the request with requestEditor
-func (c *Client[T]) GetAllWithEditor(ctx context.Context, rawQuery string, requestEditor RequestEditor, parentIDs ...string) (*Response[*ResourceList[T]], error) {
-	req, err := c.GetAllRequest(ctx, rawQuery, parentIDs...)
+// SearchWithEditor gets all resources from the API after modifying the request with requestEditor
+func (c *Client[T]) SearchWithEditor(ctx context.Context, rawQuery string, requestEditor RequestEditor, parentIDs ...string) (*Response[*ResourceList[T]], error) {
+	req, err := c.SearchRequest(ctx, rawQuery, parentIDs...)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	result, err := MakeRequest[*ResourceList[T]](req, c.client, c.customResponseCodes[MethodGetAll], requestEditor)
+	result, err := MakeRequest[*ResourceList[T]](req, c.client, c.customResponseCodes[MethodSearch], requestEditor)
 	if err != nil {
 		return nil, fmt.Errorf("error getting all resources: %w", err)
 	}
@@ -199,8 +199,8 @@ func (c *Client[T]) GetAllWithEditor(ctx context.Context, rawQuery string, reque
 	return result, nil
 }
 
-// GetAllRequest creates a request that can be used to get all resources
-func (c *Client[T]) GetAllRequest(ctx context.Context, rawQuery string, parentIDs ...string) (*http.Request, error) {
+// SearchRequest creates a request that can be used to get all resources
+func (c *Client[T]) SearchRequest(ctx context.Context, rawQuery string, parentIDs ...string) (*http.Request, error) {
 	req, err := c.NewRequestWithParentIDs(ctx, http.MethodGet, http.NoBody, "", parentIDs...)
 	if err != nil {
 		return nil, err
@@ -211,19 +211,19 @@ func (c *Client[T]) GetAllRequest(ctx context.Context, rawQuery string, parentID
 	return req, nil
 }
 
-// GetAllAny allows using GetAll when using a custom response wrapper
-func (c *Client[T]) GetAllAny(ctx context.Context, rawQuery string, parentIDs ...string) (*Response[any], error) {
-	return c.GetAllAnyWithEditor(ctx, rawQuery, c.requestEditor, parentIDs...)
+// SearchAny allows using Search when using a custom response wrapper
+func (c *Client[T]) SearchAny(ctx context.Context, rawQuery string, parentIDs ...string) (*Response[any], error) {
+	return c.SearchAnyWithEditor(ctx, rawQuery, c.requestEditor, parentIDs...)
 }
 
-// GetAllAnyWithEditor allows using GetAll when using a custom response wrapper after modifying the request with requestEditor
-func (c *Client[T]) GetAllAnyWithEditor(ctx context.Context, rawQuery string, requestEditor RequestEditor, parentIDs ...string) (*Response[any], error) {
-	req, err := c.GetAllRequest(ctx, rawQuery, parentIDs...)
+// SearchAnyWithEditor allows using Search when using a custom response wrapper after modifying the request with requestEditor
+func (c *Client[T]) SearchAnyWithEditor(ctx context.Context, rawQuery string, requestEditor RequestEditor, parentIDs ...string) (*Response[any], error) {
+	req, err := c.SearchRequest(ctx, rawQuery, parentIDs...)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	result, err := MakeRequest[any](req, c.client, c.customResponseCodes[MethodGetAll], requestEditor)
+	result, err := MakeRequest[any](req, c.client, c.customResponseCodes[MethodSearch], requestEditor)
 	if err != nil {
 		return nil, fmt.Errorf("error getting all resources: %w", err)
 	}

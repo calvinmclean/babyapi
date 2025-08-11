@@ -30,6 +30,10 @@ func (a Author) GetID() string {
 	return fmt.Sprint(a.Author.ID)
 }
 
+func (a Author) ParentID() string {
+	return ""
+}
+
 func (a *Author) Bind(r *http.Request) error {
 	if r.Method == http.MethodPost {
 		a.ID = xid.New().String()
@@ -56,7 +60,7 @@ func (s Storage) Get(ctx context.Context, id string) (*Author, error) {
 	return &Author{a}, nil
 }
 
-func (s Storage) GetAll(ctx context.Context, query url.Values) ([]*Author, error) {
+func (s Storage) Search(ctx context.Context, _ string, query url.Values) ([]*Author, error) {
 	var authors []db.Author
 	var err error
 

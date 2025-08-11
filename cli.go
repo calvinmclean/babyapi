@@ -213,7 +213,7 @@ func (c *Client[T]) Command(name string, input *cliArgs) *cobra.Command {
 			c.Address = input.address
 
 			var err error
-			req, err = c.cliGetAllRequest(parentIDs)
+			req, err = c.cliSearchRequest(parentIDs)
 			return err
 		},
 	}
@@ -305,8 +305,8 @@ func (c *Client[T]) cliDeleteRequest(parentIDs, args []string) (*http.Request, e
 	return req, nil
 }
 
-func (c *Client[T]) cliGetAllRequest(parentIDs []string) (*http.Request, error) {
-	req, err := c.GetAllRequest(context.Background(), "", parentIDs...)
+func (c *Client[T]) cliSearchRequest(parentIDs []string) (*http.Request, error) {
+	req, err := c.SearchRequest(context.Background(), "", parentIDs...)
 	if err != nil {
 		return nil, fmt.Errorf("error creating GET all request: %w", err)
 	}

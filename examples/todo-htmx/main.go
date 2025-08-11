@@ -129,8 +129,8 @@ func createAPI() *babyapi.API[*TODO] {
 
 	api.AddCustomRootRoute(http.MethodGet, "/", http.RedirectHandler("/todos", http.StatusFound))
 
-	// Use AllTODOs in the GetAll response since it implements HTMLer
-	api.SetGetAllResponseWrapper(func(todos []*TODO) render.Renderer {
+	// Use AllTODOs in the Search response since it implements HTMLer
+	api.SetSearchResponseWrapper(func(todos []*TODO) render.Renderer {
 		return AllTODOs{ResourceList: babyapi.ResourceList[*TODO]{Items: todos}}
 	})
 
