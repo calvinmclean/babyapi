@@ -32,6 +32,9 @@ type relatedAPI interface {
 
 // Parent returns the API's parent API
 func (a *API[T]) Parent() RelatedAPI {
+	if a.parent != nil && a.parent.isRoot() {
+		return nil
+	}
 	return a.parent
 }
 
