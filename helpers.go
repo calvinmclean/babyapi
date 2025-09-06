@@ -184,6 +184,11 @@ func GetFromRequest[T RendererBinder](r *http.Request, instance func() T) (T, *E
 	resource = instance()
 	err := render.Bind(r, resource)
 	if err != nil {
+		// By default, curl uses "Content-Type: application/x-www-form-urlencoded" which results in poor UX for
+		// JSON requests due to an unclear error
+		if strings.Contains(err.Error(), "doesn't exist in") {
+			err = fmt.Errorf("error may be caused by incorrect Content-Type: %w", err)
+		}
 		return *new(T), ErrInvalidRequest(err)
 	}
 
