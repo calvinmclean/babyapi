@@ -78,7 +78,7 @@ func (a *API[T]) Route(r chi.Router) error {
 
 	// Only set these middleware for root-level API
 	if a.parent == nil {
-		a.ApplyDefaultMiddleware(r)
+		a.applyDefaultMiddleware(r)
 	}
 
 	for _, m := range a.middlewares {
@@ -181,7 +181,7 @@ func (a *API[T]) doCustomRoutes(r chi.Router, routes []chi.Route) {
 
 func (a *API[T]) defaultGet() http.HandlerFunc {
 	return Handler(func(w http.ResponseWriter, r *http.Request) render.Renderer {
-		logger := GetLoggerFromContext(r.Context())
+		logger, _ := GetLoggerFromContext(r.Context())
 
 		resource, httpErr := a.GetRequestedResource(r)
 		if httpErr != nil {
@@ -197,7 +197,7 @@ func (a *API[T]) defaultGet() http.HandlerFunc {
 
 func (a *API[T]) defaultSearch() http.HandlerFunc {
 	return Handler(func(w http.ResponseWriter, r *http.Request) render.Renderer {
-		logger := GetLoggerFromContext(r.Context())
+		logger, _ := GetLoggerFromContext(r.Context())
 
 		parentID := a.GetParentIDParam(r)
 
@@ -229,7 +229,7 @@ func (a *API[T]) defaultSearch() http.HandlerFunc {
 
 func (a *API[T]) defaultPost() http.HandlerFunc {
 	return a.ReadRequestBodyAndDo(func(w http.ResponseWriter, r *http.Request, resource T) (T, *ErrResponse) {
-		logger := GetLoggerFromContext(r.Context())
+		logger, _ := GetLoggerFromContext(r.Context())
 
 		httpErr := a.onCreateOrUpdate(w, r, resource)
 		if httpErr != nil {
@@ -256,7 +256,7 @@ func (a *API[T]) defaultPost() http.HandlerFunc {
 
 func (a *API[T]) defaultPut() http.HandlerFunc {
 	return a.ReadRequestBodyAndDo(func(w http.ResponseWriter, r *http.Request, resource T) (T, *ErrResponse) {
-		logger := GetLoggerFromContext(r.Context())
+		logger, _ := GetLoggerFromContext(r.Context())
 
 		if resource.GetID() != a.GetIDParam(r) {
 			return *new(T), ErrInvalidRequest(fmt.Errorf("id must match URL path"))
@@ -287,7 +287,7 @@ func (a *API[T]) defaultPut() http.HandlerFunc {
 
 func (a *API[T]) defaultPatch() http.HandlerFunc {
 	return a.ReadRequestBodyAndDo(func(w http.ResponseWriter, r *http.Request, patchRequest T) (T, *ErrResponse) {
-		logger := GetLoggerFromContext(r.Context())
+		logger, _ := GetLoggerFromContext(r.Context())
 
 		resource, httpErr := a.GetRequestedResource(r)
 		if httpErr != nil {
@@ -332,7 +332,7 @@ func (a *API[T]) defaultPatch() http.HandlerFunc {
 
 func (a *API[T]) defaultDelete() http.HandlerFunc {
 	return Handler(func(w http.ResponseWriter, r *http.Request) render.Renderer {
-		logger := GetLoggerFromContext(r.Context())
+		logger, _ := GetLoggerFromContext(r.Context())
 		httpErr := a.beforeDelete(w, r)
 		if httpErr != nil {
 			logger.Error("error executing before func", "error", httpErr)

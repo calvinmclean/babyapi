@@ -18,13 +18,13 @@ const (
 
 // GetLoggerFromContext returns the structured logger from the context. It expects to use an HTTP
 // request context to get a logger with details from middleware
-func GetLoggerFromContext(ctx context.Context) *slog.Logger {
+func GetLoggerFromContext(ctx context.Context) (*slog.Logger, bool) {
 	logger, ok := ctx.Value(loggerCtxKey).(*slog.Logger)
 	if !ok {
-		return nil
+		return slog.Default(), false
 	}
 
-	return logger
+	return logger, true
 }
 
 // NewContextWithLogger stores a structured logger in the context

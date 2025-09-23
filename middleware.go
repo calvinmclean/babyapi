@@ -16,7 +16,7 @@ var DefaultMiddleware = []func(http.Handler) http.Handler{
 	middleware.Recoverer,
 }
 
-func (a *API[T]) ApplyDefaultMiddleware(r chi.Router) {
+func (a *API[T]) applyDefaultMiddleware(r chi.Router) {
 	for _, m := range DefaultMiddleware {
 		r.Use(m)
 	}
@@ -60,7 +60,7 @@ func (a *API[T]) requestBodyMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		logger := GetLoggerFromContext(r.Context())
+		logger, _ := GetLoggerFromContext(r.Context())
 		logger.Info("received request body", "body", body)
 
 		next.ServeHTTP(w, r.WithContext(a.NewContextWithRequestBody(r.Context(), body)))
@@ -80,7 +80,7 @@ func (a *API[T]) resourceExistsMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		logger := GetLoggerFromContext(r.Context())
+		logger, _ := GetLoggerFromContext(r.Context())
 		logger = logger.With(a.IDParamKey(), resource.GetID())
 		logger.Info("got resource")
 

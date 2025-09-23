@@ -74,7 +74,7 @@ func (a *API[T]) findIDParam(r *http.Request) string {
 // and rendering the response. This is useful for imlementing a CustomIDRoute
 func (a *API[T]) GetRequestedResourceAndDo(do func(http.ResponseWriter, *http.Request, T) (render.Renderer, *ErrResponse)) http.HandlerFunc {
 	return Handler(func(w http.ResponseWriter, r *http.Request) render.Renderer {
-		logger := GetLoggerFromContext(r.Context())
+		logger, _ := GetLoggerFromContext(r.Context())
 
 		resource, httpErr := a.GetRequestedResource(r)
 		if httpErr != nil {
@@ -103,7 +103,7 @@ func (a *API[T]) GetRequestedResourceAndDoMiddleware(do func(http.ResponseWriter
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-			logger := GetLoggerFromContext(r.Context())
+			logger, _ := GetLoggerFromContext(r.Context())
 
 			resource, httpErr := a.GetRequestedResource(r)
 			if httpErr != nil {
@@ -218,7 +218,7 @@ func Handler(do func(http.ResponseWriter, *http.Request) render.Renderer) http.H
 		if response == nil {
 			return
 		}
-		logger := GetLoggerFromContext(r.Context())
+		logger, _ := GetLoggerFromContext(r.Context())
 		if logger == nil {
 			logger = slog.Default()
 		}
