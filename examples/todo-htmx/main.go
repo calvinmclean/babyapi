@@ -148,7 +148,7 @@ func createAPI() *babyapi.API[*TODO] {
 		select {
 		case todoChan <- &babyapi.ServerSentEvent{Event: "newTODO", Data: t.HTML(w, r)}:
 		default:
-			logger := babyapi.GetLoggerFromContext(r.Context())
+			logger, _ := babyapi.GetLoggerFromContext(r.Context())
 			logger.Info("no listeners for server-sent event")
 		}
 		return nil

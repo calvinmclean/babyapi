@@ -46,7 +46,6 @@ func TestWithParentRoute[T, P babyapi.Resource](t *testing.T, api *babyapi.API[T
 	require.NoError(t, err)
 
 	router := chi.NewRouter()
-	api.ApplyDefaultMiddleware(router)
 	router.Route(fmt.Sprintf("%s/{%s}", parentBasePath, babyapi.IDParamKey(parentName)), func(r chi.Router) {
 		r.Mount("/", apiRouter)
 	})
