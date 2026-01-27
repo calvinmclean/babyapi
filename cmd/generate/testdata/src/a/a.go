@@ -1,0 +1,30 @@
+package a
+
+type TestResource struct {
+	Name string
+}
+
+type API[T any] struct{}
+
+func (a *API[T]) panicIfReadOnly() {}
+
+// This method needs panicIfReadOnly() call
+func (a *API[TestResource]) TestMethod() *API[TestResource] { // want "function TestMethod should call panicIfReadOnly at the beginning"
+	return a
+}
+
+// This method already has panicIfReadOnly() call
+func (a *API[TestResource]) ExistingMethod() *API[TestResource] {
+	a.panicIfReadOnly()
+	return a
+}
+
+// This method doesn't return *API[T] so it shouldn't be flagged
+func (a *API[TestResource]) OtherMethod() string {
+	return "test"
+}
+
+// This is not a method on *API[T] so it shouldn't be flagged
+func (t *TestResource) Method() *TestResource {
+	return t
+}
