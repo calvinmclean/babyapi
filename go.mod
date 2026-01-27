@@ -1,6 +1,6 @@
 module github.com/calvinmclean/babyapi
 
-go 1.24
+go 1.24.0
 
 require (
 	github.com/go-chi/chi/v5 v5.0.10
@@ -13,7 +13,7 @@ require (
 	github.com/tarmac-project/hord v0.6.0
 	github.com/tarmac-project/hord/drivers/hashmap v0.6.0
 	github.com/tarmac-project/hord/drivers/redis v0.6.0
-	golang.org/x/tools v0.15.0
+	golang.org/x/tools v0.41.0
 )
 
 require (
@@ -31,5 +31,7 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
+	golang.org/x/mod v0.32.0 // indirect
+	golang.org/x/sync v0.19.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
