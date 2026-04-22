@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"iter"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -675,7 +676,14 @@ func (d *ListItem) HTML(http.ResponseWriter, *http.Request) string {
 func TestHTML(t *testing.T) {
 	api := babyapi.NewAPI("Items", "/items", func() *ListItem { return &ListItem{} })
 
-	api.SetSearchResponseWrapper(func(d []*ListItem) render.Renderer {
+	api.SetSearchResponseWrapper(func(seq iter.Seq2[*ListItem, error]) render.Renderer {
+		var d []*ListItem
+		for item, err := range seq {
+			if err != nil {
+				return nil
+			}
+			d = append(d, item)
+		}
 		return &UnorderedList{d}
 	})
 
@@ -732,7 +740,14 @@ func TestHTML(t *testing.T) {
 func TestServerSentEvents(t *testing.T) {
 	api := babyapi.NewAPI("Items", "/items", func() *ListItem { return &ListItem{} })
 
-	api.SetSearchResponseWrapper(func(d []*ListItem) render.Renderer {
+	api.SetSearchResponseWrapper(func(seq iter.Seq2[*ListItem, error]) render.Renderer {
+		var d []*ListItem
+		for item, err := range seq {
+			if err != nil {
+				return nil
+			}
+			d = append(d, item)
+		}
 		return &UnorderedList{d}
 	})
 
@@ -897,8 +912,11 @@ func TestAPIModifierErrors(t *testing.T) {
 		w := babytest.TestRequest[*Album](t, api, r)
 		require.Equal(t, http.StatusUnprocessableEntity, w.Result().StatusCode)
 
-		allAlbums, err := api.Storage.Search(context.Background(), "", nil)
-		require.NoError(t, err)
+		var allAlbums []*Album
+		for a, err := range api.Storage.Search(context.Background(), "", nil) {
+			require.NoError(t, err)
+			allAlbums = append(allAlbums, a)
+		}
 
 		require.Equal(t, 0, len(allAlbums))
 	})
@@ -918,8 +936,11 @@ func TestAPIModifierErrors(t *testing.T) {
 		w := babytest.TestRequest[*Album](t, api, r)
 		require.Equal(t, http.StatusUnprocessableEntity, w.Result().StatusCode)
 
-		allAlbums, err := api.Storage.Search(context.Background(), "", nil)
-		require.NoError(t, err)
+		var allAlbums []*Album
+		for a, err := range api.Storage.Search(context.Background(), "", nil) {
+			require.NoError(t, err)
+			allAlbums = append(allAlbums, a)
+		}
 
 		require.Greater(t, len(allAlbums), 0)
 	})
@@ -943,8 +964,11 @@ func TestAPIModifierErrors(t *testing.T) {
 			r.Header.Add("Content-Type", "application/json")
 			babytest.TestRequest[*Album](t, api, r)
 
-			allAlbums, err := api.Storage.Search(context.Background(), "", nil)
-			require.NoError(t, err)
+			var allAlbums []*Album
+			for a, err := range api.Storage.Search(context.Background(), "", nil) {
+				require.NoError(t, err)
+				allAlbums = append(allAlbums, a)
+			}
 
 			require.Greater(t, len(allAlbums), 0)
 		})
@@ -957,8 +981,11 @@ func TestAPIModifierErrors(t *testing.T) {
 
 			require.Equal(t, http.StatusUnprocessableEntity, w.Result().StatusCode)
 
-			allAlbums, err := api.Storage.Search(context.Background(), "", nil)
-			require.NoError(t, err)
+			var allAlbums []*Album
+			for a, err := range api.Storage.Search(context.Background(), "", nil) {
+				require.NoError(t, err)
+				allAlbums = append(allAlbums, a)
+			}
 
 			require.Equal(t, len(allAlbums), 1)
 		})
@@ -979,8 +1006,11 @@ func TestAPIModifierErrors(t *testing.T) {
 			r.Header.Add("Content-Type", "application/json")
 			babytest.TestRequest[*Album](t, api, r)
 
-			allAlbums, err := api.Storage.Search(context.Background(), "", nil)
-			require.NoError(t, err)
+			var allAlbums []*Album
+			for a, err := range api.Storage.Search(context.Background(), "", nil) {
+				require.NoError(t, err)
+				allAlbums = append(allAlbums, a)
+			}
 
 			require.Greater(t, len(allAlbums), 0)
 		})
@@ -993,8 +1023,11 @@ func TestAPIModifierErrors(t *testing.T) {
 
 			require.Equal(t, http.StatusUnprocessableEntity, w.Result().StatusCode)
 
-			allAlbums, err := api.Storage.Search(context.Background(), "", nil)
-			require.NoError(t, err)
+			var allAlbums []*Album
+			for a, err := range api.Storage.Search(context.Background(), "", nil) {
+				require.NoError(t, err)
+				allAlbums = append(allAlbums, a)
+			}
 			afterCount := len(allAlbums)
 
 			require.Less(t, afterCount, 1)
@@ -1407,7 +1440,14 @@ func (AllAlbumsWrapper) Render(http.ResponseWriter, *http.Request) error {
 
 func TestSearchResponseWrapperWithClient(t *testing.T) {
 	api := babyapi.NewAPI("Albums", "/albums", func() *Album { return &Album{} })
-	api.SetSearchResponseWrapper(func(a []*Album) render.Renderer {
+	api.SetSearchResponseWrapper(func(seq iter.Seq2[*Album, error]) render.Renderer {
+		var a []*Album
+		for album, err := range seq {
+			if err != nil {
+				return nil
+			}
+			a = append(a, album)
+		}
 		return AllAlbumsWrapper(a)
 	})
 
@@ -1454,7 +1494,14 @@ func TestSearchResponseWrapperWithClient(t *testing.T) {
 
 func TestClient(t *testing.T) {
 	api := babyapi.NewAPI("Albums", "/albums", func() *Album { return &Album{} })
-	api.SetSearchResponseWrapper(func(a []*Album) render.Renderer {
+	api.SetSearchResponseWrapper(func(seq iter.Seq2[*Album, error]) render.Renderer {
+		var a []*Album
+		for album, err := range seq {
+			if err != nil {
+				return nil
+			}
+			a = append(a, album)
+		}
 		return AllAlbumsWrapper(a)
 	})
 

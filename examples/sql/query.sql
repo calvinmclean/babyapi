@@ -4,10 +4,13 @@ WHERE id = ? LIMIT 1;
 
 -- name: ListAuthors :many
 SELECT * FROM authors
-ORDER BY name;
+ORDER BY name
+LIMIT ? OFFSET ?;
 
 -- name: SearchAuthors :many
-SELECT * FROM authors WHERE genre = ?;
+SELECT * FROM authors WHERE genre = ?
+ORDER BY name
+LIMIT ? OFFSET ?;
 
 -- name: UpsertAuthor :exec
 INSERT INTO authors (
@@ -31,7 +34,8 @@ WHERE id = ? LIMIT 1;
 -- name: ListBooksByAuthor :many
 SELECT id, title, isbn, year, author_id FROM books
 WHERE author_id = ?
-ORDER BY year DESC, title;
+ORDER BY year DESC, title
+LIMIT ? OFFSET ?;
 
 -- name: UpsertBook :exec
 INSERT INTO books (

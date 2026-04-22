@@ -35,8 +35,11 @@ func TestClient(t *testing.T) {
 		require.Equal(t, "TODO 1", todo.Title)
 	})
 	t.Run("SearchTODOs", func(t *testing.T) {
-		todos, err := c.Search(context.Background(), "", nil)
-		require.NoError(t, err)
+		var todos []*TODO
+		for todo, err := range c.Search(context.Background(), "", nil) {
+			require.NoError(t, err)
+			todos = append(todos, todo)
+		}
 		require.Len(t, todos, 1)
 		require.Equal(t, "TODO 1", todos[0].Title)
 	})
@@ -55,18 +58,27 @@ func TestClient(t *testing.T) {
 		require.ErrorIs(t, err, ErrNotFound)
 	})
 	t.Run("SearchTODOsAgainWithEndDatedDefaultFalse", func(t *testing.T) {
-		todos, err := c.Search(context.Background(), "", nil)
-		require.NoError(t, err)
+		var todos []*TODO
+		for todo, err := range c.Search(context.Background(), "", nil) {
+			require.NoError(t, err)
+			todos = append(todos, todo)
+		}
 		require.Empty(t, todos)
 	})
 	t.Run("SearchTODOsAgainWithEndDatedFalse", func(t *testing.T) {
-		todos, err := c.Search(context.Background(), "", EndDatedQueryParam(false))
-		require.NoError(t, err)
+		var todos []*TODO
+		for todo, err := range c.Search(context.Background(), "", EndDatedQueryParam(false)) {
+			require.NoError(t, err)
+			todos = append(todos, todo)
+		}
 		require.Empty(t, todos)
 	})
 	t.Run("SearchTODOsWithEndDatedTrueStillShowsNone", func(t *testing.T) {
-		todos, err := c.Search(context.Background(), "", EndDatedQueryParam(true))
-		require.NoError(t, err)
+		var todos []*TODO
+		for todo, err := range c.Search(context.Background(), "", EndDatedQueryParam(true)) {
+			require.NoError(t, err)
+			todos = append(todos, todo)
+		}
 		require.Empty(t, todos)
 	})
 }
@@ -114,18 +126,27 @@ func TestEndDateable(t *testing.T) {
 		require.True(t, todo.EndDated())
 	})
 	t.Run("SearchTODOsAgainWithEndDatedDefaultFalse", func(t *testing.T) {
-		todos, err := c.Search(context.Background(), "", nil)
-		require.NoError(t, err)
+		var todos []*EndDateableTODO
+		for todo, err := range c.Search(context.Background(), "", nil) {
+			require.NoError(t, err)
+			todos = append(todos, todo)
+		}
 		require.Empty(t, todos)
 	})
 	t.Run("SearchTODOsAgainWithEndDatedFalse", func(t *testing.T) {
-		todos, err := c.Search(context.Background(), "", EndDatedQueryParam(false))
-		require.NoError(t, err)
+		var todos []*EndDateableTODO
+		for todo, err := range c.Search(context.Background(), "", EndDatedQueryParam(false)) {
+			require.NoError(t, err)
+			todos = append(todos, todo)
+		}
 		require.Empty(t, todos)
 	})
 	t.Run("SearchTODOsWithEndDatedTrue", func(t *testing.T) {
-		todos, err := c.Search(context.Background(), "", EndDatedQueryParam(true))
-		require.NoError(t, err)
+		var todos []*EndDateableTODO
+		for todo, err := range c.Search(context.Background(), "", EndDatedQueryParam(true)) {
+			require.NoError(t, err)
+			todos = append(todos, todo)
+		}
 		require.Len(t, todos, 1)
 		require.Equal(t, "TODO 1", todos[0].Title)
 	})

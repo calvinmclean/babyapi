@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"iter"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -85,40 +87,88 @@ func (c *KVStorage[T]) get(key string) (T, error) {
 }
 
 // Search will use the provided prefix to read data from the data source. Then, it will use Get
-// to read each element into the correct type
-func (c *KVStorage[T]) Search(_ context.Context, parentID string, query url.Values) ([]T, error) {
-	keys, err := c.db.Keys()
-	if err != nil {
-		return nil, fmt.Errorf("error getting keys: %w", err)
-	}
-
-	results := []T{}
-	for _, key := range keys {
-		if !strings.HasPrefix(key, c.prefix) {
-			continue
-		}
-
-		result, err := c.get(key)
+// to read each element into the correct type. It returns an iterator that supports limit/offset via query params.
+func (c *KVStorage[T]) Search(_ context.Context, parentID string, query url.Values) iter.Seq2[T, error] {
+	return func(yield func(T, error) bool) {
+		keys, err := c.db.Keys()
 		if err != nil {
-			return nil, fmt.Errorf("error getting data: %w", err)
+			yield(*new(T), fmt.Errorf("error getting keys: %w", err))
+			return
 		}
 
-		itemParentID := result.ParentID()
-		hasParent := itemParentID != ""
-		if hasParent && itemParentID != parentID {
-			continue
-		}
+		limit := parseLimit(query.Get("limit"))
+		offset := parseOffset(query.Get("offset"))
 
-		getEndDated := query.Get("end_dated") == "true"
-		endDateable, ok := any(result).(EndDateable)
-		if ok && !getEndDated && endDateable.EndDated() {
-			continue
-		}
+		count := 0
+		skipped := 0
 
-		results = append(results, result)
+		for _, key := range keys {
+			if !strings.HasPrefix(key, c.prefix) {
+				continue
+			}
+
+			result, err := c.get(key)
+			if err != nil {
+				if !yield(*new(T), fmt.Errorf("error getting data: %w", err)) {
+					return
+				}
+				continue
+			}
+
+			itemParentID := result.ParentID()
+			hasParent := itemParentID != ""
+			if hasParent && itemParentID != parentID {
+				continue
+			}
+
+			getEndDated := query.Get("end_dated") == "true"
+			endDateable, ok := any(result).(EndDateable)
+			if ok && !getEndDated && endDateable.EndDated() {
+				continue
+			}
+
+			// Apply offset
+			if skipped < offset {
+				skipped++
+				continue
+			}
+
+			// Yield item - stop iteration if yield returns false
+			if !yield(result, nil) {
+				return
+			}
+
+			// Apply limit
+			count++
+			if limit > 0 && count >= limit {
+				return
+			}
+		}
 	}
+}
 
-	return results, nil
+// parseLimit parses a limit string from query params. Returns 0 for no limit.
+func parseLimit(s string) int {
+	if s == "" {
+		return 0
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil || n < 0 {
+		return 0
+	}
+	return n
+}
+
+// parseOffset parses an offset string from query params.
+func parseOffset(s string) int {
+	if s == "" {
+		return 0
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil || n < 0 {
+		return 0
+	}
+	return n
 }
 
 // Set marshals the provided item and writes it to the database

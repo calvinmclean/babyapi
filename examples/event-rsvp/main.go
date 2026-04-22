@@ -46,21 +46,19 @@ func (api *API) export(w http.ResponseWriter, r *http.Request) render.Renderer {
 		return httpErr
 	}
 
-	invites, err := api.Invites.Storage.Search(r.Context(), "", nil)
-	if err != nil {
-		return babyapi.InternalServerError(err)
-	}
-
 	w.Header().Set("Content-Type", "text/csv")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment;filename=event_%s_invites.csv", event.GetID()))
 
 	csvWriter := csv.NewWriter(w)
-	err = csvWriter.Write([]string{"ID", "Name", "Contact", "RSVP", "Link"})
+	err := csvWriter.Write([]string{"ID", "Name", "Contact", "RSVP", "Link"})
 	if err != nil {
 		return babyapi.InternalServerError(err)
 	}
 
-	for _, invite := range invites {
+	for invite, err := range api.Invites.Storage.Search(r.Context(), "", nil) {
+		if err != nil {
+			return babyapi.InternalServerError(err)
+		}
 		rsvp := ""
 		if invite.RSVP != nil {
 			rsvp = fmt.Sprintf("%t", *invite.RSVP)
@@ -186,9 +184,12 @@ func (api *API) searchInvitesMiddleware(_ http.ResponseWriter, r *http.Request, 
 		return r, nil
 	}
 
-	invites, err := api.Invites.Storage.Search(r.Context(), event.GetID(), nil)
-	if err != nil {
-		return r, babyapi.InternalServerError(err)
+	var invites []*Invite
+	for invite, err := range api.Invites.Storage.Search(r.Context(), event.GetID(), nil) {
+		if err != nil {
+			return r, babyapi.InternalServerError(err)
+		}
+		invites = append(invites, invite)
 	}
 
 	ctx := context.WithValue(r.Context(), invitesCtxKey, invites)
