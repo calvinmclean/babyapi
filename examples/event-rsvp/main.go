@@ -184,12 +184,9 @@ func (api *API) searchInvitesMiddleware(_ http.ResponseWriter, r *http.Request, 
 		return r, nil
 	}
 
-	var invites []*Invite
-	for invite, err := range api.Invites.Storage.Search(r.Context(), event.GetID(), nil) {
-		if err != nil {
-			return r, babyapi.InternalServerError(err)
-		}
-		invites = append(invites, invite)
+	invites, err := babyapi.CollectIterator(api.Invites.Storage.Search(r.Context(), event.GetID(), nil))
+	if err != nil {
+		return r, babyapi.InternalServerError(err)
 	}
 
 	ctx := context.WithValue(r.Context(), invitesCtxKey, invites)

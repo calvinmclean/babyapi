@@ -166,12 +166,9 @@ func (m mcpServer[T]) search(ctx context.Context, request mcp.CallToolRequest) (
 		}
 	}
 
-	var items []T
-	for item, err := range m.storage.Search(ctx, parentID, values) {
-		if err != nil {
-			return nil, err
-		}
-		items = append(items, item)
+	items, err := CollectIterator(m.storage.Search(ctx, parentID, values))
+	if err != nil {
+		return nil, err
 	}
 	return newToolResultJSON(items)
 }

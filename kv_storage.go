@@ -88,6 +88,10 @@ func (c *KVStorage[T]) get(key string) (T, error) {
 
 // Search will use the provided prefix to read data from the data source. Then, it will use Get
 // to read each element into the correct type. It returns an iterator that supports limit/offset via query params.
+//
+// Note: This implementation continues iteration after encountering errors on individual keys, yielding
+// each error and continuing to the next key. This allows partial results to be returned even if some
+// keys are corrupted or unreadable. The caller should check for errors during iteration.
 func (c *KVStorage[T]) Search(_ context.Context, parentID string, query url.Values) iter.Seq2[T, error] {
 	return func(yield func(T, error) bool) {
 		keys, err := c.db.Keys()

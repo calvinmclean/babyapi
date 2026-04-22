@@ -12,6 +12,20 @@ var ErrNotFound = errors.New("resource not found")
 // FilterFunc is used for Search to filter resources that are read from storage
 type FilterFunc[T any] func(T) bool
 
+// CollectIterator iterates through the provided iterator and collects all results into a slice.
+// It returns the slice and the first error encountered during iteration.
+// This is a convenience helper for custom response wrappers that need to collect all results.
+func CollectIterator[T any](seq iter.Seq2[T, error]) ([]T, error) {
+	var results []T
+	for item, err := range seq {
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, item)
+	}
+	return results, nil
+}
+
 // Filter returns a new iterator that filters items from the source.
 // Iteration stops on the first error.
 func (f FilterFunc[T]) Filter(seq iter.Seq2[T, error]) iter.Seq2[T, error] {

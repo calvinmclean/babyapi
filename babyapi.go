@@ -194,6 +194,11 @@ func (a *API[T]) SetCustomResponseCode(verb string, code int) *API[T] {
 // SetSearchResponseWrapper sets a function that can create a custom response for Search.
 // This function receives an iterator and can either collect results or stream them for memory-efficient
 // handling of large datasets and pagination support.
+//
+// IMPORTANT: The searchResponder is responsible for iterating through the iterator and handling any errors.
+// If an error is encountered, the searchResponder should handle it appropriately (e.g., by returning nil
+// or an error response). The framework will not automatically handle errors from the iterator when using
+// a custom response wrapper. Use CollectIterator to easily collect all results with error handling.
 func (a *API[T]) SetSearchResponseWrapper(searchResponder func(iter.Seq2[T, error]) render.Renderer) *API[T] {
 	a.panicIfReadOnly()
 

@@ -912,12 +912,8 @@ func TestAPIModifierErrors(t *testing.T) {
 		w := babytest.TestRequest[*Album](t, api, r)
 		require.Equal(t, http.StatusUnprocessableEntity, w.Result().StatusCode)
 
-		var allAlbums []*Album
-		for a, err := range api.Storage.Search(context.Background(), "", nil) {
-			require.NoError(t, err)
-			allAlbums = append(allAlbums, a)
-		}
-
+		allAlbums, err := babyapi.CollectIterator(api.Storage.Search(context.Background(), "", nil))
+		require.NoError(t, err)
 		require.Equal(t, 0, len(allAlbums))
 	})
 
@@ -936,12 +932,8 @@ func TestAPIModifierErrors(t *testing.T) {
 		w := babytest.TestRequest[*Album](t, api, r)
 		require.Equal(t, http.StatusUnprocessableEntity, w.Result().StatusCode)
 
-		var allAlbums []*Album
-		for a, err := range api.Storage.Search(context.Background(), "", nil) {
-			require.NoError(t, err)
-			allAlbums = append(allAlbums, a)
-		}
-
+		allAlbums, err := babyapi.CollectIterator(api.Storage.Search(context.Background(), "", nil))
+		require.NoError(t, err)
 		require.Greater(t, len(allAlbums), 0)
 	})
 
@@ -981,12 +973,8 @@ func TestAPIModifierErrors(t *testing.T) {
 
 			require.Equal(t, http.StatusUnprocessableEntity, w.Result().StatusCode)
 
-			var allAlbums []*Album
-			for a, err := range api.Storage.Search(context.Background(), "", nil) {
-				require.NoError(t, err)
-				allAlbums = append(allAlbums, a)
-			}
-
+			allAlbums, err := babyapi.CollectIterator(api.Storage.Search(context.Background(), "", nil))
+			require.NoError(t, err)
 			require.Equal(t, len(allAlbums), 1)
 		})
 	})
@@ -1006,12 +994,8 @@ func TestAPIModifierErrors(t *testing.T) {
 			r.Header.Add("Content-Type", "application/json")
 			babytest.TestRequest[*Album](t, api, r)
 
-			var allAlbums []*Album
-			for a, err := range api.Storage.Search(context.Background(), "", nil) {
-				require.NoError(t, err)
-				allAlbums = append(allAlbums, a)
-			}
-
+			allAlbums, err := babyapi.CollectIterator(api.Storage.Search(context.Background(), "", nil))
+			require.NoError(t, err)
 			require.Greater(t, len(allAlbums), 0)
 		})
 
@@ -1023,11 +1007,8 @@ func TestAPIModifierErrors(t *testing.T) {
 
 			require.Equal(t, http.StatusUnprocessableEntity, w.Result().StatusCode)
 
-			var allAlbums []*Album
-			for a, err := range api.Storage.Search(context.Background(), "", nil) {
-				require.NoError(t, err)
-				allAlbums = append(allAlbums, a)
-			}
+			allAlbums, err := babyapi.CollectIterator(api.Storage.Search(context.Background(), "", nil))
+			require.NoError(t, err)
 			afterCount := len(allAlbums)
 
 			require.Less(t, afterCount, 1)
