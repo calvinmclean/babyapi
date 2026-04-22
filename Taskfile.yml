@@ -20,3 +20,14 @@ tasks:
   gofumpt:
     desc: Run gofumpt to format
     cmd: gofumpt -w .
+
+  build-examples:
+    desc: Build all example binaries to /tmp
+    silent: true
+    cmds:
+      - |
+        for dir in examples/*/; do
+          name=$(basename "$dir")
+          echo "Building $name"
+          cd ./$dir && go build -o /tmp/babyapi-example-$name && cd -
+        done
