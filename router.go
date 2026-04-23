@@ -201,23 +201,29 @@ func (a *API[T]) defaultSearch() http.HandlerFunc {
 
 		parentID := a.GetParentIDParam(r)
 
-		resources, err := a.Storage.Search(r.Context(), parentID, r.URL.Query())
-		if err != nil {
-			logger.Error("error getting resources", "error", err)
-			return InternalServerError(err)
-		}
+		seq := a.Storage.Search(r.Context(), parentID, r.URL.Query())
 
-		resources = a.searchFilter(r).Filter(resources)
-		logger.Debug("responding with resources", "count", len(resources))
+		filtered := a.searchFilter(r).Filter(seq)
 
 		var resp render.Renderer
+
 		if a.searchResponseWrapper != nil {
-			resp = a.searchResponseWrapper(resources)
+			resp = a.searchResponseWrapper(filtered)
 		} else {
 			items := []render.Renderer{}
-			for _, item := range resources {
-				items = append(items, a.responseWrapper(item))
+			var collectErr error
+			for t, err := range filtered {
+				if err != nil {
+					collectErr = err
+					break
+				}
+				items = append(items, a.responseWrapper(t))
 			}
+			if collectErr != nil {
+				logger.Error("error collecting resources", "error", collectErr)
+				return InternalServerError(collectErr)
+			}
+			logger.Debug("responding with resources", "count", len(items))
 			resp = &ResourceList[render.Renderer]{Items: items}
 		}
 

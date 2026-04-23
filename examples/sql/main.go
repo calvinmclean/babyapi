@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"iter"
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/calvinmclean/babyapi"
@@ -87,26 +89,46 @@ func (s Storage) Get(ctx context.Context, id string) (*Author, error) {
 	return &Author{a}, nil
 }
 
-func (s Storage) Search(ctx context.Context, _ string, query url.Values) ([]*Author, error) {
-	var authors []db.Author
-	var err error
-
-	genre := query.Get("genre")
-	if genre != "" {
-		authors, err = s.Queries.SearchAuthors(ctx, genre)
-	} else {
-		authors, err = s.Queries.ListAuthors(ctx)
+func parseInt64(s string) int64 {
+	n, _ := strconv.ParseInt(s, 10, 64)
+	if n < 0 {
+		return 0
 	}
-	if err != nil {
-		return nil, err
-	}
+	return n
+}
 
-	var result []*Author
-	for _, a := range authors {
-		result = append(result, &Author{a})
-	}
+func (s Storage) Search(ctx context.Context, _ string, query url.Values) iter.Seq2[*Author, error] {
+	return func(yield func(*Author, error) bool) {
+		genre := query.Get("genre")
+		limit := parseInt64(query.Get("limit"))
+		offset := parseInt64(query.Get("offset"))
 
-	return result, nil
+		var authors []db.Author
+		var err error
+
+		if genre != "" {
+			authors, err = s.Queries.SearchAuthors(ctx, db.SearchAuthorsParams{
+				Genre:  genre,
+				Limit:  limit,
+				Offset: offset,
+			})
+		} else {
+			authors, err = s.Queries.ListAuthors(ctx, db.ListAuthorsParams{
+				Limit:  limit,
+				Offset: offset,
+			})
+		}
+		if err != nil {
+			yield(nil, err)
+			return
+		}
+
+		for _, a := range authors {
+			if !yield(&Author{a}, nil) {
+				return
+			}
+		}
+	}
 }
 
 func (s Storage) Set(ctx context.Context, a *Author) error {
@@ -141,17 +163,27 @@ func (s BookStorage) Get(ctx context.Context, id string) (*Book, error) {
 	return &Book{b}, nil
 }
 
-func (s BookStorage) Search(ctx context.Context, authorID string, query url.Values) ([]*Book, error) {
-	books, err := s.Queries.ListBooksByAuthor(ctx, authorID)
-	if err != nil {
-		return nil, err
-	}
+func (s BookStorage) Search(ctx context.Context, authorID string, query url.Values) iter.Seq2[*Book, error] {
+	return func(yield func(*Book, error) bool) {
+		limit := parseInt64(query.Get("limit"))
+		offset := parseInt64(query.Get("offset"))
 
-	var result []*Book
-	for _, b := range books {
-		result = append(result, &Book{b})
+		books, err := s.Queries.ListBooksByAuthor(ctx, db.ListBooksByAuthorParams{
+			AuthorID: authorID,
+			Limit:    limit,
+			Offset:   offset,
+		})
+		if err != nil {
+			yield(nil, err)
+			return
+		}
+
+		for _, b := range books {
+			if !yield(&Book{b}, nil) {
+				return
+			}
+		}
 	}
-	return result, nil
 }
 
 func (s BookStorage) Set(ctx context.Context, b *Book) error {

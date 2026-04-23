@@ -166,7 +166,7 @@ func (m mcpServer[T]) search(ctx context.Context, request mcp.CallToolRequest) (
 		}
 	}
 
-	items, err := m.storage.Search(ctx, parentID, values)
+	items, err := CollectIterator(m.storage.Search(ctx, parentID, values))
 	if err != nil {
 		return nil, err
 	}
