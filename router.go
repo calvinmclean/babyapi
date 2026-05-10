@@ -31,10 +31,10 @@ type BuilderError struct {
 
 func (e BuilderError) Error() string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("encountered %d errors constructing API:\n", len(e.errors)))
+	fmt.Fprintf(&sb, "encountered %d errors constructing API:\n", len(e.errors))
 
 	for _, err := range e.errors {
-		sb.WriteString(fmt.Sprintf("- %v\n", err))
+		fmt.Fprintf(&sb, "- %v\n", err)
 	}
 
 	return sb.String()
@@ -246,7 +246,7 @@ func (a *API[T]) defaultPost() http.HandlerFunc {
 		}
 
 		logger.Info("storing resource", "resource", resource)
-		err := a.Storage.Set(r.Context(), resource)
+		err := a.Set(r.Context(), resource)
 		if err != nil {
 			logger.Error("error storing resource", "error", err)
 			if httpErr, ok := errors.AsType[*ErrResponse](err); ok {
@@ -280,7 +280,7 @@ func (a *API[T]) defaultPut() http.HandlerFunc {
 		}
 
 		logger.Info("storing resource", "resource", resource)
-		err := a.Storage.Set(r.Context(), resource)
+		err := a.Set(r.Context(), resource)
 		if err != nil {
 			logger.Error("error storing resource", "error", err)
 			if httpErr, ok := errors.AsType[*ErrResponse](err); ok {
@@ -328,7 +328,7 @@ func (a *API[T]) defaultPatch() http.HandlerFunc {
 
 		logger.Info("storing updated resource", "resource", resource)
 
-		err := a.Storage.Set(r.Context(), resource)
+		err := a.Set(r.Context(), resource)
 		if err != nil {
 			logger.Error("error storing updated resource", "error", err)
 			if httpErr, ok := errors.AsType[*ErrResponse](err); ok {

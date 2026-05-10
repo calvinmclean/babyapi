@@ -58,5 +58,8 @@ func main() {
 		log.Printf("received data: %+v\n", dataResponse.Data.Data)
 	}()
 
-	http.ListenAndServe(":8080", nil)
+	err := http.ListenAndServe(":8080", nil)
+	if err != nil {
+		log.Printf("error serving: %v\n", err)
+	}
 }

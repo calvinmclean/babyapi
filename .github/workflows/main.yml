@@ -30,7 +30,6 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.11
-          args: --new-from-merge-base=main
 
   unit_test:
     runs-on: ubuntu-latest

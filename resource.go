@@ -116,18 +116,18 @@ func NewID() ID {
 func (id *ID) Bind(r *http.Request) error {
 	switch r.Method {
 	case http.MethodPost:
-		if !id.ID.IsNil() {
+		if !id.IsNil() {
 			return errors.New("unable to manually set ID")
 		}
 
 		id.ID = xid.New()
 		fallthrough
 	case http.MethodPut:
-		if id.ID.IsNil() {
+		if id.IsNil() {
 			return errors.New("missing required id field")
 		}
 	case http.MethodPatch:
-		if !id.ID.IsNil() {
+		if !id.IsNil() {
 			return errors.New("updating ID is not allowed")
 		}
 	}

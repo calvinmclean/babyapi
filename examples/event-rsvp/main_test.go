@@ -12,7 +12,9 @@ import (
 )
 
 func TestAPI(t *testing.T) {
-	defer os.RemoveAll("storage.json")
+	defer func() {
+		_ = os.RemoveAll("storage.json")
+	}()
 
 	api := createAPI()
 
@@ -292,7 +294,9 @@ func TestAPI(t *testing.T) {
 }
 
 func TestIndividualTest(t *testing.T) {
-	defer os.RemoveAll("storage.json")
+	defer func() {
+		_ = os.RemoveAll("storage.json")
+	}()
 
 	api := createAPI()
 

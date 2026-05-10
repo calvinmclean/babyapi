@@ -588,13 +588,13 @@ func TestCLI(t *testing.T) {
 
 	// Create hard-coded album so we can use the ID
 	album := &Album{DefaultResource: babyapi.NewDefaultResource(), Title: "New Album"}
-	album.DefaultResource.ID.ID, _ = xid.FromString("cljcqg5o402e9s28rbp0")
+	album.ID.ID, _ = xid.FromString("cljcqg5o402e9s28rbp0")
 	_, err := api.Client(address).Put(context.Background(), album)
 	require.NoError(t, err)
 
 	// Create hard-coded song so we can use the ID
 	song := &Song{DefaultResource: babyapi.NewDefaultResource(), Title: "NewSong"}
-	song.DefaultResource.ID.ID, _ = xid.FromString("clknc0do4023onrn3bqg")
+	song.ID.ID, _ = xid.FromString("clknc0do4023onrn3bqg")
 	songClient := babyapi.NewSubClient[*Album, *Song](api.Client(address), "/songs")
 	_, err = songClient.Put(context.Background(), song, album.GetID())
 	require.NoError(t, err)
@@ -698,7 +698,7 @@ func TestHTML(t *testing.T) {
 	client := api.Client(address)
 
 	t.Run("CreateItem", func(t *testing.T) {
-		err := api.Storage.Set(context.Background(), item1)
+		err := api.Set(context.Background(), item1)
 		require.NoError(t, err)
 	})
 
@@ -761,7 +761,7 @@ func TestServerSentEvents(t *testing.T) {
 		Content:         "Item1",
 	}
 	t.Run("CreateItem", func(t *testing.T) {
-		err := api.Storage.Set(context.Background(), item1)
+		err := api.Set(context.Background(), item1)
 		require.NoError(t, err)
 	})
 
@@ -783,7 +783,9 @@ func TestServerSentEvents(t *testing.T) {
 		response, err := http.Get(address + "/items/events")
 		quitTest <- true
 		require.NoError(t, err)
-		defer response.Body.Close()
+		defer func() {
+			_ = response.Body.Close()
+		}()
 
 		require.Equal(t, http.StatusOK, response.StatusCode)
 
@@ -1298,13 +1300,13 @@ func TestRootAPICLI(t *testing.T) {
 
 			// Create hard-coded musicVideo so we can use the ID
 			musicVideo := &MusicVideo{DefaultResource: babyapi.NewDefaultResource(), Title: "New Video"}
-			musicVideo.DefaultResource.ID.ID, _ = xid.FromString("cljcqg5o402e9s28rbp0")
+			musicVideo.ID.ID, _ = xid.FromString("cljcqg5o402e9s28rbp0")
 			_, err := musicVideoAPI.Client(address).Put(context.Background(), musicVideo)
 			require.NoError(t, err)
 
 			// Create hard-coded song so we can use the ID
 			song := &Song{DefaultResource: babyapi.NewDefaultResource(), Title: "NewSong"}
-			song.DefaultResource.ID.ID, _ = xid.FromString("clknc0do4023onrn3bqg")
+			song.ID.ID, _ = xid.FromString("clknc0do4023onrn3bqg")
 			_, err = songAPI.Client(address).Put(context.Background(), song)
 			require.NoError(t, err)
 
