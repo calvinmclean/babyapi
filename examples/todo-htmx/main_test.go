@@ -10,9 +10,11 @@ import (
 )
 
 func TestAPI(t *testing.T) {
-	defer os.RemoveAll("storage.json")
+	defer func() {
+		_ = os.RemoveAll("storage.json")
+	}()
 
-	os.Setenv("STORAGE_FILE", "storage.json")
+	_ = os.Setenv("STORAGE_FILE", "storage.json")
 	api := createAPI()
 
 	babytest.RunTableTest(t, api, []babytest.TestCase[*babyapi.AnyResource]{

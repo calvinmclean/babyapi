@@ -184,6 +184,9 @@ func GetFromRequest[T RendererBinder](r *http.Request, instance func() T) (T, *E
 	resource = instance()
 	err := render.Bind(r, resource)
 	if err != nil {
+		if httpErr, ok := errors.AsType[*ErrResponse](err); ok {
+			return *new(T), httpErr
+		}
 		// By default, curl uses "Content-Type: application/x-www-form-urlencoded" which results in poor UX for
 		// JSON requests due to an unclear error
 		if strings.Contains(err.Error(), "doesn't exist in") {
@@ -201,6 +204,9 @@ func (a *API[T]) GetRequestedResource(r *http.Request) (T, *ErrResponse) {
 
 	resource, err := a.Storage.Get(r.Context(), id)
 	if err != nil {
+		if httpErr, ok := errors.AsType[*ErrResponse](err); ok {
+			return *new(T), httpErr
+		}
 		if errors.Is(err, ErrNotFound) {
 			return *new(T), ErrNotFoundResponse
 		}

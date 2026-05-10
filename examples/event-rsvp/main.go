@@ -94,7 +94,7 @@ func (api *API) rsvp(_ http.ResponseWriter, r *http.Request, invite *Invite) (re
 	rsvp := r.Form.Get("RSVP") == "true"
 	invite.RSVP = &rsvp
 
-	err := api.Invites.Storage.Set(r.Context(), invite)
+	err := api.Invites.Set(r.Context(), invite)
 	if err != nil {
 		return nil, babyapi.InternalServerError(err)
 	}
@@ -132,7 +132,7 @@ func (api *API) addBulkInvites(_ http.ResponseWriter, r *http.Request, event *Ev
 		}
 		invites = append(invites, inv)
 
-		err := api.Invites.Storage.Set(r.Context(), inv)
+		err := api.Invites.Set(r.Context(), inv)
 		if err != nil {
 			return nil, babyapi.InternalServerError(err)
 		}

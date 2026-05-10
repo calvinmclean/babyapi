@@ -26,7 +26,7 @@ func (p *Pokemon) String() string {
 	var sb strings.Builder
 
 	writef := func(format string, a ...any) {
-		sb.WriteString(fmt.Sprintf(format, a...))
+		fmt.Fprintf(&sb, format, a...)
 	}
 
 	var types []string

@@ -105,22 +105,22 @@ func (tt TestCase[T]) run(t *testing.T, client *babyapi.Client[T], getResponse P
 
 // assertError returns true when the err is a *babyapi.ErrResponse since we compare the body here and want to skip assertBody
 func (tt TestCase[T]) assertError(t *testing.T, err error) bool {
-	if tt.ExpectedResponse.Error == "" {
+	if tt.Error == "" {
 		require.NoError(t, err)
 		return false
 	}
 
 	require.Error(t, err)
-	require.Equal(t, tt.ExpectedResponse.Error, err.Error())
+	require.Equal(t, tt.Error, err.Error())
 
 	var errResp *babyapi.ErrResponse
 	if errors.As(err, &errResp) {
-		require.Equal(t, tt.ExpectedResponse.Status, errResp.HTTPStatusCode)
+		require.Equal(t, tt.Status, errResp.HTTPStatusCode)
 
 		// Compare JSON response to expected Body
 		data, jsonErr := json.Marshal(errResp)
 		require.NoError(t, jsonErr)
-		require.Equal(t, tt.ExpectedResponse.Body, string(data))
+		require.Equal(t, tt.Body, string(data))
 
 		return true
 	}
@@ -136,25 +136,25 @@ func (tt TestCase[T]) assertResponse(t *testing.T, r *Response[T]) {
 		body = r.SearchResponse.Body
 		resp = r.SearchResponse.Response
 	case r.Response != nil:
-		body = r.Response.Body
+		body = r.Body
 		resp = r.Response.Response
 	}
 
 	require.NotNil(t, r)
 
-	require.Equal(t, tt.ExpectedResponse.Status, resp.StatusCode)
+	require.Equal(t, tt.Status, resp.StatusCode)
 
 	switch {
 	case tt.NoBody:
 		require.Equal(t, http.NoBody, resp.Body)
 		require.Equal(t, "", body)
 	case tt.BodyRegexp != "":
-		require.Regexp(t, tt.ExpectedResponse.BodyRegexp, strings.TrimSpace(body))
+		require.Regexp(t, tt.BodyRegexp, strings.TrimSpace(body))
 	case tt.Body != "":
 		if r == nil {
 			t.Error("response is nil")
 			return
 		}
-		require.Equal(t, tt.ExpectedResponse.Body, strings.TrimSpace(body))
+		require.Equal(t, tt.Body, strings.TrimSpace(body))
 	}
 }

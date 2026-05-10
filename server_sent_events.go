@@ -63,7 +63,7 @@ type ServerSentEvent struct {
 // Write will write the ServerSentEvent to the HTTP response stream and flush. It removes all newlines
 // in the event data
 func (sse *ServerSentEvent) Write(w http.ResponseWriter) {
-	fmt.Fprintf(w, "event: %s\ndata: %s\n\n", sse.Event, strings.ReplaceAll(sse.Data, "\n", ""))
+	_, _ = fmt.Fprintf(w, "event: %s\ndata: %s\n\n", sse.Event, strings.ReplaceAll(sse.Data, "\n", ""))
 	if f, ok := w.(http.Flusher); ok {
 		f.Flush()
 	}

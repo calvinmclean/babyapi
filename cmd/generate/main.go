@@ -46,7 +46,7 @@ func findFunctionsNeedingPanic(pass *analysis.Pass, file *ast.File) {
 			return true
 		}
 
-		if !(isAPIType(recvType) && isAPIType(returnType)) {
+		if !isAPIType(recvType) || !isAPIType(returnType) {
 			return true
 		}
 
